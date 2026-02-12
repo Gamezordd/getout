@@ -1,0 +1,56 @@
+﻿import type { NextApiRequest, NextApiResponse } from "next";
+import type { VotesByVenue } from "../../lib/types";
+import { getGroup, saveGroup } from "../../lib/groupStore";
+import { pusher } from "../../lib/pusherServer";
+
+type VoteRequest = {
+  sessionId: string;
+  userId: string;
+  venueId: string;
+};
+
+const safeTrigger = async (channel: string, event: string, payload: unknown) => {
+  if (!process.env.PUSHER_APP_ID) return;
+  try {
+    await pusher.trigger(channel, event, payload);
+  } catch {
+    // Ignore realtime errors.
+  }
+};
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== "POST") {
+    res.setHeader("Allow", "POST");
+    return res.status(405).json({ message: "Method not allowed" });
+  }
+
+  const payload = req.body as VoteRequest;
+  if (!payload?.sessionId || !payload.userId || !payload.venueId) {
+    return res.status(400).json({ message: "Missing vote details." });
+  }
+
+  const group = await getGroup(payload.sessionId);
+  const votes: VotesByVenue = group.votes || {};
+
+  // Remove existing vote from any venue.
+  Object.keys(votes).forEach((venueId) => {
+    votes[venueId] = votes[venueId].filter((id) => id !== payload.userId);
+  });
+
+  if (!votes[payload.venueId]) {
+    votes[payload.venueId] = [];
+  }
+  if (!votes[payload.venueId].includes(payload.userId)) {
+    votes[payload.venueId].push(payload.userId);
+  }
+
+  group.votes = votes;
+  await saveGroup(payload.sessionId, group);
+
+  await safeTrigger(`group-${payload.sessionId}`, "votes-updated", {
+    venueId: payload.venueId,
+    userId: payload.userId
+  });
+
+  return res.status(200).json({ votes: group.votes });
+}
