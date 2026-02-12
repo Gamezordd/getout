@@ -389,7 +389,7 @@ export default function Home() {
   }, [sessionId, loadGroup, fetchSuggestions]);
 
   return (
-    <div className="relative min-h-screen bg-mist">
+    <div className="relative h-screen overflow-hidden bg-mist">
       <header className="fixed inset-x-0 top-0 z-10 bg-white/90 px-4 py-2.5 shadow-sm backdrop-blur">
         <div className="flex items-center justify-between gap-3">
           <h1 className="text-base font-semibold text-ink">GetOut Planner</h1>
@@ -405,8 +405,8 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="pt-16">
-        <div className="h-[56vh] w-full">
+      <main className="h-full pt-16">
+        <div className="h-full w-full">
           <MapView
             users={users}
             suggestedVenues={topVenues}
@@ -414,111 +414,13 @@ export default function Home() {
             onError={setMapError}
           />
         </div>
-
-        {(mapError || groupError || suggestionWarning) && (
-          <div className="mx-5 mt-3 rounded-2xl bg-amber-50 px-4 py-3 text-xs text-amber-800">
-            {mapError || groupError || suggestionWarning}
-          </div>
-        )}
-
-        <div className="mx-5 mt-5 space-y-5 pb-32">
-          {users.length === 0 ? (
-            <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-5 text-center shadow-sm">
-              <p className="text-sm font-semibold text-ink">Join this meetup</p>
-              <p className="mt-2 text-xs text-slate-500">
-                Add yourself with a planning location to get group ETAs.
-              </p>
-              <button
-                type="button"
-                onClick={() => setJoining(true)}
-                className="mt-4 rounded-full bg-ink px-5 py-3 text-xs font-semibold text-white"
-              >
-                Add my location
-              </button>
-            </div>
-          ) : (
-            <div className="rounded-3xl bg-white p-5 shadow-sm">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-semibold text-ink">Planning locations</p>
-                <button
-                  type="button"
-                  onClick={() => setJoining(true)}
-                  className="text-xs font-semibold text-slate-500"
-                >
-                  + Add yourself
-                </button>
-              </div>
-              <div className="mt-4 flex flex-wrap gap-3">
-                {users.map((user) => (
-                  <div
-                    key={user.id}
-                    className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-ink"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => handleEditUser(user.id)}
-                      className="flex items-center gap-2"
-                    >
-                      <img src={user.avatarUrl} alt={user.name} className="h-6 w-6 rounded-full" />
-                      {user.name}
-                    </button>
-                    {isOwner && (
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveUser(user.id)}
-                        className="rounded-full border border-slate-200 px-2 py-1 text-[10px] text-slate-500"
-                      >
-                        Remove
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="rounded-3xl bg-white p-5 shadow-sm">
-            <PlaceSearch
-              label="Add a manual venue"
-              placeholder="Search for a specific bar"
-              onSelect={handleAddManualVenue}
-            />
-            {manualVenues.length > 0 && (
-              <div className="mt-4 space-y-2">
-                {manualVenues.map((venue) => (
-                  <div
-                    key={venue.id}
-                    className="flex items-center justify-between rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm"
-                  >
-                    <div>
-                      <p className="font-semibold text-ink">{venue.name}</p>
-                      <p className="text-xs text-slate-500">{venue.address}</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveManualVenue(venue.id)}
-                      className="text-xs font-semibold text-slate-500"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="rounded-3xl bg-white p-5 shadow-sm">
-            <p className="text-sm font-semibold text-ink">Suggested bars</p>
-            <p className="mt-2 text-xs text-slate-500">
-              Suggestions are based on group centroid, 4.5+ rating, 200+ reviews, and lowest
-              total drive time.
-            </p>
-            {topVenues.length === 0 && (
-              <p className="mt-3 text-xs text-slate-500">No suggestions yet.</p>
-            )}
-          </div>
-        </div>
       </main>
+
+      {(mapError || groupError || suggestionWarning) && (
+        <div className="pointer-events-none fixed inset-x-4 top-16 z-20 rounded-2xl bg-amber-50 px-4 py-3 text-xs text-amber-800">
+          {mapError || groupError || suggestionWarning}
+        </div>
+      )}
 
       {joining && (
         <div className="fixed inset-0 z-30 flex items-end bg-black/40">
@@ -608,13 +510,19 @@ export default function Home() {
         users={users}
         venues={venues}
         suggestedVenues={suggestedVenues}
+        manualVenues={manualVenues}
         etaMatrix={etaMatrix}
         totalsByVenue={totalsByVenue}
         votes={votes}
         currentUserId={currentUserId}
+        isOwner={isOwner}
         etaError={etaError}
         onEditUser={handleEditUser}
         onVote={handleVote}
+        onAddSelf={() => setJoining(true)}
+        onRemoveUser={handleRemoveUser}
+        onAddManualVenue={handleAddManualVenue}
+        onRemoveManualVenue={handleRemoveManualVenue}
       />
     </div>
   );
