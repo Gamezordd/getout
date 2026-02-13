@@ -24,7 +24,7 @@ function HomePage() {
       typeof router.query.sessionId === "string" ? router.query.sessionId : null;
 
     if (!sessionId) {
-      router.replace({ pathname: "/join" }, undefined, { shallow: true });
+      router.replace({ pathname: "/create" }, undefined, { shallow: true });
       return;
     }
 
@@ -41,7 +41,6 @@ function HomePage() {
   }, [router, router.isReady, store.currentUserId, store.sessionId]);
 
   useEffect(() => {
-    console.log("URL venueId:", router.query.venueId, "Selected venueId:", store.selectedVenueId);
     if (!router.isReady) return;
     const venueIdFromUrl =
       typeof router.query.venueId === "string" ? router.query.venueId : null;
@@ -293,7 +292,6 @@ function HomePage() {
 
       <BottomDrawer
         users={store.users}
-        venues={store.venues}
         suggestedVenues={store.suggestedVenues}
         manualVenues={store.manualVenues}
         selectedVenue={store.selectedVenue}
@@ -306,7 +304,6 @@ function HomePage() {
         etaError={store.etaError}
         onEditUser={setEditingUserId}
         onVote={store.vote}
-        onAddSelf={handleAddSelf}
         onRemoveUser={store.removeUser}
         onRemoveManualVenue={store.removeManualVenue}
       />

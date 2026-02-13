@@ -1,5 +1,5 @@
 ﻿import type { NextApiRequest, NextApiResponse } from "next";
-import type { LatLng, User, Venue, VotesByVenue } from "../../lib/types";
+import type { LatLng, User, Venue, VenueCategory, VotesByVenue } from "../../lib/types";
 import { getGroup, saveGroup, type GroupPayload } from "../../lib/groupStore";
 import { pusher } from "../../lib/pusherServer";
 
@@ -14,6 +14,7 @@ type JoinRequest = {
   sessionId: string;
   name: string;
   location: LatLng;
+  venueCategory?: VenueCategory;
 };
 
 type SetManualVenuesRequest = {
@@ -62,6 +63,7 @@ type GroupResponse = {
   venues: Venue[];
   manualVenues: Venue[];
   votes: VotesByVenue;
+  venueCategory: VenueCategory | null;
   currentUserId?: string;
 };
 
@@ -70,11 +72,20 @@ const buildAvatarUrl = (name: string) => {
   return `https://api.dicebear.com/7.x/thumbs/svg?seed=${seed}`;
 };
 
+const ALLOWED_CATEGORIES = new Set<VenueCategory>([
+  "bar",
+  "restaurant",
+  "cafe",
+  "night_club",
+  "brewery"
+]);
+
 const toResponse = (group: GroupPayload, currentUserId?: string): GroupResponse => ({
   users: group.users,
   venues: group.venues,
   manualVenues: group.manualVenues,
   votes: group.votes,
+  venueCategory: group.venueCategory,
   currentUserId
 });
 
@@ -124,6 +135,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (payload.action === "join") {
     if (!payload.name || !payload.location) {
       return res.status(400).json({ message: "Name and location are required." });
+    }
+    if (payload.venueCategory && !ALLOWED_CATEGORIES.has(payload.venueCategory)) {
+      return res.status(400).json({ message: "Unsupported venue category." });
+    }
+    if (group.venueCategory && payload.venueCategory && payload.venueCategory !== group.venueCategory) {
+      return res.status(400).json({ message: "Venue category is already locked for this group." });
+    }
+    if (!group.venueCategory && payload.venueCategory) {
+      group.venueCategory = payload.venueCategory;
     }
 
     const user: User = {

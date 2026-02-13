@@ -1,5 +1,5 @@
 import { makeAutoObservable, runInAction } from "mobx";
-import type { EtaMatrix, LatLng, TotalsByVenue, User, Venue, VotesByVenue } from "../types";
+import type { EtaMatrix, LatLng, TotalsByVenue, User, Venue, VenueCategory, VotesByVenue } from "../types";
 
 const OWNER_KEY_PREFIX = "getout-owner-";
 const USER_KEY_PREFIX = "getout-user-";
@@ -9,6 +9,7 @@ type GroupPayload = {
   venues: Venue[];
   manualVenues?: Venue[];
   votes?: VotesByVenue;
+  venueCategory?: VenueCategory | null;
   currentUserId?: string;
 };
 
@@ -45,6 +46,7 @@ export class AppStore {
   suggestedVenues: Venue[] = [];
   totalsByVenue: TotalsByVenue = {};
   votes: VotesByVenue = {};
+  venueCategory: VenueCategory | null = null;
   selectedVenueId: string | null = null;
   groupError: string | null = null;
   copyStatus: string | null = null;
@@ -88,6 +90,7 @@ export class AppStore {
 
   setSession(sessionId: string, pathname = "/") {
     this.sessionId = sessionId;
+    this.venueCategory = null;
     if (typeof window !== "undefined") {
       this.shareUrl = `${window.location.origin}${pathname}?sessionId=${sessionId}`;
       const storedOwner = localStorage.getItem(`${OWNER_KEY_PREFIX}${sessionId}`);
@@ -136,6 +139,7 @@ export class AppStore {
         this.users = data.users || [];
         this.manualVenues = data.manualVenues || [];
         this.votes = data.votes || {};
+        this.venueCategory = data.venueCategory || null;
         if (data.currentUserId && this.sessionId) {
           localStorage.setItem(`${USER_KEY_PREFIX}${this.sessionId}`, data.currentUserId);
           this.currentUserId = data.currentUserId;
@@ -320,7 +324,7 @@ export class AppStore {
     }
   }
 
-  async joinGroup(name: string, location: LatLng) {
+  async joinGroup(name: string, location: LatLng, venueCategory?: VenueCategory) {
     if (!this.sessionId) {
       throw new Error("Missing session. Open this page from a group link.");
     }
@@ -331,7 +335,8 @@ export class AppStore {
         action: "join",
         sessionId: this.sessionId,
         name: name.trim(),
-        location
+        location,
+        venueCategory
       })
     });
     if (!response.ok) {

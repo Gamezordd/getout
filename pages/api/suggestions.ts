@@ -1,5 +1,5 @@
 ﻿import type { NextApiRequest, NextApiResponse } from "next";
-import type { EtaMatrix, LatLng, TotalsByVenue, Venue } from "../../lib/types";
+import type { EtaMatrix, LatLng, TotalsByVenue, Venue, VenueCategory } from "../../lib/types";
 import { getGroup, saveGroup } from "../../lib/groupStore";
 
 type SuggestionsResponse = {
@@ -37,7 +37,7 @@ const buildCacheKey = (sessionId: string, points: LatLng[], manualVenues: Venue[
   return `${sessionId}:${coords}:${manual}`;
 };
 
-const fetchTopBars = async (centroid: LatLng, apiKey: string) => {
+const fetchTopPlaces = async (centroid: LatLng, apiKey: string, venueCategory: VenueCategory) => {
   const response = await fetch("https://places.googleapis.com/v1/places:searchNearby", {
     method: "POST",
     headers: {
@@ -47,7 +47,7 @@ const fetchTopBars = async (centroid: LatLng, apiKey: string) => {
         "places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount"
     },
     body: JSON.stringify({
-      includedTypes: ["bar"],
+      includedTypes: [venueCategory],
       maxResultCount: 20,
       rankPreference: "POPULARITY",
       locationRestriction: {
@@ -72,7 +72,7 @@ const fetchTopBars = async (centroid: LatLng, apiKey: string) => {
       if (!location) return null;
       return {
         id: place.id,
-        name: place.displayName?.text || "Unknown bar",
+        name: place.displayName?.text || "Unknown place",
         address: place.formattedAddress,
         location: { lat: location.latitude, lng: location.longitude },
         rating: place.rating || 0,
@@ -150,7 +150,8 @@ export default async function handler(
 
   try {
     const centroid = computeCentroid(group.users.map((user) => user.location));
-    const candidates = await fetchTopBars(centroid, apiKey);
+    const category = group.venueCategory || "bar";
+    const candidates = await fetchTopPlaces(centroid, apiKey, category);
 
     const manualVenues = group.manualVenues || [];
     const combinedDestinations = [...manualVenues, ...candidates].reduce<Venue[]>((acc, venue) => {
@@ -166,7 +167,7 @@ export default async function handler(
         suggestedVenues: [],
         etaMatrix: {},
         totalsByVenue: {},
-        warning: "No bars matched the rating and review filters."
+        warning: "No places matched the rating and review filters."
       };
       suggestionsCache.set(cacheKey, { timestamp: Date.now(), payload });
       return res.status(200).json(payload);

@@ -22,3 +22,10 @@ export type EtaMatrix = Record<string, Record<string, number>>;
 export type TotalsByVenue = Record<string, number>;
 
 export type VotesByVenue = Record<string, string[]>;
+
+export type VenueCategory =
+  | "bar"
+  | "restaurant"
+  | "cafe"
+  | "night_club"
+  | "brewery";

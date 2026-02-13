@@ -4,7 +4,6 @@ import type { EtaMatrix, TotalsByVenue, User, Venue, VotesByVenue } from "../lib
 
 type Props = {
   users: User[];
-  venues: Venue[];
   suggestedVenues: Venue[];
   manualVenues: Venue[];
   selectedVenue: Venue | null;
@@ -17,14 +16,12 @@ type Props = {
   etaError?: string | null;
   onEditUser: (userId: string) => void;
   onVote: (venueId: string) => void;
-  onAddSelf: () => void;
   onRemoveUser: (userId: string) => void;
   onRemoveManualVenue: (venueId: string) => void;
 };
 
 export default function BottomDrawer({
   users,
-  venues,
   suggestedVenues,
   manualVenues,
   selectedVenue,
@@ -37,7 +34,6 @@ export default function BottomDrawer({
   etaError,
   onEditUser,
   onVote,
-  onAddSelf,
   onRemoveUser,
   onRemoveManualVenue
 }: Props) {
@@ -137,21 +133,6 @@ export default function BottomDrawer({
                 <section className="flex h-full w-1/2 min-h-0 flex-col pr-2">
                   {etaError && <p className="mb-3 text-xs text-red-600">{etaError}</p>}
                   <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
-                    {!hasCurrentUserLocation && (
-                      <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-5 text-center shadow-sm">
-                        <p className="text-sm font-semibold text-ink">Add your location</p>
-                        <p className="mt-2 text-xs text-slate-500">
-                          Join this group with your planning location to see venue details.
-                        </p>
-                        <button
-                          type="button"
-                          onClick={onAddSelf}
-                          className="mt-4 rounded-full bg-ink px-5 py-3 text-xs font-semibold text-white"
-                        >
-                          Add my location
-                        </button>
-                      </div>
-                    )}
                     {hasCurrentUserLocation && !selectedVenue && (
                       <div className="rounded-3xl bg-white p-5 text-center shadow-sm">
                         <p className="text-sm font-semibold text-ink">Select a venue on the map</p>
@@ -232,32 +213,7 @@ export default function BottomDrawer({
 
                 <section className="flex h-full w-1/2 min-h-0 flex-col pl-2">
                   <div className="min-h-0 flex-1 space-y-5 overflow-y-auto pr-1">
-                    {users.length === 0 ? (
-                      <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-5 text-center shadow-sm">
-                        <p className="text-sm font-semibold text-ink">Join this meetup</p>
-                        <p className="mt-2 text-xs text-slate-500">
-                          Add yourself with a planning location to get group ETAs.
-                        </p>
-                        <button
-                          type="button"
-                          onClick={onAddSelf}
-                          className="mt-4 rounded-full bg-ink px-5 py-3 text-xs font-semibold text-white"
-                        >
-                          Add my location
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="rounded-3xl bg-white p-5 shadow-sm">
-                        <div className="flex items-center justify-between">
-                          <p className="text-sm font-semibold text-ink">Planning locations</p>
-                          <button
-                            type="button"
-                            onClick={onAddSelf}
-                            className="text-xs font-semibold text-slate-500"
-                          >
-                            + Add yourself
-                          </button>
-                        </div>
+                    <div className="rounded-3xl bg-white p-5 shadow-sm">
                         <div className="mt-4 flex flex-wrap gap-3">
                           {users.map((user) => (
                             <div
@@ -285,7 +241,6 @@ export default function BottomDrawer({
                           ))}
                         </div>
                       </div>
-                    )}
 
                     <div className="rounded-3xl bg-white p-5 shadow-sm">
                       <div className="flex items-center justify-between">

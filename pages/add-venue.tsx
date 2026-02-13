@@ -15,7 +15,7 @@ function AddVenuePage() {
   useEffect(() => {
     if (!router.isReady) return;
     if (!sessionId) {
-      router.replace({ pathname: "/join" }, undefined, { shallow: true });
+      router.replace({ pathname: "/create" }, undefined, { shallow: true });
       return;
     }
     store.setSession(sessionId, "/");
