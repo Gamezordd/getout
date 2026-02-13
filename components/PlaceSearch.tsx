@@ -32,33 +32,14 @@ export default function PlaceSearch({ label, placeholder, onSelect }: Props) {
       try {
         setLoading(true);
         setError(null);
-        const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
-        if (!token) {
-          throw new Error("Missing Mapbox token.");
-        }
-
-        const url =
-          "https://api.mapbox.com/geocoding/v5/mapbox.places/" +
-          encodeURIComponent(query) +
-          ".json?access_token=" +
-          token +
-          "&autocomplete=true&limit=5";
-
+        const url = `/api/place-search?q=${encodeURIComponent(query)}`;
         const response = await fetch(url, { signal: controller.signal });
         if (!response.ok) {
           throw new Error("Search failed. Please try again.");
         }
 
         const data = await response.json();
-        const places: PlaceResult[] = (data.features || []).map((feature: any) => ({
-          id: feature.id,
-          name: feature.text,
-          address: feature.place_name,
-          location: {
-            lng: feature.center[0],
-            lat: feature.center[1]
-          }
-        }));
+        const places: PlaceResult[] = Array.isArray(data.results) ? data.results : [];
         setResults(places);
       } catch (err: any) {
         if (err.name !== "AbortError") {
