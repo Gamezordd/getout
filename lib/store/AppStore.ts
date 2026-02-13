@@ -356,9 +356,16 @@ export class AppStore {
   }
 
   async copyShareLink() {
-    if (!this.shareUrl) return;
+    if (!this.shareUrl || !this.sessionId) return;
+    const url = new URL(this.shareUrl);
+    url.searchParams.set("sessionId", this.sessionId);
+    if (this.selectedVenueId) {
+      url.searchParams.set("venueId", this.selectedVenueId);
+    } else {
+      url.searchParams.delete("venueId");
+    }
     try {
-      await navigator.clipboard.writeText(this.shareUrl);
+      await navigator.clipboard.writeText(url.toString());
       this.copyStatus = "Link copied!";
     } catch {
       this.copyStatus = "Copy failed. Long-press to copy.";

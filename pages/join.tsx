@@ -11,6 +11,7 @@ function JoinPage() {
   const [name, setName] = useState("");
   const [location, setLocation] = useState<PlaceResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [locationError, setLocationError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -34,7 +35,7 @@ function JoinPage() {
       return;
     }
     if (!location) {
-      setError("Pick a planning location to join.");
+      setLocationError("Pick a planning location to join.");
       return;
     }
 
@@ -87,11 +88,13 @@ function JoinPage() {
             placeholder="Search for your neighborhood"
             onSelect={(place) => {
               setLocation(place);
+              setLocationError(null);
               setError(null);
             }}
           />
 
           {location && <p className="text-xs text-slate-500">Selected: {location.address}</p>}
+          {locationError && <p className="text-xs text-red-600">{locationError}</p>}
           {error && <p className="text-xs text-red-600">{error}</p>}
 
           <button

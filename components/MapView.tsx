@@ -37,9 +37,6 @@ export default function MapView({
 
     const setupMap = async () => {
       try {
-        if(!containerRef.current) {
-          throw new Error("Map container not found.");
-        }
         const mapboxgl = (await import("mapbox-gl")).default;
         mapboxRef.current = mapboxgl;
         const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
@@ -47,7 +44,9 @@ export default function MapView({
           throw new Error("Missing Mapbox token.");
         }
         mapboxgl.accessToken = token;
-
+        if(!containerRef.current) {
+          return;
+        }
         const map = new mapboxgl.Map({
           container: containerRef.current,
           style: "mapbox://styles/mapbox/standard",

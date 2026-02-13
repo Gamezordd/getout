@@ -1,5 +1,5 @@
 import { observer } from "mobx-react-lite";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import BottomDrawer from "../components/BottomDrawer";
 import MapView from "../components/MapView";
@@ -13,6 +13,7 @@ function HomePage() {
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [fitAllTrigger, setFitAllTrigger] = useState(0);
+  const menuRef = useRef<HTMLDivElement | null>(null);
 
   const editingUser = store.users.find((user) => user.id === editingUserId) || null;
 
@@ -74,6 +75,25 @@ function HomePage() {
     store.selectedVenueId,
     store.sessionId
   ]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+
+    const handleOutside = (event: MouseEvent | TouchEvent) => {
+      const target = event.target as Node | null;
+      if (!menuRef.current || !target) return;
+      if (!menuRef.current.contains(target)) {
+        setMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleOutside);
+    document.addEventListener("touchstart", handleOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleOutside);
+      document.removeEventListener("touchstart", handleOutside);
+    };
+  }, [menuOpen]);
 
   useEffect(() => {
     if (!store.sessionId || !store.ownerKey) return;
@@ -158,55 +178,57 @@ function HomePage() {
                 <span>{store.copyStatus || "Copy link"}</span>
               </button>
             )}
-            <button
-              type="button"
-              onClick={() => setMenuOpen((prev) => !prev)}
-              className="rounded-full border border-slate-200 px-2.5 py-1 text-[13px] font-semibold text-slate-600"
-              aria-label="Open menu"
-            >
-              ...
-            </button>
-          </div>
-          {menuOpen && (
-            <div className="absolute right-0 top-10 z-20 w-40 rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
+            <div ref={menuRef} className="relative">
               <button
                 type="button"
-                onClick={() => {
-                  setMenuOpen(false);
-                  handleAddSelf();
-                }}
-                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-ink hover:bg-slate-100"
+                onClick={() => setMenuOpen((prev) => !prev)}
+                className="rounded-full border border-slate-200 px-2.5 py-1 text-[13px] font-semibold text-slate-600"
+                aria-label="Open menu"
               >
-                <svg
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                  aria-hidden="true"
-                  className="h-4 w-4 text-slate-500"
-                >
-                  <path d="M10 2a1 1 0 011 1v6h6a1 1 0 110 2h-6v6a1 1 0 11-2 0v-6H3a1 1 0 110-2h6V3a1 1 0 011-1z" />
-                </svg>
-                Add user
+                ...
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setMenuOpen(false);
-                  handleAddVenue();
-                }}
-                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-ink hover:bg-slate-100"
-              >
-                <svg
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                  aria-hidden="true"
-                  className="h-4 w-4 text-slate-500"
-                >
-                  <path d="M10 2a1 1 0 011 1v1.05A7.002 7.002 0 0116.95 10H18a1 1 0 110 2h-1.05A7.002 7.002 0 0111 17.95V19a1 1 0 11-2 0v-1.05A7.002 7.002 0 013.05 12H2a1 1 0 110-2h1.05A7.002 7.002 0 019 4.05V3a1 1 0 011-1zm0 4a4 4 0 100 8 4 4 0 000-8z" />
-                </svg>
-                Add venue
-              </button>
+              {menuOpen && (
+                <div className="absolute right-0 top-10 z-20 w-40 rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      handleAddSelf();
+                    }}
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-ink hover:bg-slate-100"
+                  >
+                    <svg
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                      aria-hidden="true"
+                      className="h-4 w-4 text-slate-500"
+                    >
+                      <path d="M10 2a1 1 0 011 1v6h6a1 1 0 110 2h-6v6a1 1 0 11-2 0v-6H3a1 1 0 110-2h6V3a1 1 0 011-1z" />
+                    </svg>
+                    Add user
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      handleAddVenue();
+                    }}
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-ink hover:bg-slate-100"
+                  >
+                    <svg
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                      aria-hidden="true"
+                      className="h-4 w-4 text-slate-500"
+                    >
+                      <path d="M10 2a1 1 0 011 1v1.05A7.002 7.002 0 0116.95 10H18a1 1 0 110 2h-1.05A7.002 7.002 0 0111 17.95V19a1 1 0 11-2 0v-1.05A7.002 7.002 0 013.05 12H2a1 1 0 110-2h1.05A7.002 7.002 0 019 4.05V3a1 1 0 011-1zm0 4a4 4 0 100 8 4 4 0 000-8z" />
+                    </svg>
+                    Add venue
+                  </button>
+                </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
       </header>
 
