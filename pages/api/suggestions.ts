@@ -1,4 +1,4 @@
-﻿import type { NextApiRequest, NextApiResponse } from "next";
+import type { NextApiRequest, NextApiResponse } from "next";
 import type { EtaMatrix, LatLng, TotalsByVenue, Venue, VenueCategory } from "../../lib/types";
 import { getGroup, saveGroup } from "../../lib/groupStore";
 
@@ -92,11 +92,27 @@ const fetchTopPlaces = async (centroid: LatLng, apiKey: string, venueCategory: V
   }
 };
 
-const fetchDriveTimes = async (
+interface DistanceMatrixElement {
+  status: string;
+  duration?: {
+    value: number;
+    text: string;
+  };
+  distance?: {
+    value: number;
+    text: string;
+  };
+}
+
+interface DistanceMatrixRow {
+  elements: DistanceMatrixElement[];
+}
+
+const fetchDriveTimesInternal = async (
   apiKey: string,
   origins: LatLng[],
   destinations: LatLng[]
-) => {
+): Promise<DistanceMatrixRow[]> => {
   const originsParam = origins.map((loc) => `${loc.lat},${loc.lng}`).join("|");
   const destinationsParam = destinations.map((loc) => `${loc.lat},${loc.lng}`).join("|");
 
@@ -114,6 +130,33 @@ const fetchDriveTimes = async (
 
   const data = await response.json();
   return data.rows || [];
+};
+
+const fetchDriveTimes = async (
+  apiKey: string,
+  origins: LatLng[],
+  destinations: LatLng[]
+): Promise<DistanceMatrixRow[]> => {
+  let driveTimesMatrix: DistanceMatrixRow[] = [];
+  const groupedOrigins = origins.reduce<LatLng[][]>((acc, origin, index) => {
+    const groupIndex = Math.floor(index / 5);
+    if (!acc[groupIndex]) {
+      acc[groupIndex] = [];
+    }
+    acc[groupIndex].push(origin);
+    return acc;
+  }, []);
+
+  for(let i = 0; i < groupedOrigins.length; i++) {
+    try {
+      const partialMatrix = await fetchDriveTimesInternal(apiKey, groupedOrigins[i], destinations);
+      driveTimesMatrix = driveTimesMatrix.concat(partialMatrix);
+    } catch (error) {
+      console.error(`Error fetching drive times for group ${i}:`, error);
+    }
+  }
+  return driveTimesMatrix;
+
 };
 
 export default async function handler(
