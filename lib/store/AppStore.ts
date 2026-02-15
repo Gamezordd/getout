@@ -1,5 +1,14 @@
 import { makeAutoObservable, runInAction } from "mobx";
-import type { EtaMatrix, LatLng, TotalsByVenue, User, Venue, VenueCategory, VotesByVenue } from "../types";
+import type {
+  EtaMatrix,
+  LatLng,
+  LockedVenue,
+  TotalsByVenue,
+  User,
+  Venue,
+  VenueCategory,
+  VotesByVenue
+} from "../types";
 
 const OWNER_KEY_PREFIX = "getout-owner-";
 const USER_KEY_PREFIX = "getout-user-";
@@ -10,6 +19,7 @@ type GroupPayload = {
   manualVenues?: Venue[];
   votes?: VotesByVenue;
   venueCategory?: VenueCategory | null;
+  lockedVenue?: LockedVenue | null;
   currentUserId?: string;
 };
 
@@ -47,6 +57,7 @@ export class AppStore {
   totalsByVenue: TotalsByVenue = {};
   votes: VotesByVenue = {};
   venueCategory: VenueCategory | null = null;
+  lockedVenue: LockedVenue | null = null;
   selectedVenueId: string | null = null;
   groupError: string | null = null;
   copyStatus: string | null = null;
@@ -71,12 +82,33 @@ export class AppStore {
     return Boolean(this.currentUser?.location);
   }
 
+  get isCurrentUserOrganizer() {
+    return Boolean(this.currentUser?.isOrganizer);
+  }
+
+  get uniqueVoterCount() {
+    const unique = new Set<string>();
+    Object.values(this.votes || {}).forEach((voterIds) => {
+      voterIds.forEach((id) => unique.add(id));
+    });
+    return unique.size;
+  }
+
+  get hasFinalizeQuorum() {
+    return this.users.length > 0 && this.uniqueVoterCount >= Math.ceil(this.users.length / 2);
+  }
+
+  get votedVenues() {
+    const voteCounts = this.votes || {};
+    return this.venues.filter((venue) => (voteCounts[venue.id] || []).length > 0);
+  }
+
   get selectedVenue() {
     return this.venues.find((venue) => venue.id === this.selectedVenueId) || null;
   }
 
   get topVenues() {
-    return this.suggestedVenues.slice(0, 3);
+    return this.suggestedVenues;
   }
 
   get mostEfficientVenueId() {
@@ -91,6 +123,7 @@ export class AppStore {
   setSession(sessionId: string, pathname = "/") {
     this.sessionId = sessionId;
     this.venueCategory = null;
+    this.lockedVenue = null;
     if (typeof window !== "undefined") {
       this.shareUrl = `${window.location.origin}${pathname}?sessionId=${sessionId}`;
       const storedOwner = localStorage.getItem(`${OWNER_KEY_PREFIX}${sessionId}`);
@@ -140,6 +173,7 @@ export class AppStore {
         this.manualVenues = data.manualVenues || [];
         this.votes = data.votes || {};
         this.venueCategory = data.venueCategory || null;
+        this.lockedVenue = data.lockedVenue || null;
         if (data.currentUserId && this.sessionId) {
           localStorage.setItem(`${USER_KEY_PREFIX}${this.sessionId}`, data.currentUserId);
           this.currentUserId = data.currentUserId;
@@ -350,6 +384,27 @@ export class AppStore {
         this.currentUserId = data.currentUserId || null;
       });
     }
+  }
+
+  async finalizeVenue(venueId: string) {
+    if (!this.sessionId || !this.currentUserId) {
+      throw new Error("Missing session or user.");
+    }
+    const response = await fetch("/api/group", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "finalizeVenue",
+        sessionId: this.sessionId,
+        userId: this.currentUserId,
+        venueId
+      })
+    });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(payload.message || "Unable to finalize venue.");
+    }
+    await this.loadGroup();
   }
 
   setSelectedVenue(venueId: string | null) {

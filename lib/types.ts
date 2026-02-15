@@ -8,6 +8,7 @@ export type User = {
   name: string;
   avatarUrl: string;
   location: LatLng;
+  isOrganizer?: boolean;
 };
 
 export type Venue = {
@@ -15,6 +16,13 @@ export type Venue = {
   name: string;
   location: LatLng;
   address?: string;
+};
+
+export type LockedVenue = {
+  id: string;
+  name: string;
+  address?: string;
+  lockedAt: string;
 };
 
 export type EtaMatrix = Record<string, Record<string, number>>;

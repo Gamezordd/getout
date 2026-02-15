@@ -38,6 +38,8 @@ const buildCacheKey = (sessionId: string, points: LatLng[], manualVenues: Venue[
 };
 
 const fetchTopPlaces = async (centroid: LatLng, apiKey: string, venueCategory: VenueCategory) => {
+  try {
+  console.log("Fetching places with centroid:", centroid, "and category:", venueCategory);
   const response = await fetch("https://places.googleapis.com/v1/places:searchNearby", {
     method: "POST",
     headers: {
@@ -58,6 +60,7 @@ const fetchTopPlaces = async (centroid: LatLng, apiKey: string, venueCategory: V
       }
     })
   });
+
 
   if (!response.ok) {
     throw new Error("Unable to fetch bar suggestions.");
@@ -80,9 +83,13 @@ const fetchTopPlaces = async (centroid: LatLng, apiKey: string, venueCategory: V
       };
     })
     .filter(Boolean)
-    .filter((venue: any) => venue.rating >= 4.5 && venue.userRatingCount >= 200) as Array<
+    .filter((venue: any) => venue.rating >= 4.2 && venue.userRatingCount >= 200) as Array<
     Venue & { rating: number; userRatingCount: number }
   >;
+  } catch (error) {
+    console.error("Error fetching places:", error);
+    return [];
+  }
 };
 
 const fetchDriveTimes = async (
@@ -205,7 +212,7 @@ export default async function handler(
     const rankedSuggested = totals
       .map((entry) => candidates.find((venue) => venue.id === entry.venueId))
       .filter(Boolean)
-      .slice(0, 3) as Venue[];
+      .slice(0, 10) as Venue[];
 
     const mergedVenues: Venue[] = [
       ...manualVenues,

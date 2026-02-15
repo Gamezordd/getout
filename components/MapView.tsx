@@ -134,8 +134,11 @@ export default function MapView({
         lat: venue.location.lat
       };
       const wrapper = document.createElement("div");
-      wrapper.className = "relative";
+      wrapper.className = "flex flex-col items-center";
       wrapper.style.cursor = "pointer";
+
+      const pin = document.createElement("div");
+      pin.className = "relative";
 
       const el = document.createElement("div");
       el.className =
@@ -149,8 +152,15 @@ export default function MapView({
         el.style.borderColor = "#22c55e";
         el.style.boxShadow = "0 0 0 3px rgba(34, 197, 94, 0.3)";
       }
-      wrapper.appendChild(el);
-      addVoteBadge(wrapper, venue.id);
+      pin.appendChild(el);
+      addVoteBadge(pin, venue.id);
+      wrapper.appendChild(pin);
+
+      const label = document.createElement("div");
+      label.className =
+        "mt-1 max-w-[108px] rounded-md bg-white/95 px-2 py-0.5 text-center text-[10px] font-medium leading-tight text-ink shadow";
+      label.textContent = venue.name;
+      wrapper.appendChild(label);
       wrapper.addEventListener("click", () => onSelectVenue?.(venue.id));
 
       const marker = new mapboxgl.Marker({ element: wrapper })
@@ -167,8 +177,11 @@ export default function MapView({
         lat: venue.location.lat
       };
       const wrapper = document.createElement("div");
-      wrapper.className = "relative";
+      wrapper.className = "flex flex-col items-center";
       wrapper.style.cursor = "pointer";
+
+      const pin = document.createElement("div");
+      pin.className = "relative";
 
       const el = document.createElement("div");
       el.className =
@@ -179,8 +192,15 @@ export default function MapView({
         el.style.borderColor = "#22c55e";
         el.style.boxShadow = "0 0 0 3px rgba(34, 197, 94, 0.3)";
       }
-      wrapper.appendChild(el);
-      addVoteBadge(wrapper, venue.id);
+      pin.appendChild(el);
+      addVoteBadge(pin, venue.id);
+      wrapper.appendChild(pin);
+
+      const label = document.createElement("div");
+      label.className =
+        "mt-1 max-w-[108px] rounded-md bg-white/95 px-2 py-0.5 text-center text-[10px] font-medium leading-tight text-ink shadow";
+      label.textContent = venue.name;
+      wrapper.appendChild(label);
       wrapper.addEventListener("click", () => onSelectVenue?.(venue.id));
 
       const marker = new mapboxgl.Marker({ element: wrapper })

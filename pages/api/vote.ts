@@ -30,6 +30,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const group = await getGroup(payload.sessionId);
+  if (group.lockedVenue) {
+    return res.status(400).json({ message: "Voting is closed. Venue already finalized." });
+  }
   const votes: VotesByVenue = group.votes || {};
 
   // Remove existing vote from any venue.
