@@ -16,6 +16,8 @@ export type Venue = {
   name: string;
   location: LatLng;
   address?: string;
+  rating?: number;
+  userRatingCount?: number;
 };
 
 export type LockedVenue = {

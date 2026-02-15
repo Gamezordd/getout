@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import type { User, Venue, VotesByVenue } from "../lib/types";
 
 const DEFAULT_CENTER = { lng: -73.9857, lat: 40.7484 };
@@ -82,6 +82,9 @@ export default function MapView({
     let hasPoints = false;
 
     users.forEach((user) => {
+      const wrapper = document.createElement("div");
+      wrapper.className = "flex flex-col items-center";
+
       const el = document.createElement("div");
       el.className = "rounded-full border-2 border-white shadow-lg";
       el.style.width = "40px";
@@ -89,8 +92,15 @@ export default function MapView({
       el.style.backgroundImage = `url(${user.avatarUrl})`;
       el.style.backgroundSize = "cover";
       el.style.backgroundPosition = "center";
+      wrapper.appendChild(el);
 
-      const marker = new mapboxgl.Marker({ element: el })
+      const label = document.createElement("div");
+      label.className =
+        "max-w-[108px] rounded-md px-2 py-0.5 text-center text-[10px] font-medium leading-tight text-ink";
+      label.textContent = user.name;
+      wrapper.appendChild(label);
+
+      const marker = new mapboxgl.Marker({ element: wrapper })
         .setLngLat([user.location.lng, user.location.lat])
         .addTo(map);
       markersRef.current.push(marker);
@@ -104,7 +114,7 @@ export default function MapView({
 
       const badge = document.createElement("div");
       badge.className =
-        "absolute -right-1.5 -top-1.5 flex h-5 min-w-[26px] items-center justify-center gap-0.5 rounded-full border border-white bg-rose-500 px-1 text-[10px] font-bold text-white shadow";
+        "absolute -right-1.55 flex h-5 min-w-[26px] items-center justify-center rounded-full border border-white bg-rose-500 px-1 text-[10px] font-bold text-white shadow";
 
       const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
       svg.setAttribute("viewBox", "0 0 20 20");
