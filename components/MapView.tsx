@@ -114,7 +114,7 @@ export default function MapView({
 
       const badge = document.createElement("div");
       badge.className =
-        "absolute -right-1.55 flex h-5 min-w-[26px] items-center justify-center rounded-full border border-white bg-rose-500 px-1 text-[10px] font-bold text-white shadow";
+        "absolute -right-1 -top-2 flex h-5 min-w-[26px] items-center justify-center rounded-full border border-white bg-rose-500 px-1 text-[10px] font-bold text-white shadow";
 
       const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
       svg.setAttribute("viewBox", "0 0 20 20");
