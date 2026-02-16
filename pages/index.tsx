@@ -218,6 +218,17 @@ function HomePage() {
     return map;
   }, [store.manualVenues, store.venues]);
 
+  const pickedCountText = useMemo(() => {
+    const count = store.votedVenues.length;
+    if (count === 0) return "No picks yet";
+    if (count > 0 && count < store.users.length) return `${count} of ${store.users.length} picked`;
+    if(count === store.users.length) return "Everyone’s picked • Ready to finalize";
+  }, [store.selectedVenue, store.votes, store.votedVenues.length, store.users.length]);
+
+  if(!store.currentUser){
+    return null;
+  }
+
   return (
     <div className="relative h-screen overflow-hidden bg-mist">
       <header className="fixed inset-x-0 top-0 z-10 bg-white/90 px-4 py-2.5 shadow-sm backdrop-blur">
@@ -334,7 +345,7 @@ function HomePage() {
             onClick={() => setShowGroupSettings(true)}
             className="rounded-full bg-white/95 px-4 py-1.5 text-xs font-semibold text-ink shadow-sm backdrop-blur"
           >
-            {store.uniqueVoterCount}/{store.users.length} Members Picked
+            {pickedCountText}
           </button>
         </div>
         <button
@@ -536,7 +547,7 @@ function HomePage() {
         />
       )}
       {showVoteFooter && (
-        <div className="fixed inset-x-0 bottom-0 z-[10000] h-20 bg-mist/95 px-4 pb-3 pt-2 backdrop-blur">
+        <div className="fixed inset-x-0 bottom-0 z-[10000] bg-mist/95 px-4 pb-3 pt-2 backdrop-blur">
           <button
             type="button"
             onClick={() => {
@@ -552,7 +563,7 @@ function HomePage() {
           >
             {store.currentUserId && store.votes?.[store.selectedVenue.id]?.includes(store.currentUserId)
               ? "Picked"
-              : "Pick Venue"}
+              : "Pick This Venue"}
           </button>
         </div>
       )}

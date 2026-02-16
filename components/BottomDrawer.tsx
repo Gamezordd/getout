@@ -115,9 +115,12 @@ export default function BottomDrawer({
   };
 
   return (
-    <div className="fixed inset-x-0 z-[60]" style={{ bottom: FOOTER_HEIGHT }}>
+    <div
+      className="pointer-events-none fixed inset-x-0 z-[60]"
+      style={{ bottom: FOOTER_HEIGHT }}
+    >
       <motion.div
-        className="relative mx-auto flex w-full flex-col rounded-t-[28px] bg-white shadow-lg outline-none"
+        className="pointer-events-auto relative mx-auto flex w-full flex-col rounded-t-[28px] bg-white shadow-lg outline-none"
         style={{ y, height: maxHeight || undefined }}
         animate={controls}
         drag="y"
@@ -141,9 +144,21 @@ export default function BottomDrawer({
                 )}
                 <h2 className="text-sm font-semibold text-ink">{selectedVenue.name}</h2>
               </div>
-              <span className="text-xs font-semibold text-slate-500">
-                {typeof currentUserEta === "number" ? `${Math.round(currentUserEta)} min` : "--"}
-              </span>
+              <div className="flex items-center gap-3 text-xs font-semibold text-slate-500">
+                <span>{typeof currentUserEta === "number" ? `${Math.round(currentUserEta)} min` : "--"}</span>
+                <span className="inline-flex items-center gap-1">
+                  <svg
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    aria-hidden="true"
+                    className="h-3.5 w-3.5 text-rose-500"
+                  >
+                    <path d="m9.653 16.915-.005-.003-.019-.01a20.759 20.759 0 0 1-1.162-.682 22.045 22.045 0 0 1-2.582-1.9C4.045 12.733 2 10.352 2 7.5a4.5 4.5 0 0 1 8-2.828A4.5 4.5 0 0 1 18 7.5c0 2.852-2.044 5.233-3.885 6.82a22.049 22.049 0 0 1-3.744 2.582l-.019.01-.005.003h-.002a.739.739 0 0 1-.69.001l-.002-.001Z" />
+                  </svg>
+                  {(votes?.[selectedVenue.id]?.length || 0)} vote
+                  {(votes?.[selectedVenue.id]?.length || 0) === 1 ? "" : "s"}
+                </span>
+              </div>
             </div>
           ) : (
             <h2 className="text-sm font-semibold text-ink">
@@ -154,7 +169,7 @@ export default function BottomDrawer({
         <div className="h-full px-5 pb-6">
           {etaError && <p className="mb-3 text-xs text-red-600">{etaError}</p>}
           <div className="h-full min-h-0 space-y-4 overflow-y-auto pr-1">
-            {!hasCurrentUserLocation && isExpanded && (
+            {!hasCurrentUserLocation && (
               <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-5 text-center shadow-sm">
                 <p className="text-sm font-semibold text-ink">Add your location</p>
                 <p className="mt-2 text-xs text-slate-500">
@@ -169,7 +184,7 @@ export default function BottomDrawer({
                 </button>
               </div>
             )}
-            {hasCurrentUserLocation && !selectedVenue && isExpanded && (
+            {hasCurrentUserLocation && !selectedVenue && (
               <div className="rounded-3xl bg-white p-5 text-center shadow-sm">
                 <p className="text-sm font-semibold text-ink">Select a venue on the map</p>
                 <p className="mt-2 text-xs text-slate-500">
@@ -177,7 +192,7 @@ export default function BottomDrawer({
                 </p>
               </div>
             )}
-            {hasCurrentUserLocation && selectedVenue && isExpanded && (
+            {hasCurrentUserLocation && selectedVenue && (
               <div className="rounded-2xl border border-slate-100 bg-mist p-4">
                 <div className="flex items-start gap-3">
                   <div className="flex-1">
@@ -212,20 +227,6 @@ export default function BottomDrawer({
                         : "--"}
                     </p>
                   </div>
-                </div>
-                <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
-                  <span className="inline-flex items-center gap-1">
-                    <svg
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
-                      aria-hidden="true"
-                      className="h-3.5 w-3.5 text-rose-500"
-                    >
-                      <path d="m9.653 16.915-.005-.003-.019-.01a20.759 20.759 0 0 1-1.162-.682 22.045 22.045 0 0 1-2.582-1.9C4.045 12.733 2 10.352 2 7.5a4.5 4.5 0 0 1 8-2.828A4.5 4.5 0 0 1 18 7.5c0 2.852-2.044 5.233-3.885 6.82a22.049 22.049 0 0 1-3.744 2.582l-.019.01-.005.003h-.002a.739.739 0 0 1-.69.001l-.002-.001Z" />
-                    </svg>
-                    {(votes?.[selectedVenue.id]?.length || 0)} vote
-                    {(votes?.[selectedVenue.id]?.length || 0) === 1 ? "" : "s"}
-                  </span>
                 </div>
                 <div className="mt-3 space-y-2">
                   {users.map((user) => {
