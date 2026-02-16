@@ -76,6 +76,7 @@ function CreatePage() {
               setError(null);
             }}
           />
+          {location && <p className="text-xs text-slate-500">Selected: {location.address}</p>}
 
           <div>
             <label className="text-sm font-semibold text-ink">Looking for</label>
@@ -92,9 +93,6 @@ function CreatePage() {
             </select>
           </div>
 
-
-
-          {location && <p className="text-xs text-slate-500">Selected: {location.address}</p>}
           {locationError && <p className="text-xs text-red-600">{locationError}</p>}
           {error && <p className="text-xs text-red-600">{error}</p>}
 

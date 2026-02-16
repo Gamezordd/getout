@@ -73,7 +73,7 @@ function JoinPage() {
     <main className="min-h-screen bg-mist px-4 pb-8 pt-6">
       <div className="mx-auto max-w-md rounded-3xl bg-white p-5 shadow-sm">
         <div className="flex items-center justify-between">
-          <h1 className="text-base font-semibold text-ink">Join this group</h1>
+          <h1 className="text-base font-semibold text-ink">You've been invited</h1>
           <button
             type="button"
             onClick={() => router.push({ pathname: "/", query: sessionId ? { sessionId } : {} })}
@@ -89,7 +89,8 @@ function JoinPage() {
             </svg>
           </button>
         </div>
-
+        <p className="mt-2 text-sm font-semibold text-slate-500">{store.users.length} {store.users.length === 1 ? "person is" : "people are"} waiting on you</p>
+        
         <div className="mt-4 space-y-4">
           <div>
             <label className="text-sm font-semibold text-ink">Your name</label>
@@ -101,15 +102,8 @@ function JoinPage() {
             />
           </div>
 
-          <p className="rounded-xl bg-slate-100 px-4 py-3 text-xs text-slate-600">
-            Category for this group:{" "}
-            <span className="font-semibold text-ink">
-              {CATEGORY_OPTIONS.find((option) => option.value === store.venueCategory)?.label || "Bars"}
-            </span>
-          </p>
-
           <PlaceSearch
-            label="Your planning location"
+            label="Your location"
             placeholder="Search for your neighborhood"
             onSelect={(place) => {
               setLocation(place);
@@ -122,13 +116,20 @@ function JoinPage() {
           {locationError && <p className="text-xs text-red-600">{locationError}</p>}
           {error && <p className="text-xs text-red-600">{error}</p>}
 
+          <div className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-600">
+            <span>Picking</span>
+            <span className="font-semibold text-ink">
+              {CATEGORY_OPTIONS.find((option) => option.value === store.venueCategory)?.label || "Bars"}
+            </span>
+          </div>
+
           <button
             type="button"
             onClick={handleJoin}
             disabled={submitting}
             className="w-full rounded-full bg-ink px-5 py-3 text-sm font-semibold text-white disabled:opacity-60"
           >
-            {submitting ? "Joining..." : "Join group"}
+            {submitting ? "Suii..." : "Join & Pick"}
           </button>
         </div>
       </div>
