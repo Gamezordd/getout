@@ -132,9 +132,9 @@ export default function BottomDrawer({
         <div className="px-5 pb-2 pt-2">
           {selectedVenue ? (
             <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center flex-grow gap-2">
                 {suggestedIndex.get(selectedVenue.id) ? (
-                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-ink text-xs font-bold text-white">
+                  <div className="flex h-7 w-8 items-center justify-center rounded-full bg-ink text-xs font-bold text-white">
                     {suggestedIndex.get(selectedVenue.id)}
                   </div>
                 ) : (
@@ -142,11 +142,13 @@ export default function BottomDrawer({
                     Manual
                   </div>
                 )}
-                <h2 className="text-sm font-semibold text-ink">{selectedVenue.name}</h2>
+                <div className="w-full">
+                  <h2 className="text-sm font-semibold text-ink line-clamp-2 w-full">{selectedVenue.name}</h2>
+                </div>
               </div>
               <div className="flex items-center gap-3 text-xs font-semibold text-slate-500">
-                <span>{typeof currentUserEta === "number" ? `${Math.round(currentUserEta)} min` : "--"}</span>
-                <span className="inline-flex items-center gap-1">
+                <span className="whitespace-nowrap">{typeof currentUserEta === "number" ? `${Math.round(currentUserEta)} min` : "--"}</span>
+                <span className="inline-flex items-center gap-1 whitespace-nowrap">
                   <svg
                     viewBox="0 0 20 20"
                     fill="currentColor"
@@ -169,21 +171,6 @@ export default function BottomDrawer({
         <div className="h-full px-5 pb-6">
           {etaError && <p className="mb-3 text-xs text-red-600">{etaError}</p>}
           <div className="h-full min-h-0 space-y-4 overflow-y-auto pr-1">
-            {!hasCurrentUserLocation && (
-              <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-5 text-center shadow-sm">
-                <p className="text-sm font-semibold text-ink">Add your location</p>
-                <p className="mt-2 text-xs text-slate-500">
-                  Join this group with your planning location to see venue details.
-                </p>
-                <button
-                  type="button"
-                  onClick={onAddSelf}
-                  className="mt-4 rounded-full bg-ink px-5 py-3 text-xs font-semibold text-white"
-                >
-                  Add my location
-                </button>
-              </div>
-            )}
             {hasCurrentUserLocation && !selectedVenue && (
               <div className="rounded-3xl bg-white p-5 text-center shadow-sm">
                 <p className="text-sm font-semibold text-ink">Select a venue on the map</p>

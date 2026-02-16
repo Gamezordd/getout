@@ -358,6 +358,22 @@ export class AppStore {
     }
   }
 
+  applyVote(userId: string, venueId: string) {
+    const votes: VotesByVenue = this.votes || {};
+    Object.keys(votes).forEach((existingVenueId) => {
+      votes[existingVenueId] = votes[existingVenueId].filter((id) => id !== userId);
+    });
+
+    if (!votes[venueId]) {
+      votes[venueId] = [];
+    }
+    if (!votes[venueId].includes(userId)) {
+      votes[venueId].push(userId);
+    }
+
+    this.votes = { ...votes };
+  }
+
   async joinGroup(
     name: string,
     location: LatLng,

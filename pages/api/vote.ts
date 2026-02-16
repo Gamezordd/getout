@@ -50,7 +50,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   group.votes = votes;
   await saveGroup(payload.sessionId, group);
 
-  await safeTrigger(`group-${payload.sessionId}`, "votes-updated", {
+  await safeTrigger(`private-group-${payload.sessionId}`, "votes-updated", {
     venueId: payload.venueId,
     userId: payload.userId
   });

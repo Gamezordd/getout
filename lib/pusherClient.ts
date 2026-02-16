@@ -9,7 +9,8 @@ const createPusherClient = () => {
   }
   return new Pusher(key, {
     cluster,
-    forceTLS: true
+    forceTLS: true,
+    authEndpoint: "/api/pusher/auth"
   });
 };
 

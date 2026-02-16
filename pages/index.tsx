@@ -1,5 +1,6 @@
 import { observer } from "mobx-react-lite";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { Channel } from "pusher-js";
 import { useRouter } from "next/router";
 import BottomDrawer from "../components/BottomDrawer";
 import MapView from "../components/MapView";
@@ -21,6 +22,7 @@ function HomePage() {
   const [finalizing, setFinalizing] = useState(false);
   const [showGroupSettings, setShowGroupSettings] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const channelRef = useRef<Channel | null>(null);
   const seenUserIdsRef = useRef<Set<string>>(new Set());
   const usersInitializedRef = useRef(false);
 
@@ -164,7 +166,8 @@ function HomePage() {
     if (!store.sessionId) return;
     const client = createPusherClient();
     if (!client) return;
-    const channel = client.subscribe(`group-${store.sessionId}`);
+    const channel = client.subscribe(`private-group-${store.sessionId}`);
+    channelRef.current = channel;
 
     const refresh = async () => {
       await store.loadGroup();
@@ -173,12 +176,18 @@ function HomePage() {
 
     channel.bind("group-updated", refresh);
     channel.bind("votes-updated", refresh);
+    channel.bind("client-vote", (data: { userId?: string; venueId?: string }) => {
+      if (!data?.userId || !data?.venueId) return;
+      store.applyVote(data.userId, data.venueId);
+    });
 
     return () => {
       channel.unbind("group-updated", refresh);
       channel.unbind("votes-updated", refresh);
-      client.unsubscribe(`group-${store.sessionId}`);
+      channel.unbind("client-vote");
+      client.unsubscribe(`private-group-${store.sessionId}`);
       client.disconnect();
+      channelRef.current = null;
     };
   }, [store, store.sessionId]);
 
@@ -197,6 +206,17 @@ function HomePage() {
     await store.updateUserLocation(editingUserId, place.location);
     setEditingUserId(null);
   };
+
+  const handleVote = useCallback(() => {
+    if (!store.selectedVenue || !store.currentUserId) return;
+    store.applyVote(store.currentUserId, store.selectedVenue.id);
+    const channel = channelRef.current;
+    if (!channel) return;
+    channel.trigger("client-vote", {
+      userId: store.currentUserId,
+      venueId: store.selectedVenue.id
+    });
+  }, [store.currentUserId, store.selectedVenue]);
 
   const errorBanner = useMemo(
     () => store.mapError || store.groupError || store.suggestionWarning,
@@ -550,12 +570,12 @@ function HomePage() {
         />
       )}
       {showVoteFooter && (
-        <div className="fixed inset-x-0 bottom-0 z-[10000] bg-mist/95 px-4 pb-3 pt-2 backdrop-blur">
+        <div className="fixed inset-x-0 bottom-0 z-[100] bg-mist/95 px-4 pb-3 pt-2 backdrop-blur border-t border-slate-200">
           <button
             type="button"
             onClick={() => {
               triggerHaptic();
-              store.vote(store.selectedVenue!.id);
+              handleVote();
             }}
             disabled={!store.currentUserId}
             className={`w-full rounded-2xl px-4 py-3 text-base font-semibold transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60 ${

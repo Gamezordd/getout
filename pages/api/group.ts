@@ -129,7 +129,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const group = await getGroup(payload.sessionId);
-  const channel = `group-${payload.sessionId}`;
+  const channel = `private-group-${payload.sessionId}`;
 
   if (payload.action === "init") {
     if (!payload.ownerKey) {
