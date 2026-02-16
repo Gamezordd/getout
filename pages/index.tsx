@@ -507,7 +507,7 @@ function HomePage() {
           isOpen={!!store.lockedVenue && !!store.currentUserId}
           onClose={() => {}} // No direct close for this persistent dialog
           title="Venue locked"
-          description="Finalized by organizer. This decision is locked for the group."
+          description="Voting has ended. GetOut to:"
         >
           <p className="mt-2 text-sm font-semibold text-ink">{store.lockedVenue.name}</p>
           <p className="mt-1 text-xs text-slate-500">{store.lockedVenue.address}</p>
