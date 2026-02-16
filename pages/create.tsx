@@ -52,8 +52,9 @@ function CreatePage() {
     <main className="min-h-screen bg-mist px-4 pb-8 pt-6">
       <div className="mx-auto max-w-md rounded-3xl bg-white p-5 shadow-sm">
         <div className="flex items-center justify-between">
-          <h1 className="text-base font-semibold text-ink">Create group</h1>
+          <h1 className="text-base font-bold text-ink">GetOut</h1>
         </div>
+        <p className="mt-2 text-sm font-semibold text-slate-500">Lets pick today's spot. Fast.</p>
 
         <div className="mt-4 space-y-4">
           <div>
@@ -66,8 +67,18 @@ function CreatePage() {
             />
           </div>
 
+          <PlaceSearch
+            label="Your location"
+            placeholder="Search for your neighborhood"
+            onSelect={(place) => {
+              setLocation(place);
+              setLocationError(null);
+              setError(null);
+            }}
+          />
+
           <div>
-            <label className="text-sm font-semibold text-ink">Venue category</label>
+            <label className="text-sm font-semibold text-ink">Looking for</label>
             <select
               value={category}
               onChange={(event) => setCategory(event.target.value as VenueCategory)}
@@ -81,15 +92,7 @@ function CreatePage() {
             </select>
           </div>
 
-          <PlaceSearch
-            label="Your planning location"
-            placeholder="Search for your neighborhood"
-            onSelect={(place) => {
-              setLocation(place);
-              setLocationError(null);
-              setError(null);
-            }}
-          />
+
 
           {location && <p className="text-xs text-slate-500">Selected: {location.address}</p>}
           {locationError && <p className="text-xs text-red-600">{locationError}</p>}
@@ -101,7 +104,7 @@ function CreatePage() {
             disabled={submitting}
             className="w-full rounded-full bg-ink px-5 py-3 text-sm font-semibold text-white disabled:opacity-60"
           >
-            {submitting ? "Creating..." : "Create group"}
+            {submitting ? "Suii..." : "Start Picking"}
           </button>
         </div>
       </div>
