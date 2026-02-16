@@ -12,6 +12,7 @@ type Props = {
   votes: VotesByVenue;
   currentUserId: string | null;
   etaError?: string | null;
+  isLoading?: boolean;
   onEditUser: (userId: string) => void;
   onAddSelf: () => void;
 };
@@ -26,6 +27,7 @@ export default function BottomDrawer({
   votes,
   currentUserId,
   etaError,
+  isLoading = false,
   onEditUser,
   onAddSelf
 }: Props) {
@@ -129,7 +131,13 @@ export default function BottomDrawer({
         onDragEnd={handleDragEnd}
       >
         <div className="mx-auto mt-2 h-1.5 w-12 rounded-full bg-slate-200" />
-        <div className="px-5 pb-2 pt-2">
+        {isLoading && (
+          <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-5 text-center shadow-sm">
+            <p className="text-sm font-semibold text-ink">Loading group...</p>
+            <p className="mt-2 text-xs text-slate-500">Fetching members and venues.</p>
+          </div>
+        )}
+        {!isLoading && <div className="px-5 pb-2 pt-2">
           {selectedVenue ? (
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center flex-grow gap-2">
@@ -162,24 +170,13 @@ export default function BottomDrawer({
                 </span>
               </div>
             </div>
-          ) : (
-            <h2 className="text-sm font-semibold text-ink">
-              {hasCurrentUserLocation ? "Select a venue" : "Add my location"}
-            </h2>
-          )}
-        </div>
-        <div className="h-full px-5 pb-6">
+          ) : null
+          }
+        </div>}
+        {!isLoading && <div className="h-full px-5 pb-6">
           {etaError && <p className="mb-3 text-xs text-red-600">{etaError}</p>}
           <div className="h-full min-h-0 space-y-4 overflow-y-auto pr-1">
-            {hasCurrentUserLocation && !selectedVenue && (
-              <div className="rounded-3xl bg-white p-5 text-center shadow-sm">
-                <p className="text-sm font-semibold text-ink">Select a venue on the map</p>
-                <p className="mt-2 text-xs text-slate-500">
-                  Venue details show here only after you tap a map marker.
-                </p>
-              </div>
-            )}
-            {hasCurrentUserLocation && selectedVenue && (
+            {!isLoading && hasCurrentUserLocation && selectedVenue && isExpanded && (
               <div className="rounded-2xl border border-slate-100 bg-mist p-4">
                 <div className="flex items-start gap-3">
                   <div className="flex-1">
@@ -241,7 +238,7 @@ export default function BottomDrawer({
               </div>
             )}
           </div>
-        </div>
+        </div>}
       </motion.div>
     </div>
   );

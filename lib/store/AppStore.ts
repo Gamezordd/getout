@@ -65,6 +65,8 @@ export class AppStore {
   etaMatrix: EtaMatrix = {};
   etaError: string | null = null;
   mapError: string | null = null;
+  isLoadingGroup = false;
+  isLoadingSuggestions = false;
 
   constructor() {
     makeAutoObservable(this, {}, { autoBind: true });
@@ -161,6 +163,7 @@ export class AppStore {
   async loadGroup() {
     if (!this.sessionId) return;
     try {
+      this.isLoadingGroup = true;
       this.groupError = null;
       const response = await fetch(`/api/group?sessionId=${this.sessionId}`);
       if (!response.ok) {
@@ -174,6 +177,7 @@ export class AppStore {
         this.votes = data.votes || {};
         this.venueCategory = data.venueCategory || null;
         this.lockedVenue = data.lockedVenue || null;
+        this.isLoadingGroup = false;
         if (data.currentUserId && this.sessionId) {
           localStorage.setItem(`${USER_KEY_PREFIX}${this.sessionId}`, data.currentUserId);
           this.currentUserId = data.currentUserId;
@@ -182,6 +186,7 @@ export class AppStore {
     } catch (err: any) {
       runInAction(() => {
         this.groupError = err.message || "Unable to load group.";
+        this.isLoadingGroup = false;
       });
     }
   }
@@ -196,6 +201,7 @@ export class AppStore {
     }
 
     try {
+      this.isLoadingSuggestions = true;
       this.etaError = null;
       this.suggestionWarning = null;
       const response = await fetch(`/api/suggestions?sessionId=${this.sessionId}`);
@@ -210,6 +216,7 @@ export class AppStore {
         this.totalsByVenue = data.totalsByVenue || {};
         this.etaMatrix = data.etaMatrix || {};
         this.suggestionWarning = data.warning || null;
+        this.isLoadingSuggestions = false;
         const hasSelected =
           this.selectedVenueId && this.venues.find((venue) => venue.id === this.selectedVenueId);
         if (!hasSelected) {
@@ -223,6 +230,7 @@ export class AppStore {
     } catch (err: any) {
       runInAction(() => {
         this.etaError = err.message || "Unable to calculate ETAs.";
+        this.isLoadingSuggestions = false;
       });
     }
   }

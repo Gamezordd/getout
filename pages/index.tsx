@@ -564,6 +564,7 @@ function HomePage() {
           totalsByVenue={store.totalsByVenue}
           votes={store.votes}
           currentUserId={store.currentUserId}
+          isLoading={store.isLoadingGroup || store.isLoadingSuggestions}
           etaError={store.etaError}
           onEditUser={setEditingUserId}
           onAddSelf={handleAddSelf}
