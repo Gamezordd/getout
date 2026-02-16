@@ -180,7 +180,10 @@ function HomePage() {
     };
 
     channel.bind("group-updated", refresh);
-    channel.bind("votes-updated", refresh);
+    channel.bind("votes-updated", (data: { userId?: string; venueId?: string }) => {
+      if (!data?.userId || !data?.venueId) return;
+      store.applyVote(data.userId, data.venueId);
+    });
     channel.bind("client-vote", (data: { userId?: string; venueId?: string }) => {
       if (!data?.userId || !data?.venueId) return;
       store.applyVote(data.userId, data.venueId);
