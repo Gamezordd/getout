@@ -167,7 +167,12 @@ function HomePage() {
     const client = createPusherClient();
     if (!client) return;
     const channel = client.subscribe(`private-group-${store.sessionId}`);
-    channelRef.current = channel;
+    channel.bind("pusher:subscription_succeeded", () => {
+      channelRef.current = channel;
+    });
+    channel.bind("pusher:subscription_error", () => {
+      channelRef.current = null;
+    });
 
     const refresh = async () => {
       await store.loadGroup();
@@ -185,6 +190,8 @@ function HomePage() {
       channel.unbind("group-updated", refresh);
       channel.unbind("votes-updated", refresh);
       channel.unbind("client-vote");
+      channel.unbind("pusher:subscription_succeeded");
+      channel.unbind("pusher:subscription_error");
       client.unsubscribe(`private-group-${store.sessionId}`);
       client.disconnect();
       channelRef.current = null;
@@ -211,11 +218,12 @@ function HomePage() {
     if (!store.selectedVenue || !store.currentUserId) return;
     store.applyVote(store.currentUserId, store.selectedVenue.id);
     const channel = channelRef.current;
-    if (!channel) return;
+    if (!channel || !channel.subscribed) return;
     channel.trigger("client-vote", {
       userId: store.currentUserId,
       venueId: store.selectedVenue.id
     });
+    store.vote(store.selectedVenue.id);
   }, [store.currentUserId, store.selectedVenue]);
 
   const errorBanner = useMemo(
@@ -273,7 +281,7 @@ function HomePage() {
                 <span>{store.copyStatus || "Copy link"}</span>
               </button>
             )}
-            <button
+            {store.isCurrentUserOrganizer && <button
               type="button"
               disabled={!canFinalize}
               onClick={() => {
@@ -288,7 +296,7 @@ function HomePage() {
               }`}
             >
               Finalize
-            </button>
+            </button>}
             <div ref={menuRef} className="relative">
               <button
                 type="button"
