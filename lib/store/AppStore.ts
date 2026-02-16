@@ -358,7 +358,12 @@ export class AppStore {
     }
   }
 
-  async joinGroup(name: string, location: LatLng, venueCategory?: VenueCategory) {
+  async joinGroup(
+    name: string,
+    location: LatLng,
+    venueCategory?: VenueCategory,
+    options?: { preserveCurrentUser?: boolean }
+  ) {
     if (!this.sessionId) {
       throw new Error("Missing session. Open this page from a group link.");
     }
@@ -378,7 +383,7 @@ export class AppStore {
       throw new Error(payload.message || "Unable to join group.");
     }
     const data = (await response.json()) as { currentUserId?: string };
-    if (data.currentUserId && this.sessionId) {
+    if (data.currentUserId && this.sessionId && !options?.preserveCurrentUser) {
       localStorage.setItem(`${USER_KEY_PREFIX}${this.sessionId}`, data.currentUserId);
       runInAction(() => {
         this.currentUserId = data.currentUserId || null;

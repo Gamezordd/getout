@@ -13,7 +13,6 @@ type Props = {
   currentUserId: string | null;
   etaError?: string | null;
   onEditUser: (userId: string) => void;
-  onVote: (venueId: string) => void;
   onAddSelf: () => void;
 };
 
@@ -28,10 +27,10 @@ export default function BottomDrawer({
   currentUserId,
   etaError,
   onEditUser,
-  onVote,
   onAddSelf
 }: Props) {
   const [isMounted, setIsMounted] = useState(false);
+  const [snapIndex, setSnapIndex] = useState(1);
   const sheetRef = useRef<SheetRef>(null);
 
   const suggestedIndex = useMemo(() => {
@@ -51,32 +50,68 @@ export default function BottomDrawer({
 
   if (!isMounted) return null;
 
+  const isOpen = snapIndex >= 2;
+  const handleSnap = (nextSnap: number) => {
+    if (nextSnap <= 0) {
+      requestAnimationFrame(() => sheetRef.current?.snapTo(0));
+      setSnapIndex(0);
+      return;
+    }
+    setSnapIndex(nextSnap);
+  };
+  const currentUserEta =
+    selectedVenue && currentUserId
+      ? etaMatrix?.[selectedVenue.id]?.[currentUserId]
+      : undefined;
+
   return (
     <Sheet
       isOpen
       onClose={() => {
-        // Keep sheet persistent; users can drag between snap points.
+        requestAnimationFrame(() => sheetRef.current?.snapTo(0));
+        setSnapIndex(0);
       }}
-      snapPoints={[0, 60, 0.5, 1]}
+      snapPoints={[60, 0.5, 0.85]}
       initialSnap={1}
+      dragCloseThreshold={1}
+      dragVelocityThreshold={9999}
       detent="full"
       disableDismiss
       ref={sheetRef}
+      onSnap={handleSnap}
     >
       <Sheet.Container>
         <Sheet.Header className="px-5 pb-2 pt-1">
           <div className="mx-auto mb-2 h-1.5 w-12 rounded-full bg-slate-200" />
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-semibold text-ink">
-              {hasCurrentUserLocation ? "Venue" : "Add my location"}
+          {selectedVenue ? (
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                {suggestedIndex.get(selectedVenue.id) ? (
+                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-ink text-xs font-bold text-white">
+                    {suggestedIndex.get(selectedVenue.id)}
+                  </div>
+                ) : (
+                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-sun text-[9px] font-semibold text-ink">
+                    Manual
+                  </div>
+                )}
+                <h2 className="text-sm font-semibold text-ink">{selectedVenue.name}</h2>
+              </div>
+              <span className="text-xs font-semibold text-slate-500">
+                {typeof currentUserEta === "number" ? `${Math.round(currentUserEta)} min` : "--"}
+              </span>
+            </div>
+          ) : (
+            <h2 className="text-sm font-semibold text-ink">
+              {hasCurrentUserLocation ? "Select a venue" : "Add my location"}
             </h2>
-          </div>
+          )}
         </Sheet.Header>
         <Sheet.Content className="h-full">
           <div className="h-full px-5 pb-6">
             {etaError && <p className="mb-3 text-xs text-red-600">{etaError}</p>}
             <div className="h-full min-h-0 space-y-4 overflow-y-auto pr-1">
-              {!hasCurrentUserLocation && (
+              {!hasCurrentUserLocation && isOpen && (
                 <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-5 text-center shadow-sm">
                   <p className="text-sm font-semibold text-ink">Add your location</p>
                   <p className="mt-2 text-xs text-slate-500">
@@ -91,7 +126,7 @@ export default function BottomDrawer({
                   </button>
                 </div>
               )}
-              {hasCurrentUserLocation && !selectedVenue && (
+              {hasCurrentUserLocation && !selectedVenue && isOpen && (
                 <div className="rounded-3xl bg-white p-5 text-center shadow-sm">
                   <p className="text-sm font-semibold text-ink">Select a venue on the map</p>
                   <p className="mt-2 text-xs text-slate-500">
@@ -99,21 +134,11 @@ export default function BottomDrawer({
                   </p>
                 </div>
               )}
-              {hasCurrentUserLocation && selectedVenue && (
+              {hasCurrentUserLocation && selectedVenue && isOpen && (
                 <div className="rounded-2xl border border-slate-100 bg-mist p-4">
                   <div className="flex items-start gap-3">
-                    {suggestedIndex.get(selectedVenue.id) ? (
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-ink text-sm font-bold text-white">
-                        {suggestedIndex.get(selectedVenue.id)}
-                      </div>
-                    ) : (
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-sun text-[10px] font-semibold text-ink">
-                        Manual
-                      </div>
-                    )}
                     <div className="flex-1">
-                      <p className="font-semibold text-ink">{selectedVenue.name}</p>
-                     <p className="text-xs text-slate-500">{selectedVenue.address}</p>
+                      <p className="text-xs text-slate-500">{selectedVenue.address}</p>
                       <a
                         href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
                           `${selectedVenue.name} ${selectedVenue.address || ""}`.trim()
@@ -158,19 +183,6 @@ export default function BottomDrawer({
                       {(votes?.[selectedVenue.id]?.length || 0)} vote
                       {(votes?.[selectedVenue.id]?.length || 0) === 1 ? "" : "s"}
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => onVote(selectedVenue.id)}
-                      className={`rounded-full px-4 py-2 text-sm font-bold tracking-wide shadow-md transition active:scale-[0.98] ${
-                        currentUserId && votes?.[selectedVenue.id]?.includes(currentUserId)
-                          ? "bg-emerald-700 text-white shadow-emerald-200"
-                          : "bg-emerald-500 text-white shadow-emerald-300"
-                      }`}
-                    >
-                      {currentUserId && votes?.[selectedVenue.id]?.includes(currentUserId)
-                        ? "Voted"
-                        : "Vote"}
-                    </button>
                   </div>
                   <div className="mt-3 space-y-2">
                     {users.map((user) => {

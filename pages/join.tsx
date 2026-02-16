@@ -17,6 +17,7 @@ function JoinPage() {
   const store = useAppStore();
   const router = useRouter();
   const sessionId = typeof router.query.sessionId === "string" ? router.query.sessionId : "";
+  const addUser = router.query.addUser === "1";
   const [name, setName] = useState("");
   const [location, setLocation] = useState<PlaceResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -57,7 +58,9 @@ function JoinPage() {
     try {
       setSubmitting(true);
       setError(null);
-      await store.joinGroup(name.trim(), location.location);
+      await store.joinGroup(name.trim(), location.location, undefined, {
+        preserveCurrentUser: addUser
+      });
       router.push({ pathname: "/", query: { sessionId: store.sessionId } });
     } catch (err: any) {
       setError(err.message || "Unable to join group.");
