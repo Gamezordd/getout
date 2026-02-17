@@ -8,6 +8,7 @@ import PlaceSearch, { PlaceResult } from "../components/PlaceSearch";
 import { createPusherClient } from "../lib/pusherClient";
 import { useAppStore } from "../lib/store/AppStoreProvider";
 import Dialog from "../components/Dialog";
+import { isIOS } from "../components/DetectPlatform";
 
 function HomePage() {
   const store = useAppStore();
@@ -259,10 +260,11 @@ function HomePage() {
   if(!store.currentUser){
     return null;
   }
+  const iOS = isIOS();
 
   return (
-    <div className="relative h-screen overflow-hidden bg-mist">
-      <header className="fixed inset-x-0 top-0 z-10 bg-white/90 px-4 py-2.5 shadow-sm backdrop-blur">
+    <div style={{ height: iOS ? 'calc(100vh - 100px)' : undefined}} className="relative flex flex-col h-screen overflow-clip bg-mist">
+      <header className="inset-x-0 w-full top-0 z-10 bg-white/90 px-4 py-2.5 shadow-sm backdrop-blur">
         <div className="relative flex items-center justify-between gap-3">
           <h1 className="text-base font-semibold text-ink">GetOut</h1>
           <div className="flex items-center gap-2">
@@ -356,7 +358,7 @@ function HomePage() {
         </div>
       </header>
 
-      <main className="h-full pt-12">
+      <main className="h-full">
         <div className="h-full w-full">
           <MapView
             users={store.users}
@@ -370,7 +372,7 @@ function HomePage() {
             onError={store.setMapError}
           />
         </div>
-        <div className="fixed inset-x-0 top-16 z-[9] flex justify-center">
+        <div className="absolute inset-x-0 top-16 z-[9] flex justify-center">
           <button
             type="button"
             onClick={() => setShowGroupSettings(true)}
@@ -382,7 +384,7 @@ function HomePage() {
         <button
           type="button"
           onClick={() => setFitAllTrigger((value) => value + 1)}
-          className="fixed right-4 top-16 z-[9] rounded-full bg-white/95 p-2.5 text-ink shadow-md backdrop-blur"
+          className="absolute right-4 top-16 z-[9] rounded-full bg-white/95 p-2.5 text-ink shadow-md backdrop-blur"
           aria-label="Fit all"
         >
           <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className="h-4 w-4">
@@ -392,12 +394,12 @@ function HomePage() {
       </main>
 
       {errorBanner && (
-        <div className="pointer-events-none fixed inset-x-4 top-16 z-20 rounded-2xl bg-amber-50 px-4 py-3 text-xs text-amber-800">
+        <div className="pointer-events-none absolute inset-x-4 top-16 z-20 rounded-2xl bg-amber-50 px-4 py-3 text-xs text-amber-800">
           {errorBanner}
         </div>
       )}
       {joinNotice && (
-        <div className="pointer-events-none fixed inset-x-4 top-28 z-20 rounded-2xl bg-emerald-50 px-4 py-3 text-xs font-semibold text-emerald-800">
+        <div className="pointer-events-none absolute inset-x-4 top-28 z-20 rounded-2xl bg-emerald-50 px-4 py-3 text-xs font-semibold text-emerald-800">
           {joinNotice}
         </div>
       )}
@@ -582,7 +584,7 @@ function HomePage() {
         />
       )}
       {showVoteFooter && (
-        <div className="fixed inset-x-0 bottom-0 z-[100] bg-mist/95 px-4 pb-3 pt-2 backdrop-blur border-t border-slate-200">
+        <div className="w-full inset-x-0 bottom-0 z-[100] bg-mist/95 px-4 pb-3 pt-2 backdrop-blur border-t border-slate-200">
           <button
             type="button"
             onClick={() => {

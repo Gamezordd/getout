@@ -63,6 +63,7 @@ function CreatePage() {
               value={name}
               onChange={(event) => setName(event.target.value)}
               placeholder="Type your name"
+              style={{ fontSize: 18}}
               className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-slate-400 focus:outline-none"
             />
           </div>

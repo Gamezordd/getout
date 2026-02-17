@@ -62,9 +62,10 @@ export default function PlaceSearch({ label, placeholder, onSelect }: Props) {
       <label className="text-sm font-semibold text-ink">{label}</label>
       <input
         value={query}
+        style={{ fontSize: 18}}
         onChange={(event) => setQuery(event.target.value)}
         placeholder={placeholder}
-        className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-slate-400 focus:outline-none"
+        className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm focus:border-slate-400 focus:outline-none"
       />
       {loading && <p className="text-xs text-slate-500">Searching…</p>}
       {error && <p className="text-xs text-red-600">{error}</p>}
