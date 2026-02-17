@@ -82,14 +82,14 @@ function AddVenuePage() {
             }}
           />
 
-          {venue && <p className="text-xs text-slate-500">Selected: {venue.address}</p>}
-          {error && <p className="text-xs text-red-600">{error}</p>}
+          {venue && <p className="text-base text-slate-500">Selected: {venue.address}</p>}
+          {error && <p className="text-base text-red-600">{error}</p>}
 
           <button
             type="button"
             onClick={handleAddVenue}
             disabled={submitting}
-            className="w-full rounded-full bg-ink px-5 py-3 text-sm font-semibold text-white disabled:opacity-60"
+            className="w-full rounded-full bg-ink px-5 py-3 text-base font-semibold text-white disabled:opacity-60"
           >
             {submitting ? "Adding..." : "Add venue"}
           </button>

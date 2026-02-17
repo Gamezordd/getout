@@ -152,7 +152,7 @@ export default function MapView({
 
       const el = document.createElement("div");
       el.className =
-        "flex h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-ink text-sm font-bold text-white shadow-lg";
+        "flex h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-ink text-base font-bold text-white shadow-lg";
       el.textContent = String(index + 1);
       if (venue.id === highlightedVenueId) {
         el.style.backgroundColor = "#16a34a";
@@ -195,7 +195,7 @@ export default function MapView({
 
       const el = document.createElement("div");
       el.className =
-        "flex h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-sun text-[11px] font-bold text-ink shadow-lg";
+        "flex h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-sun text-base font-bold text-ink shadow-lg";
       el.textContent = "M";
       if (venue.id === selectedVenueId) {
         wrapper.style.transform = "scale(1.1)";

@@ -89,16 +89,16 @@ function JoinPage() {
             </svg>
           </button>
         </div>
-        <p className="mt-2 text-sm font-semibold text-slate-500">{store.users.length} {store.users.length === 1 ? "person is" : "people are"} waiting on you</p>
+        <p className="mt-2 text-base font-semibold text-slate-500">{store.users.length} {store.users.length === 1 ? "person is" : "people are"} waiting on you</p>
         
         <div className="mt-4 space-y-4">
           <div>
-            <label className="text-sm font-semibold text-ink">Your name</label>
+            <label className="text-base font-semibold text-ink">Your name</label>
             <input
               value={name}
               onChange={(event) => setName(event.target.value)}
               placeholder="Type your name"
-              className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-slate-400 focus:outline-none"
+              className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base shadow-sm focus:border-slate-400 focus:outline-none"
             />
           </div>
 
@@ -112,11 +112,11 @@ function JoinPage() {
             }}
           />
 
-          {location && <p className="text-xs text-slate-500">Selected: {location.address}</p>}
-          {locationError && <p className="text-xs text-red-600">{locationError}</p>}
-          {error && <p className="text-xs text-red-600">{error}</p>}
+          {location && <p className="text-base text-slate-500">Selected: {location.address}</p>}
+          {locationError && <p className="text-base text-red-600">{locationError}</p>}
+          {error && <p className="text-base text-red-600">{error}</p>}
 
-          <div className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-600">
+          <div className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2 text-base text-slate-600">
             <span>Picking</span>
             <span className="font-semibold text-ink">
               {CATEGORY_OPTIONS.find((option) => option.value === store.venueCategory)?.label || "Bars"}
@@ -127,7 +127,7 @@ function JoinPage() {
             type="button"
             onClick={handleJoin}
             disabled={submitting}
-            className="w-full rounded-full bg-ink px-5 py-3 text-sm font-semibold text-white disabled:opacity-60"
+            className="w-full rounded-full bg-ink px-5 py-3 text-base font-semibold text-white disabled:opacity-60"
           >
             {submitting ? "Suii..." : "Join & Pick"}
           </button>

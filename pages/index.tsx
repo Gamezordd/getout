@@ -263,7 +263,7 @@ function HomePage() {
   const iOS = isIOS();
 
   return (
-    <div style={{ height: iOS ? 'calc(100vh - 100px)' : undefined}} className="relative flex flex-col h-screen overflow-clip bg-mist">
+    <div style={{ height: iOS ? 'calc(100vh - 80px)' : undefined}} className="relative flex flex-col h-screen overflow-clip bg-mist">
       <header className="inset-x-0 w-full top-0 z-10 bg-white/90 px-4 py-2.5 shadow-sm backdrop-blur">
         <div className="relative flex items-center justify-between gap-3">
           <h1 className="text-base font-semibold text-ink">GetOut</h1>
@@ -272,7 +272,7 @@ function HomePage() {
               <button
                 type="button"
                 onClick={store.copyShareLink}
-                className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 px-3 py-1 text-[11px] font-semibold text-slate-600"
+                className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 px-3 py-1 text-base font-semibold text-slate-600"
               >
                 <svg
                   viewBox="0 0 20 20"
@@ -294,7 +294,7 @@ function HomePage() {
                 setFinalizeVenueId(firstVoted);
                 setShowFinalizeDialog(true);
               }}
-              className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
+              className={`rounded-full px-3 py-1 text-base font-semibold ${
                 canFinalize
                   ? "bg-emerald-600 text-white shadow-sm"
                   : "border border-slate-200 text-slate-400"
@@ -321,7 +321,7 @@ function HomePage() {
                       setMenuOpen(false);
                       handleAddSelf();
                     }}
-                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-ink hover:bg-slate-100"
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-base text-ink hover:bg-slate-100"
                   >
                     <svg
                       viewBox="0 0 20 20"
@@ -339,7 +339,7 @@ function HomePage() {
                       setMenuOpen(false);
                       handleAddVenue();
                     }}
-                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-ink hover:bg-slate-100"
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-base text-ink hover:bg-slate-100"
                   >
                     <svg
                       viewBox="0 0 20 20"
@@ -376,7 +376,7 @@ function HomePage() {
           <button
             type="button"
             onClick={() => setShowGroupSettings(true)}
-            className="rounded-full bg-white/95 px-4 py-1.5 text-xs font-semibold text-ink shadow-sm backdrop-blur"
+            className="rounded-full bg-white/95 px-4 py-1.5 text-base font-semibold text-ink shadow-sm backdrop-blur"
           >
             {pickedCountText}
           </button>
@@ -394,12 +394,12 @@ function HomePage() {
       </main>
 
       {errorBanner && (
-        <div className="pointer-events-none absolute inset-x-4 top-16 z-20 rounded-2xl bg-amber-50 px-4 py-3 text-xs text-amber-800">
+        <div className="pointer-events-none absolute inset-x-4 top-16 z-20 rounded-2xl bg-amber-50 px-4 py-3 text-base text-amber-800">
           {errorBanner}
         </div>
       )}
       {joinNotice && (
-        <div className="pointer-events-none absolute inset-x-4 top-28 z-20 rounded-2xl bg-emerald-50 px-4 py-3 text-xs font-semibold text-emerald-800">
+        <div className="pointer-events-none absolute inset-x-4 top-28 z-20 rounded-2xl bg-emerald-50 px-4 py-3 text-base font-semibold text-emerald-800">
           {joinNotice}
         </div>
       )}
@@ -412,7 +412,7 @@ function HomePage() {
         >
           <div className="mt-4 max-h-56 space-y-2 overflow-y-auto">
             {store.votedVenues.length === 0 && (
-              <p className="rounded-xl bg-slate-100 px-3 py-2 text-xs text-slate-600">
+              <p className="rounded-xl bg-slate-100 px-3 py-2 text-base text-slate-600">
                 No voted venues yet.
               </p>
             )}
@@ -429,8 +429,8 @@ function HomePage() {
                   className="mt-0.5"
                 />
                 <div>
-                  <p className="text-sm font-semibold text-ink">{venue.name}</p>
-                  <p className="text-xs text-slate-500">{venue.address}</p>
+                  <p className="text-base font-semibold text-ink">{venue.name}</p>
+                  <p className="text-base text-slate-500">{venue.address}</p>
                 </div>
               </label>
             ))}
@@ -450,7 +450,7 @@ function HomePage() {
                 setFinalizing(false);
               }
             }}
-            className="mt-4 inline-flex w-full items-center justify-center rounded-full bg-emerald-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50"
+            className="mt-4 inline-flex w-full items-center justify-center rounded-full bg-emerald-600 px-4 py-3 text-base font-semibold text-white disabled:opacity-50"
           >
             {finalizing ? "Locking..." : "Lock venue"}
           </button>
@@ -465,7 +465,7 @@ function HomePage() {
         >
           <div className="mt-4 space-y-2">
             {store.users.length === 0 && (
-              <p className="rounded-xl bg-slate-100 px-3 py-2 text-xs text-slate-600">
+              <p className="rounded-xl bg-slate-100 px-3 py-2 text-base text-slate-600">
                 No participants yet.
               </p>
             )}
@@ -483,19 +483,19 @@ function HomePage() {
                   <div className="flex items-center gap-2">
                     <img src={user.avatarUrl} alt={user.name} className="h-7 w-7 rounded-full" />
                     <div>
-                      <p className="text-sm font-semibold text-ink">{user.name}</p>
-                      {user.isOrganizer && <p className="text-[11px] text-slate-500">Organizer</p>}
+                      <p className="text-base font-semibold text-ink">{user.name}</p>
+                      {user.isOrganizer && <p className="text-base text-slate-500">Organizer</p>}
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-xs font-semibold text-slate-500">
+                    <span className="text-base font-semibold text-slate-500">
                       {pickedName || "No pick"}
                     </span>
                     {store.isCurrentUserOrganizer && !user.isOrganizer && (
                       <button
                         type="button"
                         onClick={() => store.removeUser(user.id)}
-                        className="rounded-full border border-rose-200 px-2.5 py-1 text-[11px] font-semibold text-rose-600"
+                        className="rounded-full border border-rose-200 px-2.5 py-1 text-base font-semibold text-rose-600"
                       >
                         Remove
                       </button>
@@ -514,15 +514,15 @@ function HomePage() {
           title="Venue locked"
           description="Voting has ended. GetOut to:"
         >
-          <p className="mt-2 text-sm font-semibold text-ink">{store.lockedVenue.name}</p>
-          <p className="mt-1 text-xs text-slate-500">{store.lockedVenue.address}</p>
+          <p className="mt-2 text-base font-semibold text-ink">{store.lockedVenue.name}</p>
+          <p className="mt-1 text-base text-slate-500">{store.lockedVenue.address}</p>
           <a
             href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
               `${store.lockedVenue.name} ${store.lockedVenue.address || ""}`.trim()
             )}`}
             target="_blank"
             rel="noreferrer"
-            className="mt-4 inline-flex w-full items-center justify-center rounded-full bg-emerald-600 px-4 py-3 text-sm font-semibold text-white"
+            className="mt-4 inline-flex w-full items-center justify-center rounded-full bg-emerald-600 px-4 py-3 text-base font-semibold text-white"
           >
             Open in Google Maps
           </a>
@@ -539,7 +539,7 @@ function HomePage() {
                   <button
                     type="button"
                     onClick={store.copyShareLink}
-                    className="mt-4 inline-flex w-full items-center justify-center gap-1.5 rounded-full bg-ink px-4 py-3 text-sm font-semibold text-white"
+                    className="mt-4 inline-flex w-full items-center justify-center gap-1.5 rounded-full bg-ink px-4 py-3 text-base font-semibold text-white"
                   >
                     <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" className="h-4 w-4">
                       <path d="M7 3a2 2 0 00-2 2v1a1 1 0 11-2 0V5a4 4 0 014-4h6a4 4 0 014 4v6a4 4 0 01-4 4h-1a1 1 0 110-2h1a2 2 0 002-2V5a2 2 0 00-2-2H7z" />

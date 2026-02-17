@@ -59,16 +59,16 @@ export default function PlaceSearch({ label, placeholder, onSelect }: Props) {
 
   return (
     <div className="space-y-2">
-      <label className="text-sm font-semibold text-ink">{label}</label>
+      <label className="text-base font-semibold text-ink">{label}</label>
       <input
         value={query}
         style={{ fontSize: 18}}
         onChange={(event) => setQuery(event.target.value)}
         placeholder={placeholder}
-        className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm focus:border-slate-400 focus:outline-none"
+        className="w-full rounded-xl border border-slate-200 bg-white text-base px-4 py-3 shadow-sm focus:border-slate-400 focus:outline-none"
       />
-      {loading && <p className="text-xs text-slate-500">Searching…</p>}
-      {error && <p className="text-xs text-red-600">{error}</p>}
+      {loading && <p className="text-base text-slate-500">Searching…</p>}
+      {error && <p className="text-base text-red-600">{error}</p>}
       <div className="space-y-2">
         {results.map((place) => (
           <button
@@ -79,10 +79,10 @@ export default function PlaceSearch({ label, placeholder, onSelect }: Props) {
               setQuery("");
               setResults([]);
             }}
-            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-left text-sm shadow-sm hover:border-slate-300"
+            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-left text-base shadow-sm hover:border-slate-300"
           >
             <p className="font-semibold text-ink">{place.name}</p>
-            <p className="text-xs text-slate-500">{place.address}</p>
+            <p className="text-base text-slate-500">{place.address}</p>
           </button>
         ))}
       </div>

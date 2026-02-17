@@ -35,7 +35,7 @@ export default function Dialog({
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-base font-semibold text-ink">{title}</p>
-            {description && <p className="mt-1 text-xs text-slate-500">{description}</p>}
+            {description && <p className="mt-1 text-base text-slate-500">{description}</p>}
           </div>
           <button
             type="button"
