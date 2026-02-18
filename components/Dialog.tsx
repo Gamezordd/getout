@@ -29,7 +29,7 @@ export default function Dialog({
       onClick={onClose} // This will close the dialog when clicking on the overlay
     >
       <div
-        className={`w-full max-w-sm rounded-3xl bg-white p-5 shadow-2xl ${className} self-center ${contentClassName.includes("items-end") ? "self-end" : ""}`}
+        className={`w-full flex flex-col max-h-80 max-w-sm rounded-3xl bg-white p-5 shadow-2xl ${className} self-center ${contentClassName.includes("items-end") ? "self-end" : ""}`}
         onClick={(e) => e.stopPropagation()} // This will prevent clicks inside the dialog from closing it
       >
         <div className="flex items-start justify-between gap-3">
@@ -52,7 +52,9 @@ export default function Dialog({
             </svg>
           </button>
         </div>
-        {children}
+        <div className="flex-grow min-h-0 flex">
+          {children}
+        </div>
       </div>
     </div>
   );

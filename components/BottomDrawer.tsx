@@ -1,9 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from "react";
 import { motion, useAnimation, useMotionValue } from "framer-motion";
-import type {
-  Venue,
-} from "../lib/types";
-import DrawerContent from "./DrawerContent";
 
 export type BottomDrawerHandle = {
   snapTo: (preset: "min" | "mid" | "max") => void;
