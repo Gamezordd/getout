@@ -14,7 +14,6 @@ type Props = {
   etaError?: string | null;
   isLoading?: boolean;
   onEditUser: (userId: string) => void;
-  onAddSelf: () => void;
 };
 
 export default function BottomDrawer({
@@ -29,7 +28,6 @@ export default function BottomDrawer({
   etaError,
   isLoading = false,
   onEditUser,
-  onAddSelf
 }: Props) {
   const [isMounted, setIsMounted] = useState(false);
   const [activeSnapHeight, setActiveSnapHeight] = useState<number>(0);
