@@ -2,7 +2,7 @@ import { observer } from "mobx-react-lite";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Channel } from "pusher-js";
 import { useRouter } from "next/router";
-import BottomDrawer from "../components/BottomDrawer";
+import BottomDrawer, { BottomDrawerHandle } from "../components/BottomDrawer";
 import MapView from "../components/MapView";
 import PlaceSearch, { PlaceResult } from "../components/PlaceSearch";
 import { createPusherClient } from "../lib/pusherClient";
@@ -10,11 +10,11 @@ import { useAppStore } from "../lib/store/AppStoreProvider";
 import Dialog from "../components/Dialog";
 import FinalizeDialog from "../components/FinalizeDialog";
 import { Header } from "../components/Header";
+import DrawerContent from "../components/DrawerContent";
 
 function HomePage() {
   const store = useAppStore();
   const router = useRouter();
-  const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [fitAllTrigger, setFitAllTrigger] = useState(0);
   const [showInviteDialog, setShowInviteDialog] = useState(false);
   const [joinNotice, setJoinNotice] = useState<string | null>(null);
@@ -25,8 +25,19 @@ function HomePage() {
   const channelRef = useRef<Channel | null>(null);
   const seenUserIdsRef = useRef<Set<string>>(new Set());
   const usersInitializedRef = useRef(false);
+  const bottomSheetRef = useRef<BottomDrawerHandle>(null);
 
-  const editingUser = store.users.find((user) => user.id === editingUserId) || null;
+  const handleEditUser = useCallback((userId: string) => {
+    if (userId !== store.currentUserId) return;
+    bottomSheetRef.current?.snapTo("max");
+  }, [store.currentUserId]);
+
+  useEffect(() => {
+    if(store.selectedVenue){
+      bottomSheetRef.current?.snapTo("mid");
+    }
+  }, [store.selectedVenue]);
+
 
   useEffect(() => {
     if (!router.isReady) return;
@@ -183,12 +194,6 @@ function HomePage() {
       channelRef.current = null;
     };
   }, [store, store.sessionId]);
-
-  const handleUpdateUserLocation = async (place: PlaceResult) => {
-    if (!editingUserId) return;
-    await store.updateUserLocation(editingUserId, place.location);
-    setEditingUserId(null);
-  };
 
   const handleVote = useCallback(() => {
     if (!store.selectedVenue || !store.currentUserId) return;
@@ -375,37 +380,12 @@ function HomePage() {
                   </button>
                 </Dialog>      )}
 
-      {editingUser && (
-        <Dialog
-          isOpen={!!editingUser}
-          onClose={() => setEditingUserId(null)}
-          title="Update location"
-          description={editingUser?.name}
-          contentClassName="items-end"
-        >
-          <div className="mt-4">
-            <PlaceSearch
-              label="New planning spot"
-              placeholder="Search for a neighborhood or address"
-              onSelect={handleUpdateUserLocation}
-            />
-          </div>
-        </Dialog>
-      )}
+
 
       {!store.lockedVenue && (
         <BottomDrawer
-          users={store.users}
-          suggestedVenues={store.suggestedVenues}
-          selectedVenue={store.selectedVenue}
-          hasCurrentUserLocation={store.hasCurrentUserLocation}
-          etaMatrix={store.etaMatrix}
-          totalsByVenue={store.totalsByVenue}
-          votes={store.votes}
-          currentUserId={store.currentUserId}
-          isLoading={store.isLoadingGroup || store.isLoadingSuggestions}
-          etaError={store.etaError}
-          onEditUser={setEditingUserId}
+          ref={bottomSheetRef}
+          render={(isExpanded) => <DrawerContent isExpanded={isExpanded} onEditUser={handleEditUser} />}
         />
       )}
       {showVoteFooter && (

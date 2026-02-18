@@ -1,75 +1,33 @@
-import { useEffect, useMemo, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from "react";
 import { motion, useAnimation, useMotionValue } from "framer-motion";
 import type {
-  EtaMatrix,
-  TotalsByVenue,
-  User,
   Venue,
-  VotesByVenue,
 } from "../lib/types";
-import Dialog from "./Dialog";
+import DrawerContent from "./DrawerContent";
 
-type Props = {
-  users: User[];
-  suggestedVenues: Venue[];
-  selectedVenue: Venue | null;
-  hasCurrentUserLocation: boolean;
-  etaMatrix: EtaMatrix;
-  totalsByVenue: TotalsByVenue;
-  votes: VotesByVenue;
-  currentUserId: string | null;
-  etaError?: string | null;
-  isLoading?: boolean;
-  onEditUser: (userId: string) => void;
+export type BottomDrawerHandle = {
+  snapTo: (preset: "min" | "mid" | "max") => void;
 };
 
-export default function BottomDrawer({
-  users,
-  suggestedVenues,
-  selectedVenue,
-  hasCurrentUserLocation,
-  etaMatrix,
-  totalsByVenue,
-  votes,
-  currentUserId,
-  etaError,
-  isLoading = false,
-  onEditUser,
-}: Props) {
+type Props = {
+  onCollapse?: () => void;
+  render: (isExpanded: boolean) => React.ReactNode;
+};
+
+const BottomDrawer = forwardRef<BottomDrawerHandle, Props>(function BottomDrawer({
+  onCollapse,
+  render,
+}: Props, ref) {
   const [isMounted, setIsMounted] = useState(false);
-  const [activeSnapHeight, setActiveSnapHeight] = useState<number>(0);
   const [viewportHeight, setViewportHeight] = useState(0);
-  const [showAllVoters, setShowAllVoters] = useState(false);
+  const [activeSnapHeight, setActiveSnapHeight] = useState<number>(0);
   const controls = useAnimation();
   const y = useMotionValue(0);
 
   const FOOTER_HEIGHT = 80;
   const MIN_SNAP = 64;
 
-  const suggestedIndex = useMemo(() => {
-    const index = new Map<string, number>();
-    suggestedVenues.forEach((venue, idx) => index.set(venue.id, idx + 1));
-    return index;
-  }, [suggestedVenues]);
-
-  const voterNames = useMemo(() => {
-    if (!selectedVenue) return [];
-    const voterIds = votes?.[selectedVenue.id] || [];
-    if (voterIds.length === 0) return [];
-    const userById = new Map(users.map((user) => [user.id, user]));
-    return voterIds
-      .map((id) => userById.get(id))
-      .filter((user): user is User => Boolean(user))
-      .map((user) => user.name);
-  }, [selectedVenue, votes, users]);
-
-  const formatVoterNames = (names: string[], maxVisible = 4) => {
-    if (names.length === 0) return "";
-    const visible = names.slice(0, maxVisible);
-    if (visible.length === 1) return `${visible[0]} picked`;
-    if (visible.length === 2) return `${visible[0]} and ${visible[1]} picked`;
-    return `${visible.slice(0, -1).join(", ")} and ${visible[visible.length - 1]} picked`;
-  };
+  const isExpanded = activeSnapHeight > MIN_SNAP;
 
   useEffect(() => {
     setIsMounted(true);
@@ -109,26 +67,36 @@ export default function BottomDrawer({
     controls.set({ y: Math.max(0, maxHeight - activeSnapHeight) });
   }, [activeSnapHeight, controls, maxHeight, snapPoints]);
 
-  useEffect(() => {
-    if (!selectedVenue) return;
-    const mid = snapPoints[Math.min(1, snapPoints.length - 1)];
-    setActiveSnapHeight(mid);
-    setShowAllVoters(false);
-    if (maxHeight) {
+  // useEffect(() => {
+  //   if (!selectedVenue) return;
+  //   const mid = snapPoints[Math.min(1, snapPoints.length - 1)];
+  //   setActiveSnapHeight(mid);
+  //   if (maxHeight) {
+  //     controls.start({
+  //       y: Math.max(0, maxHeight - mid),
+  //       transition: { type: "spring", stiffness: 320, damping: 32 },
+  //     });
+  //   }
+  // }, [selectedVenue, snapPoints, maxHeight, controls]);
+
+  useImperativeHandle(ref, () => ({
+    snapTo(preset) {
+      if (!maxHeight || snapPoints.length === 0) return;
+      const target =
+        preset === "min"
+          ? snapPoints[0]
+          : preset === "mid"
+          ? snapPoints[Math.min(1, snapPoints.length - 1)]
+          : snapPoints[snapPoints.length - 1];
+      setActiveSnapHeight(target);
       controls.start({
-        y: Math.max(0, maxHeight - mid),
+        y: Math.max(0, maxHeight - target),
         transition: { type: "spring", stiffness: 320, damping: 32 },
       });
-    }
-  }, [selectedVenue, snapPoints, maxHeight, controls]);
+    },
+  }), [maxHeight, snapPoints, controls]);
 
   if (!isMounted) return null;
-
-  const isExpanded = activeSnapHeight > MIN_SNAP;
-  const currentUserEta =
-    selectedVenue && currentUserId
-      ? etaMatrix?.[selectedVenue.id]?.[currentUserId]
-      : undefined;
 
   const handleDragEnd = () => {
     if (!maxHeight) return;
@@ -168,176 +136,11 @@ export default function BottomDrawer({
         dragElastic={0.06}
         onDragEnd={handleDragEnd}
       >
-        <div className="mx-auto mt-2 h-1.5 w-12 rounded-full bg-slate-200" />
-        {isLoading && (
-          <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-5 text-center shadow-sm">
-            <p className="text-sm font-semibold text-ink">Loading group...</p>
-            <p className="mt-2 text-xs text-slate-500">
-              Fetching members and venues.
-            </p>
-          </div>
-        )}
-        {!isLoading && (
-          <div className="px-5 pb-2 pt-2">
-            {selectedVenue ? (
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center flex-grow gap-2">
-                  {suggestedIndex.get(selectedVenue.id) ? (
-                    <div className="flex h-7 w-8 items-center justify-center rounded-full bg-ink text-xs font-bold text-white">
-                      {suggestedIndex.get(selectedVenue.id)}
-                    </div>
-                  ) : (
-                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-sun text-[9px] font-semibold text-ink">
-                      Manual
-                    </div>
-                  )}
-                  <div className="w-full">
-                    <h2 className="text-sm font-semibold text-ink line-clamp-2 w-full">
-                      {selectedVenue.name}
-                    </h2>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 text-xs font-semibold text-slate-500">
-                  <span className="whitespace-nowrap">
-                    {typeof currentUserEta === "number"
-                      ? `${Math.round(currentUserEta)} min`
-                      : "--"}
-                  </span>
-                </div>
-              </div>
-            ) : null}
-          </div>
-        )}
-        {!isLoading && (
-          <div className="h-full px-5 pb-6">
-            {etaError && (
-              <p className="mb-3 text-xs text-red-600">{etaError}</p>
-            )}
-            <div className="h-full min-h-0 space-y-4 overflow-y-auto pr-1">
-              {hasCurrentUserLocation &&
-                selectedVenue &&
-                voterNames.length > 0 && (
-                  <div className="pl-1 flex items-start gap-2 text-xs font-semibold text-slate-600 leading-tight">
-                    <svg
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
-                      aria-hidden="true"
-                      className="h-3.5 w-3.5 text-rose-500"
-                    >
-                      <path d="m9.653 16.915-.005-.003-.019-.01a20.759 20.759 0 0 1-1.162-.682 22.045 22.045 0 0 1-2.582-1.9C4.045 12.733 2 10.352 2 7.5a4.5 4.5 0 0 1 8-2.828A4.5 4.5 0 0 1 18 7.5c0 2.852-2.044 5.233-3.885 6.82a22.049 22.045 0 0 1-3.744 2.582l-.019.01-.005.003h-.002a.739.739 0 0 1-.69.001l-.002-.001Z" />
-                    </svg>
-                    <span>{formatVoterNames(voterNames)}</span>
-                    {voterNames.length > 4 && (
-                      <button
-                        type="button"
-                        onClick={() => setShowAllVoters(true)}
-                        className="ml-2 text-xs font-semibold text-slate-500 underline"
-                      >
-                        ..and {voterNames.length - 4} more
-                      </button>
-                    )}
-                  </div>
-                )}
-              {!isLoading &&
-                hasCurrentUserLocation &&
-                selectedVenue &&
-                isExpanded && (
-                  <div className="rounded-2xl border border-slate-100 bg-mist p-4">
-                    <div className="flex items-start gap-3">
-                      <div className="flex-1">
-                        <p className="text-xs text-slate-500">
-                          {selectedVenue.address}
-                        </p>
-                        <a
-                          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                            `${selectedVenue.name} ${selectedVenue.address || ""}`.trim(),
-                          )}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="mt-1 inline-block text-xs text-blue-600 hover:underline"
-                        >
-                          View on Google Maps
-                        </a>
-                        {selectedVenue.rating && (
-                          <p className="mt-1 flex items-center gap-1 text-xs text-slate-500">
-                            <svg
-                              viewBox="0 0 20 20"
-                              fill="currentColor"
-                              aria-hidden="true"
-                              className="h-3.5 w-3.5 text-yellow-400"
-                            >
-                              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.539 1.118l-2.8-2.034a1 1 0 00-1.176 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.462a1 1 0 00.95-.69l1.07-3.292z" />
-                            </svg>
-                            {selectedVenue.rating} (
-                            {selectedVenue.userRatingCount || 0})
-                          </p>
-                        )}
-                        <p className="mt-2 text-xs text-slate-500">
-                          Total drive time:{" "}
-                          {typeof totalsByVenue?.[selectedVenue.id] === "number"
-                            ? `${totalsByVenue[selectedVenue.id]} min`
-                            : "--"}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="mt-3 space-y-2">
-                      {users.map((user) => {
-                        const minutes =
-                          etaMatrix?.[selectedVenue.id]?.[user.id];
-                        return (
-                          <div
-                            key={user.id}
-                            className="flex items-center justify-between text-sm"
-                          >
-                            <button
-                              type="button"
-                              onClick={() => onEditUser(user.id)}
-                              className="flex items-center gap-2"
-                            >
-                              <img
-                                src={user.avatarUrl}
-                                alt={user.name}
-                                className="h-6 w-6 rounded-full"
-                              />
-                              <span className="font-medium text-ink">
-                                {user.name}
-                                {user.isOrganizer ? " (Organizer)" : ""}
-                              </span>
-                            </button>
-                            <span className="text-slate-600">
-                              {typeof minutes === "number"
-                                ? `${Math.round(minutes)} min`
-                                : "--"}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-            </div>
-          </div>
-        )}
+        {render(isExpanded)}
       </motion.div>
-      {showAllVoters && (
-        <Dialog
-          isOpen={showAllVoters}
-          onClose={() => setShowAllVoters(false)}
-          title="All picks"
-          description="People who picked this venue."
-        >
-          <div className="mt-4 flex flex-wrap gap-2">
-            {voterNames.map((name, index) => (
-              <span
-                key={`${name}-${index}`}
-                className="rounded-full bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700"
-              >
-                {name}
-              </span>
-            ))}
-          </div>
-        </Dialog>
-      )}
+
     </div>
   );
-}
+});
+
+export default BottomDrawer;
