@@ -263,7 +263,9 @@ function HomePage() {
   const iOS = isIOS();
 
   return (
-    <div style={{ height: iOS ? 'calc(100vh - 80px)' : undefined}} className="relative flex flex-col h-screen overflow-clip bg-mist">
+    <div 
+    // style={{ height: iOS ? 'calc(100vh - 80px)' : undefined}} 
+    className="relative flex flex-col h-full overflow-clip bg-mist">
       <header className="inset-x-0 w-full top-0 z-10 bg-white/90 px-4 py-2.5 shadow-sm backdrop-blur">
         <div className="relative flex items-center justify-between gap-3">
           <h1 className="text-base font-semibold text-ink">GetOut</h1>

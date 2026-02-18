@@ -9,3 +9,9 @@
 body {
   @apply bg-mist text-ink;
 }
+
+html,
+#__next,
+body {
+  @apply h-full w-full overflow-x-hidden;
+}
