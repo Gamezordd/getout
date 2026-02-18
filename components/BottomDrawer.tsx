@@ -133,8 +133,8 @@ export default function BottomDrawer({
         <div className="mx-auto mt-2 h-1.5 w-12 rounded-full bg-slate-200" />
         {isLoading && (
           <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-5 text-center shadow-sm">
-            <p className="text-base font-semibold text-ink">Loading group...</p>
-            <p className="mt-2 text-base text-slate-500">Fetching members and venues.</p>
+            <p className="text-sm font-semibold text-ink">Loading group...</p>
+            <p className="mt-2 text-xs text-slate-500">Fetching members and venues.</p>
           </div>
         )}
         {!isLoading && <div className="px-5 pb-2 pt-2">
@@ -142,19 +142,19 @@ export default function BottomDrawer({
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center flex-grow gap-2">
                 {suggestedIndex.get(selectedVenue.id) ? (
-                  <div className="flex h-7 w-8 items-center justify-center rounded-full bg-ink text-base font-bold text-white">
+                  <div className="flex h-7 w-8 items-center justify-center rounded-full bg-ink text-xs font-bold text-white">
                     {suggestedIndex.get(selectedVenue.id)}
                   </div>
                 ) : (
-                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-sun text-base font-semibold text-ink">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-sun text-[9px] font-semibold text-ink">
                     Manual
                   </div>
                 )}
                 <div className="w-full">
-                  <h2 className="text-base font-semibold text-ink line-clamp-2 w-full">{selectedVenue.name}</h2>
+                  <h2 className="text-sm font-semibold text-ink line-clamp-2 w-full">{selectedVenue.name}</h2>
                 </div>
               </div>
-              <div className="flex items-center gap-3 text-base font-semibold text-slate-500">
+              <div className="flex items-center gap-3 text-xs font-semibold text-slate-500">
                 <span className="whitespace-nowrap">{typeof currentUserEta === "number" ? `${Math.round(currentUserEta)} min` : "--"}</span>
                 <span className="inline-flex items-center gap-1 whitespace-nowrap">
                   <svg
@@ -174,25 +174,25 @@ export default function BottomDrawer({
           }
         </div>}
         {!isLoading && <div className="h-full px-5 pb-6">
-          {etaError && <p className="mb-3 text-base text-red-600">{etaError}</p>}
+          {etaError && <p className="mb-3 text-xs text-red-600">{etaError}</p>}
           <div className="h-full min-h-0 space-y-4 overflow-y-auto pr-1">
             {!isLoading && hasCurrentUserLocation && selectedVenue && isExpanded && (
               <div className="rounded-2xl border border-slate-100 bg-mist p-4">
                 <div className="flex items-start gap-3">
                   <div className="flex-1">
-                    <p className="text-base text-slate-500">{selectedVenue.address}</p>
+                    <p className="text-xs text-slate-500">{selectedVenue.address}</p>
                     <a
                       href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
                         `${selectedVenue.name} ${selectedVenue.address || ""}`.trim()
                       )}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="mt-1 inline-block text-base text-blue-600 hover:underline"
+                      className="mt-1 inline-block text-xs text-blue-600 hover:underline"
                     >
                       View on Google Maps
                     </a>
                     {selectedVenue.rating && (
-                      <p className="mt-1 flex items-center gap-1 text-base text-slate-500">
+                      <p className="mt-1 flex items-center gap-1 text-xs text-slate-500">
                         <svg
                           viewBox="0 0 20 20"
                           fill="currentColor"
@@ -204,7 +204,7 @@ export default function BottomDrawer({
                         {selectedVenue.rating} ({selectedVenue.userRatingCount || 0})
                       </p>
                     )}
-                    <p className="mt-2 text-base text-slate-500">
+                    <p className="mt-2 text-xs text-slate-500">
                       Total drive time:{" "}
                       {typeof totalsByVenue?.[selectedVenue.id] === "number"
                         ? `${totalsByVenue[selectedVenue.id]} min`
@@ -216,7 +216,7 @@ export default function BottomDrawer({
                   {users.map((user) => {
                     const minutes = etaMatrix?.[selectedVenue.id]?.[user.id];
                     return (
-                      <div key={user.id} className="flex items-center justify-between text-base">
+                      <div key={user.id} className="flex items-center justify-between text-sm">
                         <button
                           type="button"
                           onClick={() => onEditUser(user.id)}
@@ -228,7 +228,7 @@ export default function BottomDrawer({
                             {user.isOrganizer ? " (Organizer)" : ""}
                           </span>
                         </button>
-                        <span className="text-base text-slate-600">
+                        <span className="text-slate-600">
                           {typeof minutes === "number" ? `${Math.round(minutes)} min` : "--"}
                         </span>
                       </div>
