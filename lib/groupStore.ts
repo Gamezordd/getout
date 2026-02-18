@@ -1,4 +1,10 @@
-import type { LockedVenue, User, Venue, VenueCategory, VotesByVenue } from "./types";
+import type {
+  LockedVenue,
+  User,
+  Venue,
+  VenueCategory,
+  VotesByVenue,
+} from "./types";
 import { redis } from "./redis";
 
 type GroupPayload = {
@@ -20,7 +26,7 @@ const createEmptyGroup = (): GroupPayload => ({
   votes: {},
   ownerKey: null,
   venueCategory: null,
-  lockedVenue: null
+  lockedVenue: null,
 });
 
 const getGroup = async (sessionId: string): Promise<GroupPayload> => {
@@ -32,10 +38,13 @@ const getGroup = async (sessionId: string): Promise<GroupPayload> => {
     if (!Array.isArray(hydrated.users)) hydrated.users = [];
     if (!Array.isArray(hydrated.venues)) hydrated.venues = [];
     if (!hydrated.votes) hydrated.votes = {};
-    if (hydrated.users.length > 0 && !hydrated.users.some((user) => user.isOrganizer)) {
+    if (
+      hydrated.users.length > 0 &&
+      !hydrated.users.some((user) => user.isOrganizer)
+    ) {
       hydrated.users = hydrated.users.map((user, index) => ({
         ...user,
-        isOrganizer: index === 0
+        isOrganizer: index === 0,
       }));
     }
     await redis.set(key, hydrated);

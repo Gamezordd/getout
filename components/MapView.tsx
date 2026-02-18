@@ -26,13 +26,15 @@ export default function MapView({
   selectedVenueId,
   highlightedVenueId,
   onSelectVenue,
-  onError
+  onError,
 }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<any>(null);
   const mapboxRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
-  const venueCoordsRef = useRef<Record<string, { lng: number; lat: number }>>({});
+  const venueCoordsRef = useRef<Record<string, { lng: number; lat: number }>>(
+    {},
+  );
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -46,14 +48,14 @@ export default function MapView({
           throw new Error("Missing Mapbox token.");
         }
         mapboxgl.accessToken = token;
-        if(!containerRef.current) {
+        if (!containerRef.current) {
           return;
         }
         const map = new mapboxgl.Map({
           container: containerRef.current,
           style: "mapbox://styles/mapbox/standard",
           center: [DEFAULT_CENTER.lng, DEFAULT_CENTER.lat],
-          zoom: 12
+          zoom: 12,
         });
 
         map.on("error", (event: any) => {
@@ -72,6 +74,7 @@ export default function MapView({
   }, [onError]);
 
   useEffect(() => {
+    console.log("Updating map markers");
     const map = mapRef.current;
     const mapboxgl = mapboxRef.current;
     if (!map || !mapboxgl) return;
@@ -127,10 +130,13 @@ export default function MapView({
       svg.style.width = "8px";
       svg.style.height = "8px";
 
-      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      const path = document.createElementNS(
+        "http://www.w3.org/2000/svg",
+        "path",
+      );
       path.setAttribute(
         "d",
-        "m9.653 16.915-.005-.003-.019-.01a20.759 20.759 0 0 1-1.162-.682 22.045 22.045 0 0 1-2.582-1.9C4.045 12.733 2 10.352 2 7.5a4.5 4.5 0 0 1 8-2.828A4.5 4.5 0 0 1 18 7.5c0 2.852-2.044 5.233-3.885 6.82a22.049 22.049 0 0 1-3.744 2.582l-.019.01-.005.003h-.002a.739.739 0 0 1-.69.001l-.002-.001Z"
+        "m9.653 16.915-.005-.003-.019-.01a20.759 20.759 0 0 1-1.162-.682 22.045 22.045 0 0 1-2.582-1.9C4.045 12.733 2 10.352 2 7.5a4.5 4.5 0 0 1 8-2.828A4.5 4.5 0 0 1 18 7.5c0 2.852-2.044 5.233-3.885 6.82a22.049 22.049 0 0 1-3.744 2.582l-.019.01-.005.003h-.002a.739.739 0 0 1-.69.001l-.002-.001Z",
       );
       svg.appendChild(path);
 
@@ -155,7 +161,8 @@ export default function MapView({
         const user = userById.get(id);
         if (!user) return;
         const avatar = document.createElement("div");
-        avatar.className = "h-3.5 w-3.5 rounded-full border border-white shadow-sm";
+        avatar.className =
+          "h-3.5 w-3.5 rounded-full border border-white shadow-sm";
         avatar.style.marginLeft = index === 0 ? "0" : "-7px";
         avatar.style.backgroundImage = `url(${user.avatarUrl})`;
         avatar.style.backgroundSize = "cover";
@@ -179,7 +186,8 @@ export default function MapView({
       .filter((value): value is number => typeof value === "number");
     const minTotal = totals.length ? Math.min(...totals) : 0;
     const maxTotal = totals.length ? Math.max(...totals) : 0;
-    const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+    const clamp = (value: number, min: number, max: number) =>
+      Math.min(Math.max(value, min), max);
     const toHex = (value: number) => value.toString(16).padStart(2, "0");
     const mixColor = (t: number) => {
       const clamped = clamp(t, 0, 1);
@@ -206,7 +214,7 @@ export default function MapView({
     suggestedVenues.forEach((venue, index) => {
       venueCoordsRef.current[venue.id] = {
         lng: venue.location.lng,
-        lat: venue.location.lat
+        lat: venue.location.lat,
       };
       const wrapper = document.createElement("div");
       wrapper.className = "flex flex-col items-center";
@@ -252,7 +260,7 @@ export default function MapView({
     manualVenues.forEach((venue) => {
       venueCoordsRef.current[venue.id] = {
         lng: venue.location.lng,
-        lat: venue.location.lat
+        lat: venue.location.lat,
       };
       const wrapper = document.createElement("div");
       wrapper.className = "flex flex-col items-center";
@@ -301,7 +309,7 @@ export default function MapView({
     votes,
     highlightedVenueId,
     selectedVenueId,
-    onSelectVenue
+    onSelectVenue,
   ]);
 
   useEffect(() => {
@@ -312,7 +320,7 @@ export default function MapView({
     const points = [
       ...users.map((user) => user.location),
       ...suggestedVenues.map((venue) => venue.location),
-      ...manualVenues.map((venue) => venue.location)
+      ...manualVenues.map((venue) => venue.location),
     ];
     if (points.length === 0) return;
 
@@ -336,7 +344,7 @@ export default function MapView({
       duration: 600,
       zoom: Math.max(map.getZoom(), 10),
       // Positive Y offset places the target above viewport center.
-      offset: [0, -offsetY]
+      offset: [0, -offsetY],
     });
   }, [selectedVenueId]);
 

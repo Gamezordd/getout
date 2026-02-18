@@ -9,7 +9,11 @@ type VoteRequest = {
   venueId: string;
 };
 
-const safeTrigger = async (channel: string, event: string, payload: unknown) => {
+const safeTrigger = async (
+  channel: string,
+  event: string,
+  payload: unknown,
+) => {
   if (!process.env.PUSHER_APP_ID) return;
   try {
     await pusher.trigger(channel, event, payload);
@@ -18,7 +22,10 @@ const safeTrigger = async (channel: string, event: string, payload: unknown) => 
   }
 };
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse,
+) {
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
     return res.status(405).json({ message: "Method not allowed" });
@@ -31,7 +38,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const group = await getGroup(payload.sessionId);
   if (group.lockedVenue) {
-    return res.status(400).json({ message: "Voting is closed. Venue already finalized." });
+    return res
+      .status(400)
+      .json({ message: "Voting is closed. Venue already finalized." });
   }
   const votes: VotesByVenue = group.votes || {};
 
@@ -52,7 +61,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   await safeTrigger(`private-group-${payload.sessionId}`, "votes-updated", {
     venueId: payload.venueId,
-    userId: payload.userId
+    userId: payload.userId,
   });
 
   return res.status(200).json({ votes: group.votes });

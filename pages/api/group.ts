@@ -1,5 +1,12 @@
 ﻿import type { NextApiRequest, NextApiResponse } from "next";
-import type { LatLng, LockedVenue, User, Venue, VenueCategory, VotesByVenue } from "../../lib/types";
+import type {
+  LatLng,
+  LockedVenue,
+  User,
+  Venue,
+  VenueCategory,
+  VotesByVenue,
+} from "../../lib/types";
 import { getGroup, saveGroup, type GroupPayload } from "../../lib/groupStore";
 import { pusher } from "../../lib/pusherServer";
 
@@ -86,20 +93,27 @@ const ALLOWED_CATEGORIES = new Set<VenueCategory>([
   "restaurant",
   "cafe",
   "night_club",
-  "brewery"
+  "brewery",
 ]);
 
-const toResponse = (group: GroupPayload, currentUserId?: string): GroupResponse => ({
+const toResponse = (
+  group: GroupPayload,
+  currentUserId?: string,
+): GroupResponse => ({
   users: group.users,
   venues: group.venues,
   manualVenues: group.manualVenues,
   votes: group.votes,
   venueCategory: group.venueCategory,
   lockedVenue: group.lockedVenue,
-  currentUserId
+  currentUserId,
 });
 
-const safeTrigger = async (channel: string, event: string, payload: unknown) => {
+const safeTrigger = async (
+  channel: string,
+  event: string,
+  payload: unknown,
+) => {
   if (!process.env.PUSHER_APP_ID) return;
   try {
     await pusher.trigger(channel, event, payload);
@@ -108,7 +122,10 @@ const safeTrigger = async (channel: string, event: string, payload: unknown) => 
   }
 };
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse,
+) {
   if (req.method === "GET") {
     const sessionId = req.query.sessionId;
     if (typeof sessionId !== "string") {
@@ -144,13 +161,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (payload.action === "join") {
     if (!payload.name || !payload.location) {
-      return res.status(400).json({ message: "Name and location are required." });
+      return res
+        .status(400)
+        .json({ message: "Name and location are required." });
     }
-    if (payload.venueCategory && !ALLOWED_CATEGORIES.has(payload.venueCategory)) {
+    if (
+      payload.venueCategory &&
+      !ALLOWED_CATEGORIES.has(payload.venueCategory)
+    ) {
       return res.status(400).json({ message: "Unsupported venue category." });
     }
-    if (group.venueCategory && payload.venueCategory && payload.venueCategory !== group.venueCategory) {
-      return res.status(400).json({ message: "Venue category is already locked for this group." });
+    if (
+      group.venueCategory &&
+      payload.venueCategory &&
+      payload.venueCategory !== group.venueCategory
+    ) {
+      return res
+        .status(400)
+        .json({ message: "Venue category is already locked for this group." });
     }
     if (!group.venueCategory && payload.venueCategory) {
       group.venueCategory = payload.venueCategory;
@@ -161,7 +189,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       name: payload.name.trim(),
       avatarUrl: buildAvatarUrl(payload.name),
       location: payload.location,
-      isOrganizer: group.users.length === 0
+      isOrganizer: group.users.length === 0,
     };
 
     group.users.push(user);
@@ -190,7 +218,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   if (payload.action === "removeManualVenue") {
-    group.manualVenues = group.manualVenues.filter((venue) => venue.id !== payload.venueId);
+    group.manualVenues = group.manualVenues.filter(
+      (venue) => venue.id !== payload.venueId,
+    );
     await saveGroup(payload.sessionId, group);
     await safeTrigger(channel, "group-updated", { reason: "manual-venues" });
     return res.status(200).json(toResponse(group));
@@ -209,21 +239,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (payload.action === "removeUser") {
     if (!group.ownerKey || payload.ownerKey !== group.ownerKey) {
-      return res.status(403).json({ message: "Only the group owner can remove users." });
+      return res
+        .status(403)
+        .json({ message: "Only the group owner can remove users." });
     }
     const index = group.users.findIndex((user) => user.id === payload.userId);
     if (index === -1) {
       return res.status(404).json({ message: "User not found." });
     }
     group.users.splice(index, 1);
-    if (group.users.length > 0 && !group.users.some((user) => user.isOrganizer)) {
+    if (
+      group.users.length > 0 &&
+      !group.users.some((user) => user.isOrganizer)
+    ) {
       group.users = group.users.map((user, userIndex) => ({
         ...user,
-        isOrganizer: userIndex === 0
+        isOrganizer: userIndex === 0,
       }));
     }
     Object.keys(group.votes).forEach((venueId) => {
-      group.votes[venueId] = group.votes[venueId].filter((id) => id !== payload.userId);
+      group.votes[venueId] = group.votes[venueId].filter(
+        (id) => id !== payload.userId,
+      );
     });
     await saveGroup(payload.sessionId, group);
     await safeTrigger(channel, "group-updated", { reason: "remove-user" });
@@ -232,17 +269,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (payload.action === "finalizeVenue") {
     if (group.lockedVenue) {
-      return res.status(400).json({ message: "Venue already locked for this group." });
+      return res
+        .status(400)
+        .json({ message: "Venue already locked for this group." });
     }
     const organizer = group.users.find((user) => user.isOrganizer);
     if (!organizer || organizer.id !== payload.userId) {
-      return res.status(403).json({ message: "Only organizer can finalize a venue." });
+      return res
+        .status(403)
+        .json({ message: "Only organizer can finalize a venue." });
     }
     const votedVenueIds = Object.keys(group.votes || {}).filter(
-      (venueId) => (group.votes[venueId] || []).length > 0
+      (venueId) => (group.votes[venueId] || []).length > 0,
     );
     if (!votedVenueIds.includes(payload.venueId)) {
-      return res.status(400).json({ message: "Selected venue does not have votes." });
+      return res
+        .status(400)
+        .json({ message: "Selected venue does not have votes." });
     }
 
     const allVenues = [...group.manualVenues, ...group.venues];
@@ -255,10 +298,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       id: venue.id,
       name: venue.name,
       address: venue.address,
-      lockedAt: new Date().toISOString()
+      lockedAt: new Date().toISOString(),
     };
     await saveGroup(payload.sessionId, group);
-    await safeTrigger(channel, "group-updated", { reason: "venue-finalized", venueId: venue.id });
+    await safeTrigger(channel, "group-updated", {
+      reason: "venue-finalized",
+      venueId: venue.id,
+    });
     return res.status(200).json(toResponse(group));
   }
 

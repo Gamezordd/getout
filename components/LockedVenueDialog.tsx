@@ -1,7 +1,8 @@
+import { observer } from "mobx-react-lite";
 import Dialog from "./Dialog";
 import { useAppStore } from "../lib/store/AppStoreProvider";
 
-export default function LockedVenueDialog() {
+const LockedVenueDialog = observer(function LockedVenueDialog() {
   const store = useAppStore();
 
   if (!store.lockedVenue || !store.currentUserId) return null;
@@ -13,11 +14,13 @@ export default function LockedVenueDialog() {
       title="Venue locked"
       description="Voting has ended. GetOut to:"
     >
-      <p className="mt-2 text-sm font-semibold text-ink">{store.lockedVenue.name}</p>
+      <p className="mt-2 text-sm font-semibold text-ink">
+        {store.lockedVenue.name}
+      </p>
       <p className="mt-1 text-xs text-slate-500">{store.lockedVenue.address}</p>
       <a
         href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-          `${store.lockedVenue.name} ${store.lockedVenue.address || ""}`.trim()
+          `${store.lockedVenue.name} ${store.lockedVenue.address || ""}`.trim(),
         )}`}
         target="_blank"
         rel="noreferrer"
@@ -27,4 +30,6 @@ export default function LockedVenueDialog() {
       </a>
     </Dialog>
   );
-}
+});
+
+export default LockedVenueDialog;

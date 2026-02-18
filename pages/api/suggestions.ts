@@ -1,5 +1,11 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import type { EtaMatrix, LatLng, TotalsByVenue, Venue, VenueCategory } from "../../lib/types";
+import type {
+  EtaMatrix,
+  LatLng,
+  TotalsByVenue,
+  Venue,
+  VenueCategory,
+} from "../../lib/types";
 import { getGroup, saveGroup } from "../../lib/groupStore";
 
 type SuggestionsResponse = {
@@ -25,67 +31,87 @@ const computeCentroid = (points: LatLng[]): LatLng => {
       acc.lng += point.lng;
       return acc;
     },
-    { lat: 0, lng: 0 }
+    { lat: 0, lng: 0 },
   );
   const count = points.length || 1;
   return { lat: total.lat / count, lng: total.lng / count };
 };
 
-const buildCacheKey = (sessionId: string, points: LatLng[], manualVenues: Venue[]) => {
-  const coords = points.map((point) => `${point.lat.toFixed(5)},${point.lng.toFixed(5)}`).join("|");
-  const manual = manualVenues.map((venue) => venue.id).sort().join(",");
+const buildCacheKey = (
+  sessionId: string,
+  points: LatLng[],
+  manualVenues: Venue[],
+) => {
+  const coords = points
+    .map((point) => `${point.lat.toFixed(5)},${point.lng.toFixed(5)}`)
+    .join("|");
+  const manual = manualVenues
+    .map((venue) => venue.id)
+    .sort()
+    .join(",");
   return `${sessionId}:${coords}:${manual}`;
 };
 
-const fetchTopPlaces = async (centroid: LatLng, apiKey: string, venueCategory: VenueCategory) => {
+const fetchTopPlaces = async (
+  centroid: LatLng,
+  apiKey: string,
+  venueCategory: VenueCategory,
+) => {
   try {
-  console.log("Fetching places with centroid:", centroid, "and category:", venueCategory);
-  const response = await fetch("https://places.googleapis.com/v1/places:searchNearby", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Goog-Api-Key": apiKey,
-      "X-Goog-FieldMask":
-        "places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount"
-    },
-    body: JSON.stringify({
-      includedTypes: [venueCategory],
-      maxResultCount: 20,
-      rankPreference: "POPULARITY",
-      locationRestriction: {
-        circle: {
-          center: { latitude: centroid.lat, longitude: centroid.lng },
-          radius: 5000
-        }
-      }
-    })
-  });
+    console.log(
+      "Fetching places with centroid:",
+      centroid,
+      "and category:",
+      venueCategory,
+    );
+    const response = await fetch(
+      "https://places.googleapis.com/v1/places:searchNearby",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Goog-Api-Key": apiKey,
+          "X-Goog-FieldMask":
+            "places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount",
+        },
+        body: JSON.stringify({
+          includedTypes: [venueCategory],
+          maxResultCount: 20,
+          rankPreference: "POPULARITY",
+          locationRestriction: {
+            circle: {
+              center: { latitude: centroid.lat, longitude: centroid.lng },
+              radius: 5000,
+            },
+          },
+        }),
+      },
+    );
 
+    if (!response.ok) {
+      throw new Error("Unable to fetch bar suggestions.");
+    }
 
-  if (!response.ok) {
-    throw new Error("Unable to fetch bar suggestions.");
-  }
+    const data = await response.json();
+    const places = Array.isArray(data.places) ? data.places : [];
 
-  const data = await response.json();
-  const places = Array.isArray(data.places) ? data.places : [];
-
-  return places
-    .map((place: any) => {
-      const location = place.location;
-      if (!location) return null;
-      return {
-        id: place.id,
-        name: place.displayName?.text || "Unknown place",
-        address: place.formattedAddress,
-        location: { lat: location.latitude, lng: location.longitude },
-        rating: place.rating || 0,
-        userRatingCount: place.userRatingCount || 0
-      };
-    })
-    .filter(Boolean)
-    .filter((venue: any) => venue.rating >= 4.2 && venue.userRatingCount >= 200) as Array<
-    Venue & { rating: number; userRatingCount: number }
-  >;
+    return places
+      .map((place: any) => {
+        const location = place.location;
+        if (!location) return null;
+        return {
+          id: place.id,
+          name: place.displayName?.text || "Unknown place",
+          address: place.formattedAddress,
+          location: { lat: location.latitude, lng: location.longitude },
+          rating: place.rating || 0,
+          userRatingCount: place.userRatingCount || 0,
+        };
+      })
+      .filter(Boolean)
+      .filter(
+        (venue: any) => venue.rating >= 4.2 && venue.userRatingCount >= 200,
+      ) as Array<Venue & { rating: number; userRatingCount: number }>;
   } catch (error) {
     console.error("Error fetching places:", error);
     return [];
@@ -111,10 +137,12 @@ interface DistanceMatrixRow {
 const fetchDriveTimesInternal = async (
   apiKey: string,
   origins: LatLng[],
-  destinations: LatLng[]
+  destinations: LatLng[],
 ): Promise<DistanceMatrixRow[]> => {
   const originsParam = origins.map((loc) => `${loc.lat},${loc.lng}`).join("|");
-  const destinationsParam = destinations.map((loc) => `${loc.lat},${loc.lng}`).join("|");
+  const destinationsParam = destinations
+    .map((loc) => `${loc.lat},${loc.lng}`)
+    .join("|");
 
   const url =
     "https://maps.googleapis.com/maps/api/distancematrix/json?" +
@@ -135,7 +163,7 @@ const fetchDriveTimesInternal = async (
 const fetchDriveTimes = async (
   apiKey: string,
   origins: LatLng[],
-  destinations: LatLng[]
+  destinations: LatLng[],
 ): Promise<DistanceMatrixRow[]> => {
   let driveTimesMatrix: DistanceMatrixRow[] = [];
   const groupedOrigins = origins.reduce<LatLng[][]>((acc, origin, index) => {
@@ -147,21 +175,24 @@ const fetchDriveTimes = async (
     return acc;
   }, []);
 
-  for(let i = 0; i < groupedOrigins.length; i++) {
+  for (let i = 0; i < groupedOrigins.length; i++) {
     try {
-      const partialMatrix = await fetchDriveTimesInternal(apiKey, groupedOrigins[i], destinations);
+      const partialMatrix = await fetchDriveTimesInternal(
+        apiKey,
+        groupedOrigins[i],
+        destinations,
+      );
       driveTimesMatrix = driveTimesMatrix.concat(partialMatrix);
     } catch (error) {
       console.error(`Error fetching drive times for group ${i}:`, error);
     }
   }
   return driveTimesMatrix;
-
 };
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse<SuggestionsResponse | { message: string }>
+  res: NextApiResponse<SuggestionsResponse | { message: string }>,
 ) {
   if (req.method !== "GET") {
     res.setHeader("Allow", "GET");
@@ -184,14 +215,14 @@ export default async function handler(
       venues: [],
       suggestedVenues: [],
       etaMatrix: {},
-      totalsByVenue: {}
+      totalsByVenue: {},
     });
   }
 
   const cacheKey = buildCacheKey(
     sessionId,
     group.users.map((user) => user.location),
-    group.manualVenues
+    group.manualVenues,
   );
   const cached = suggestionsCache.get(cacheKey);
   if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
@@ -204,7 +235,9 @@ export default async function handler(
     const candidates = await fetchTopPlaces(centroid, apiKey, category);
 
     const manualVenues = group.manualVenues || [];
-    const combinedDestinations = [...manualVenues, ...candidates].reduce<Venue[]>((acc, venue) => {
+    const combinedDestinations = [...manualVenues, ...candidates].reduce<
+      Venue[]
+    >((acc, venue) => {
       if (!acc.find((item) => item.id === venue.id)) {
         acc.push(venue);
       }
@@ -217,7 +250,7 @@ export default async function handler(
         suggestedVenues: [],
         etaMatrix: {},
         totalsByVenue: {},
-        warning: "No places matched the rating and review filters."
+        warning: "No places matched the rating and review filters.",
       };
       suggestionsCache.set(cacheKey, { timestamp: Date.now(), payload });
       return res.status(200).json(payload);
@@ -226,7 +259,7 @@ export default async function handler(
     const rows = await fetchDriveTimes(
       apiKey,
       group.users.map((user) => user.location),
-      combinedDestinations.map((venue) => venue.location)
+      combinedDestinations.map((venue) => venue.location),
     );
 
     const etaMatrix: EtaMatrix = {};
@@ -239,7 +272,10 @@ export default async function handler(
 
       group.users.forEach((user, userIndex) => {
         const element = rows?.[userIndex]?.elements?.[venueIndex];
-        if (element?.status === "OK" && typeof element.duration?.value === "number") {
+        if (
+          element?.status === "OK" &&
+          typeof element.duration?.value === "number"
+        ) {
           const minutes = Math.round(element.duration.value / 60);
           etaMatrix[venue.id][user.id] = minutes;
           totalMinutes += minutes;
@@ -259,7 +295,9 @@ export default async function handler(
 
     const mergedVenues: Venue[] = [
       ...manualVenues,
-      ...rankedSuggested.filter((venue) => !manualVenues.find((item) => item.id === venue.id))
+      ...rankedSuggested.filter(
+        (venue) => !manualVenues.find((item) => item.id === venue.id),
+      ),
     ];
 
     group.venues = rankedSuggested;
@@ -269,7 +307,7 @@ export default async function handler(
       venues: mergedVenues,
       suggestedVenues: rankedSuggested,
       etaMatrix,
-      totalsByVenue
+      totalsByVenue,
     };
     suggestionsCache.set(cacheKey, { timestamp: Date.now(), payload });
 

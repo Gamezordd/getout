@@ -6,7 +6,10 @@ type Payload = {
   venues: Venue[];
 };
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse,
+) {
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
     return res.status(405).json({ message: "Method not allowed" });
@@ -16,7 +19,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { users, venues } = req.body as Payload;
 
     if (!users?.length || !venues?.length) {
-      return res.status(400).json({ message: "Users and venues are required." });
+      return res
+        .status(400)
+        .json({ message: "Users and venues are required." });
     }
 
     const token = process.env.MAPBOX_SECRET_TOKEN || process.env.MAPBOX_TOKEN;

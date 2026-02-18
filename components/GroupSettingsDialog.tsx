@@ -1,3 +1,4 @@
+import { observer } from "mobx-react-lite";
 import Dialog from "./Dialog";
 import { useAppStore } from "../lib/store/AppStoreProvider";
 
@@ -6,7 +7,7 @@ interface Props {
   setShowGroupSettings: (open: boolean) => void;
 }
 
-export default function GroupSettingsDialog({
+const GroupSettingsDialog = observer(function GroupSettingsDialog({
   showGroupSettings,
   setShowGroupSettings,
 }: Props) {
@@ -31,9 +32,11 @@ export default function GroupSettingsDialog({
         )}
         {store.users.map((user) => {
           const pickedVenueId = Object.keys(store.votes || {}).find((venueId) =>
-            store.votes?.[venueId]?.includes(user.id)
+            store.votes?.[venueId]?.includes(user.id),
           );
-          const pickedName = pickedVenueId ? venueById.get(pickedVenueId)?.name : null;
+          const pickedName = pickedVenueId
+            ? venueById.get(pickedVenueId)?.name
+            : null;
 
           return (
             <div
@@ -41,10 +44,16 @@ export default function GroupSettingsDialog({
               className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 px-3 py-2"
             >
               <div className="flex items-center gap-2">
-                <img src={user.avatarUrl} alt={user.name} className="h-7 w-7 rounded-full" />
+                <img
+                  src={user.avatarUrl}
+                  alt={user.name}
+                  className="h-7 w-7 rounded-full"
+                />
                 <div>
                   <p className="text-sm font-semibold text-ink">{user.name}</p>
-                  {user.isOrganizer && <p className="text-[11px] text-slate-500">Organizer</p>}
+                  {user.isOrganizer && (
+                    <p className="text-[11px] text-slate-500">Organizer</p>
+                  )}
                 </div>
               </div>
               <div className="flex items-center gap-3">
@@ -67,4 +76,6 @@ export default function GroupSettingsDialog({
       </div>
     </Dialog>
   );
-}
+});
+
+export default GroupSettingsDialog;

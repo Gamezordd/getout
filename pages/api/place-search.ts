@@ -12,19 +12,26 @@ type SearchResponse = {
   results: PlaceResult[];
 };
 
-const searchTextPlaces = async (apiKey: string, query: string): Promise<PlaceResult[]> => {
-  const response = await fetch("https://places.googleapis.com/v1/places:searchText", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Goog-Api-Key": apiKey,
-      "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.location"
+const searchTextPlaces = async (
+  apiKey: string,
+  query: string,
+): Promise<PlaceResult[]> => {
+  const response = await fetch(
+    "https://places.googleapis.com/v1/places:searchText",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": apiKey,
+        "X-Goog-FieldMask":
+          "places.id,places.displayName,places.formattedAddress,places.location",
+      },
+      body: JSON.stringify({
+        textQuery: query,
+        maxResultCount: 5,
+      }),
     },
-    body: JSON.stringify({
-      textQuery: query,
-      maxResultCount: 5
-    })
-  });
+  );
 
   if (!response.ok) {
     throw new Error("Places search failed.");
@@ -39,18 +46,22 @@ const searchTextPlaces = async (apiKey: string, query: string): Promise<PlaceRes
       if (!location) return null;
       return {
         id: place.id,
-        name: place.displayName?.text || place.formattedAddress || "Unknown place",
+        name:
+          place.displayName?.text || place.formattedAddress || "Unknown place",
         address: place.formattedAddress || undefined,
         location: {
           lat: location.latitude,
-          lng: location.longitude
-        }
+          lng: location.longitude,
+        },
       };
     })
     .filter(Boolean) as PlaceResult[];
 };
 
-const geocodeAddress = async (apiKey: string, query: string): Promise<PlaceResult[]> => {
+const geocodeAddress = async (
+  apiKey: string,
+  query: string,
+): Promise<PlaceResult[]> => {
   const url =
     "https://maps.googleapis.com/maps/api/geocode/json?address=" +
     encodeURIComponent(query) +
@@ -72,17 +83,19 @@ const geocodeAddress = async (apiKey: string, query: string): Promise<PlaceResul
       address: result.formatted_address || undefined,
       location: {
         lat: result.geometry?.location?.lat,
-        lng: result.geometry?.location?.lng
-      }
+        lng: result.geometry?.location?.lng,
+      },
     }))
-    .filter((result: PlaceResult) =>
-      typeof result.location.lat === "number" && typeof result.location.lng === "number"
+    .filter(
+      (result: PlaceResult) =>
+        typeof result.location.lat === "number" &&
+        typeof result.location.lng === "number",
     );
 };
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse<SearchResponse | { message: string }>
+  res: NextApiResponse<SearchResponse | { message: string }>,
 ) {
   if (req.method !== "GET") {
     res.setHeader("Allow", "GET");
@@ -109,6 +122,8 @@ export default async function handler(
     const geocoded = await geocodeAddress(apiKey, query);
     return res.status(200).json({ results: geocoded });
   } catch {
-    return res.status(500).json({ message: "Search failed. Please try again." });
+    return res
+      .status(500)
+      .json({ message: "Search failed. Please try again." });
   }
 }

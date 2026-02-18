@@ -9,7 +9,11 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   if (!storeRef.current) {
     storeRef.current = new AppStore();
   }
-  return <AppStoreContext.Provider value={storeRef.current}>{children}</AppStoreContext.Provider>;
+  return (
+    <AppStoreContext.Provider value={storeRef.current}>
+      {children}
+    </AppStoreContext.Provider>
+  );
 }
 
 export const useAppStore = () => {

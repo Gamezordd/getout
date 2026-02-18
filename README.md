@@ -1,11 +1,13 @@
 ﻿# GetOut Meetup Planner
 
 ## Setup
+
 1. Install dependencies: `npm install`
 2. Create `.env.local` using `.env.local.example` as a template
 3. Run the dev server: `npm run dev`
 
 ## Notes
+
 - The app uses Mapbox GL JS for rendering and Mapbox Geocoding API for search.
 - Suggestions and ETA calculations are in `/api/suggestions` using Google Places + Distance Matrix.
 - Suggestions are 4.5+ rated bars with 200+ reviews within 5km of the group centroid, ranked by total drive time.

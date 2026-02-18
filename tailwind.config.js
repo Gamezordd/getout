@@ -7,9 +7,9 @@ module.exports = {
         ink: "#0f172a",
         mist: "#f8fafc",
         mint: "#d1fae5",
-        sun: "#fde68a"
-      }
-    }
+        sun: "#fde68a",
+      },
+    },
   },
-  plugins: []
+  plugins: [],
 };

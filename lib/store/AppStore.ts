@@ -7,7 +7,7 @@ import type {
   User,
   Venue,
   VenueCategory,
-  VotesByVenue
+  VotesByVenue,
 } from "../types";
 
 const OWNER_KEY_PREFIX = "getout-owner-";
@@ -97,16 +97,23 @@ export class AppStore {
   }
 
   get hasFinalizeQuorum() {
-    return this.users.length > 0 && this.uniqueVoterCount >= Math.ceil(this.users.length / 2);
+    return (
+      this.users.length > 0 &&
+      this.uniqueVoterCount >= Math.ceil(this.users.length / 2)
+    );
   }
 
   get votedVenues() {
     const voteCounts = this.votes || {};
-    return this.venues.filter((venue) => (voteCounts[venue.id] || []).length > 0);
+    return this.venues.filter(
+      (venue) => (voteCounts[venue.id] || []).length > 0,
+    );
   }
 
   get selectedVenue() {
-    return this.venues.find((venue) => venue.id === this.selectedVenueId) || null;
+    return (
+      this.venues.find((venue) => venue.id === this.selectedVenueId) || null
+    );
   }
 
   get topVenues() {
@@ -115,8 +122,14 @@ export class AppStore {
 
   get mostEfficientVenueId() {
     const withTotals = this.venues
-      .map((venue) => ({ venueId: venue.id, total: this.totalsByVenue?.[venue.id] }))
-      .filter((entry) => typeof entry.total === "number") as Array<{ venueId: string; total: number }>;
+      .map((venue) => ({
+        venueId: venue.id,
+        total: this.totalsByVenue?.[venue.id],
+      }))
+      .filter((entry) => typeof entry.total === "number") as Array<{
+      venueId: string;
+      total: number;
+    }>;
     if (withTotals.length === 0) return null;
     withTotals.sort((a, b) => a.total - b.total);
     return withTotals[0].venueId;
@@ -128,7 +141,9 @@ export class AppStore {
     this.lockedVenue = null;
     if (typeof window !== "undefined") {
       this.shareUrl = `${window.location.origin}${pathname}?sessionId=${sessionId}`;
-      const storedOwner = localStorage.getItem(`${OWNER_KEY_PREFIX}${sessionId}`);
+      const storedOwner = localStorage.getItem(
+        `${OWNER_KEY_PREFIX}${sessionId}`,
+      );
       if (storedOwner) {
         this.ownerKey = storedOwner;
       } else {
@@ -153,7 +168,11 @@ export class AppStore {
       await fetch("/api/group", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "init", sessionId: this.sessionId, ownerKey: this.ownerKey })
+        body: JSON.stringify({
+          action: "init",
+          sessionId: this.sessionId,
+          ownerKey: this.ownerKey,
+        }),
       });
     } catch {
       // Ignore init errors.
@@ -179,7 +198,10 @@ export class AppStore {
         this.lockedVenue = data.lockedVenue || null;
         this.isLoadingGroup = false;
         if (data.currentUserId && this.sessionId) {
-          localStorage.setItem(`${USER_KEY_PREFIX}${this.sessionId}`, data.currentUserId);
+          localStorage.setItem(
+            `${USER_KEY_PREFIX}${this.sessionId}`,
+            data.currentUserId,
+          );
           this.currentUserId = data.currentUserId;
         }
       });
@@ -204,7 +226,9 @@ export class AppStore {
       this.isLoadingSuggestions = true;
       this.etaError = null;
       this.suggestionWarning = null;
-      const response = await fetch(`/api/suggestions?sessionId=${this.sessionId}`);
+      const response = await fetch(
+        `/api/suggestions?sessionId=${this.sessionId}`,
+      );
       if (!response.ok) {
         const payload = await response.json().catch(() => ({}));
         throw new Error(payload.message || "Unable to fetch suggestions.");
@@ -218,13 +242,24 @@ export class AppStore {
         this.suggestionWarning = data.warning || null;
         this.isLoadingSuggestions = false;
         const hasSelected =
-          this.selectedVenueId && this.venues.find((venue) => venue.id === this.selectedVenueId);
+          this.selectedVenueId &&
+          this.venues.find((venue) => venue.id === this.selectedVenueId);
         if (!hasSelected) {
           const ranked = this.venues
-            .map((venue) => ({ id: venue.id, total: this.totalsByVenue?.[venue.id] }))
-            .filter((item) => typeof item.total === "number") as Array<{ id: string; total: number }>;
+            .map((venue) => ({
+              id: venue.id,
+              total: this.totalsByVenue?.[venue.id],
+            }))
+            .filter((item) => typeof item.total === "number") as Array<{
+            id: string;
+            total: number;
+          }>;
           ranked.sort((a, b) => a.total - b.total);
-          this.selectedVenueId = ranked[0]?.id || this.suggestedVenues[0]?.id || this.venues[0]?.id || null;
+          this.selectedVenueId =
+            ranked[0]?.id ||
+            this.suggestedVenues[0]?.id ||
+            this.venues[0]?.id ||
+            null;
         }
       });
     } catch (err: any) {
@@ -235,7 +270,12 @@ export class AppStore {
     }
   }
 
-  async addManualVenue(place: { id: string; name: string; address?: string; location: LatLng }) {
+  async addManualVenue(place: {
+    id: string;
+    name: string;
+    address?: string;
+    location: LatLng;
+  }) {
     if (!this.sessionId) return;
     try {
       this.groupError = null;
@@ -249,9 +289,9 @@ export class AppStore {
             id: place.id,
             name: place.name,
             address: place.address,
-            location: place.location
-          }
-        })
+            location: place.location,
+          },
+        }),
       });
       if (!response.ok) {
         const payload = await response.json().catch(() => ({}));
@@ -273,7 +313,11 @@ export class AppStore {
       const response = await fetch("/api/group", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "removeManualVenue", sessionId: this.sessionId, venueId })
+        body: JSON.stringify({
+          action: "removeManualVenue",
+          sessionId: this.sessionId,
+          venueId,
+        }),
       });
       if (!response.ok) {
         const payload = await response.json().catch(() => ({}));
@@ -298,8 +342,8 @@ export class AppStore {
           action: "updateUser",
           sessionId: this.sessionId,
           userId,
-          location
-        })
+          location,
+        }),
       });
       if (!response.ok) {
         const payload = await response.json().catch(() => ({}));
@@ -324,8 +368,8 @@ export class AppStore {
           action: "removeUser",
           sessionId: this.sessionId,
           userId,
-          ownerKey: this.ownerKey
-        })
+          ownerKey: this.ownerKey,
+        }),
       });
       if (!response.ok) {
         const payload = await response.json().catch(() => ({}));
@@ -349,7 +393,11 @@ export class AppStore {
       const response = await fetch("/api/vote", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId: this.sessionId, userId: this.currentUserId, venueId })
+        body: JSON.stringify({
+          sessionId: this.sessionId,
+          userId: this.currentUserId,
+          venueId,
+        }),
       });
       if (!response.ok) {
         const payload = await response.json().catch(() => ({}));
@@ -369,7 +417,9 @@ export class AppStore {
   applyVote(userId: string, venueId: string) {
     const votes: VotesByVenue = this.votes || {};
     Object.keys(votes).forEach((existingVenueId) => {
-      votes[existingVenueId] = votes[existingVenueId].filter((id) => id !== userId);
+      votes[existingVenueId] = votes[existingVenueId].filter(
+        (id) => id !== userId,
+      );
     });
 
     if (!votes[venueId]) {
@@ -386,7 +436,7 @@ export class AppStore {
     name: string,
     location: LatLng,
     venueCategory?: VenueCategory,
-    options?: { preserveCurrentUser?: boolean }
+    options?: { preserveCurrentUser?: boolean },
   ) {
     if (!this.sessionId) {
       throw new Error("Missing session. Open this page from a group link.");
@@ -399,8 +449,8 @@ export class AppStore {
         sessionId: this.sessionId,
         name: name.trim(),
         location,
-        venueCategory
-      })
+        venueCategory,
+      }),
     });
     if (!response.ok) {
       const payload = await response.json().catch(() => ({}));
@@ -408,7 +458,10 @@ export class AppStore {
     }
     const data = (await response.json()) as { currentUserId?: string };
     if (data.currentUserId && this.sessionId && !options?.preserveCurrentUser) {
-      localStorage.setItem(`${USER_KEY_PREFIX}${this.sessionId}`, data.currentUserId);
+      localStorage.setItem(
+        `${USER_KEY_PREFIX}${this.sessionId}`,
+        data.currentUserId,
+      );
       runInAction(() => {
         this.currentUserId = data.currentUserId || null;
       });
@@ -426,8 +479,8 @@ export class AppStore {
         action: "finalizeVenue",
         sessionId: this.sessionId,
         userId: this.currentUserId,
-        venueId
-      })
+        venueId,
+      }),
     });
     if (!response.ok) {
       const payload = await response.json().catch(() => ({}));

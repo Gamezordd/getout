@@ -1,9 +1,10 @@
 import { useState } from "react";
+import { observer } from "mobx-react-lite";
 import { useAppStore } from "../lib/store/AppStoreProvider";
 import MapView from "./MapView";
 import GroupSettingsDialog from "./GroupSettingsDialog";
 
-export function MapContainer() {
+export const MapContainer = observer(function MapContainer() {
   const store = useAppStore();
   const [fitAllTrigger, setFitAllTrigger] = useState(0);
   const [showGroupSettings, setShowGroupSettings] = useState(false);
@@ -65,4 +66,4 @@ export function MapContainer() {
       />
     </>
   );
-}
+});

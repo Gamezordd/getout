@@ -1,15 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
+import { observer } from "mobx-react-lite";
 import { useAppStore } from "../lib/store/AppStoreProvider";
 import Dialog from "./Dialog";
 import PlaceSearch, { PlaceResult } from "./PlaceSearch";
 import { User } from "../lib/types";
 
-
 interface Props {
   isExpanded: boolean;
   onEditUser: (userId: string) => void;
 }
-export default function DrawerContent({ isExpanded, onEditUser }: Props) {
+const DrawerContent = observer(function DrawerContent({
+  isExpanded,
+  onEditUser,
+}: Props) {
   const {
     hasCurrentUserLocation,
     totalsByVenue,
@@ -28,7 +31,6 @@ export default function DrawerContent({ isExpanded, onEditUser }: Props) {
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [showAllVoters, setShowAllVoters] = useState(false);
 
-
   const editingUser = users.find((user) => user.id === editingUserId) || null;
 
   const voterNames = useMemo(() => {
@@ -41,7 +43,7 @@ export default function DrawerContent({ isExpanded, onEditUser }: Props) {
       .filter((user): user is User => Boolean(user))
       .map((user) => user.name);
   }, [selectedVenue, votes, users]);
-    
+
   const handleUpdateUserLocation = async (place: PlaceResult) => {
     if (!editingUserId) return;
     await updateUserLocation(editingUserId, place.location);
@@ -72,7 +74,7 @@ export default function DrawerContent({ isExpanded, onEditUser }: Props) {
       setShowAllVoters(false);
     }
   }, [isExpanded]);
-  
+
   return (
     <>
       <div className="mx-auto mt-2 h-1.5 w-12 rounded-full bg-slate-200" />
@@ -260,4 +262,6 @@ export default function DrawerContent({ isExpanded, onEditUser }: Props) {
       )}
     </>
   );
-}
+});
+
+export default DrawerContent;

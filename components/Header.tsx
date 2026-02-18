@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { observer } from "mobx-react-lite";
 import { useAppStore } from "../lib/store/AppStoreProvider";
 import { useRouter } from "next/router";
 
@@ -6,7 +7,7 @@ interface Props {
   onFinalizeClick: () => void;
 }
 
-export function Header({ onFinalizeClick }: Props) {
+export const Header = observer(function Header({ onFinalizeClick }: Props) {
   const store = useAppStore();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -48,7 +49,9 @@ export function Header({ onFinalizeClick }: Props) {
   }, [menuOpen]);
 
   const canFinalize =
-    store.isCurrentUserOrganizer && store.hasFinalizeQuorum && !store.lockedVenue;
+    store.isCurrentUserOrganizer &&
+    store.hasFinalizeQuorum &&
+    !store.lockedVenue;
 
   return (
     <header className="inset-x-0 w-full top-0 z-10 bg-white/90 px-4 py-2.5 shadow-sm backdrop-blur">
@@ -150,4 +153,4 @@ export function Header({ onFinalizeClick }: Props) {
       </div>
     </header>
   );
-}
+});

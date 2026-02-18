@@ -39,7 +39,9 @@ export default function PlaceSearch({ label, placeholder, onSelect }: Props) {
         }
 
         const data = await response.json();
-        const places: PlaceResult[] = Array.isArray(data.results) ? data.results : [];
+        const places: PlaceResult[] = Array.isArray(data.results)
+          ? data.results
+          : [];
         setResults(places);
       } catch (err: any) {
         if (err.name !== "AbortError") {
@@ -62,7 +64,7 @@ export default function PlaceSearch({ label, placeholder, onSelect }: Props) {
       <label className="text-base font-semibold text-ink">{label}</label>
       <input
         value={query}
-        style={{ fontSize: 18}}
+        style={{ fontSize: 18 }}
         onChange={(event) => setQuery(event.target.value)}
         placeholder={placeholder}
         className="w-full rounded-xl border border-slate-200 bg-white text-base px-4 py-3 shadow-sm focus:border-slate-400 focus:outline-none"

@@ -10,13 +10,14 @@ const CATEGORY_OPTIONS: Array<{ value: VenueCategory; label: string }> = [
   { value: "restaurant", label: "Restaurants" },
   { value: "cafe", label: "Cafes" },
   { value: "night_club", label: "Night clubs" },
-  { value: "brewery", label: "Breweries" }
+  { value: "brewery", label: "Breweries" },
 ];
 
 function JoinPage() {
   const store = useAppStore();
   const router = useRouter();
-  const sessionId = typeof router.query.sessionId === "string" ? router.query.sessionId : "";
+  const sessionId =
+    typeof router.query.sessionId === "string" ? router.query.sessionId : "";
   const addUser = router.query.addUser === "1";
   const [name, setName] = useState("");
   const [location, setLocation] = useState<PlaceResult | null>(null);
@@ -59,7 +60,7 @@ function JoinPage() {
       setSubmitting(true);
       setError(null);
       await store.joinGroup(name.trim(), location.location, undefined, {
-        preserveCurrentUser: addUser
+        preserveCurrentUser: addUser,
       });
       router.push({ pathname: "/", query: { sessionId: store.sessionId } });
     } catch (err: any) {
@@ -73,14 +74,26 @@ function JoinPage() {
     <main className="min-h-screen bg-mist px-4 pb-8 pt-6">
       <div className="mx-auto max-w-md rounded-3xl bg-white p-5 shadow-sm">
         <div className="flex items-center justify-between">
-          <h1 className="text-base font-semibold text-ink">You've been invited</h1>
+          <h1 className="text-base font-semibold text-ink">
+            You've been invited
+          </h1>
           <button
             type="button"
-            onClick={() => router.push({ pathname: "/", query: sessionId ? { sessionId } : {} })}
+            onClick={() =>
+              router.push({
+                pathname: "/",
+                query: sessionId ? { sessionId } : {},
+              })
+            }
             className="rounded-full p-1 text-slate-500 hover:bg-slate-100"
             aria-label="Go back"
           >
-            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" className="h-4 w-4">
+            <svg
+              viewBox="0 0 20 20"
+              fill="currentColor"
+              aria-hidden="true"
+              className="h-4 w-4"
+            >
               <path
                 fillRule="evenodd"
                 d="M12.707 4.293a1 1 0 010 1.414L9.414 9H17a1 1 0 110 2H9.414l3.293 3.293a1 1 0 11-1.414 1.414l-5-5a1 1 0 010-1.414l5-5a1 1 0 011.414 0z"
@@ -89,11 +102,16 @@ function JoinPage() {
             </svg>
           </button>
         </div>
-        <p className="mt-2 text-base font-semibold text-slate-500">{store.users.length} {store.users.length === 1 ? "person is" : "people are"} waiting on you</p>
-        
+        <p className="mt-2 text-base font-semibold text-slate-500">
+          {store.users.length}{" "}
+          {store.users.length === 1 ? "person is" : "people are"} waiting on you
+        </p>
+
         <div className="mt-4 space-y-4">
           <div>
-            <label className="text-base font-semibold text-ink">Your name</label>
+            <label className="text-base font-semibold text-ink">
+              Your name
+            </label>
             <input
               value={name}
               onChange={(event) => setName(event.target.value)}
@@ -112,14 +130,22 @@ function JoinPage() {
             }}
           />
 
-          {location && <p className="text-base text-slate-500">Selected: {location.address}</p>}
-          {locationError && <p className="text-base text-red-600">{locationError}</p>}
+          {location && (
+            <p className="text-base text-slate-500">
+              Selected: {location.address}
+            </p>
+          )}
+          {locationError && (
+            <p className="text-base text-red-600">{locationError}</p>
+          )}
           {error && <p className="text-base text-red-600">{error}</p>}
 
           <div className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2 text-base text-slate-600">
             <span>Picking</span>
             <span className="font-semibold text-ink">
-              {CATEGORY_OPTIONS.find((option) => option.value === store.venueCategory)?.label || "Bars"}
+              {CATEGORY_OPTIONS.find(
+                (option) => option.value === store.venueCategory,
+              )?.label || "Bars"}
             </span>
           </div>
 

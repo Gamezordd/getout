@@ -7,7 +7,8 @@ import { useAppStore } from "../lib/store/AppStoreProvider";
 function AddVenuePage() {
   const store = useAppStore();
   const router = useRouter();
-  const sessionId = typeof router.query.sessionId === "string" ? router.query.sessionId : "";
+  const sessionId =
+    typeof router.query.sessionId === "string" ? router.query.sessionId : "";
   const [venue, setVenue] = useState<PlaceResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -24,9 +25,13 @@ function AddVenuePage() {
   useEffect(() => {
     if (!router.isReady || !store.sessionId) return;
     if (store.currentUserId) return;
-    router.replace({ pathname: "/join", query: { sessionId: store.sessionId } }, undefined, {
-      shallow: true
-    });
+    router.replace(
+      { pathname: "/join", query: { sessionId: store.sessionId } },
+      undefined,
+      {
+        shallow: true,
+      },
+    );
   }, [router, router.isReady, store.currentUserId, store.sessionId]);
 
   const handleAddVenue = async () => {
@@ -58,11 +63,21 @@ function AddVenuePage() {
           <h1 className="text-base font-semibold text-ink">Add manual venue</h1>
           <button
             type="button"
-            onClick={() => router.push({ pathname: "/", query: sessionId ? { sessionId } : {} })}
+            onClick={() =>
+              router.push({
+                pathname: "/",
+                query: sessionId ? { sessionId } : {},
+              })
+            }
             className="rounded-full p-1 text-slate-500 hover:bg-slate-100"
             aria-label="Go back"
           >
-            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" className="h-4 w-4">
+            <svg
+              viewBox="0 0 20 20"
+              fill="currentColor"
+              aria-hidden="true"
+              className="h-4 w-4"
+            >
               <path
                 fillRule="evenodd"
                 d="M12.707 4.293a1 1 0 010 1.414L9.414 9H17a1 1 0 110 2H9.414l3.293 3.293a1 1 0 11-1.414 1.414l-5-5a1 1 0 010-1.414l5-5a1 1 0 011.414 0z"
@@ -82,7 +97,11 @@ function AddVenuePage() {
             }}
           />
 
-          {venue && <p className="text-base text-slate-500">Selected: {venue.address}</p>}
+          {venue && (
+            <p className="text-base text-slate-500">
+              Selected: {venue.address}
+            </p>
+          )}
           {error && <p className="text-base text-red-600">{error}</p>}
 
           <button

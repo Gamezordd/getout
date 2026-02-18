@@ -4,12 +4,15 @@ import { pusher } from "../../../lib/pusherServer";
 const parseBody = (body: any) => {
   if (body && typeof body === "object") return body;
   if (typeof body === "string") {
-    return body.split("&").reduce((acc, pair) => {
-      const [key, value] = pair.split("=");
-      if (!key) return acc;
-      acc[decodeURIComponent(key)] = decodeURIComponent(value || "");
-      return acc;
-    }, {} as Record<string, string>);
+    return body.split("&").reduce(
+      (acc, pair) => {
+        const [key, value] = pair.split("=");
+        if (!key) return acc;
+        acc[decodeURIComponent(key)] = decodeURIComponent(value || "");
+        return acc;
+      },
+      {} as Record<string, string>,
+    );
   }
   return {};
 };

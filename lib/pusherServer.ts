@@ -14,7 +14,7 @@ const pusher = new Pusher({
   key: key || "",
   secret: secret || "",
   cluster: cluster || "",
-  useTLS: true
+  useTLS: true,
 });
 
 export { pusher };

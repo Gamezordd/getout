@@ -6,8 +6,8 @@ import type { VotesByVenue } from "../../../lib/types";
 
 export const config = {
   api: {
-    bodyParser: false
-  }
+    bodyParser: false,
+  },
 };
 
 const readRawBody = (req: NextApiRequest): Promise<string> =>
@@ -21,7 +21,11 @@ const readRawBody = (req: NextApiRequest): Promise<string> =>
     req.on("error", reject);
   });
 
-const safeTrigger = async (channel: string, event: string, payload: unknown) => {
+const safeTrigger = async (
+  channel: string,
+  event: string,
+  payload: unknown,
+) => {
   if (!process.env.PUSHER_APP_ID) return;
   try {
     await pusher.trigger(channel, event, payload);
@@ -30,7 +34,10 @@ const safeTrigger = async (channel: string, event: string, payload: unknown) => 
   }
 };
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse,
+) {
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
     return res.status(405).json({ message: "Method not allowed" });
@@ -43,7 +50,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const rawBody = await readRawBody(req);
   const signature = req.headers["x-pusher-signature"];
-  const expected = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
+  const expected = crypto
+    .createHmac("sha256", secret)
+    .update(rawBody)
+    .digest("hex");
 
   if (signature !== expected) {
     return res.status(401).json({ message: "Invalid signature." });
@@ -59,7 +69,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!event.channel.startsWith("private-group-")) continue;
 
     const sessionId = event.channel.replace("private-group-", "");
-    const data = JSON.parse(event.data || "{}") as { userId?: string; venueId?: string };
+    const data = JSON.parse(event.data || "{}") as {
+      userId?: string;
+      venueId?: string;
+    };
     if (!data.userId || !data.venueId) continue;
 
     const group = await getGroup(sessionId);
@@ -79,7 +92,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     group.votes = votes;
     await saveGroup(sessionId, group);
-    await safeTrigger(event.channel, "votes-updated", { venueId: data.venueId, userId: data.userId });
+    await safeTrigger(event.channel, "votes-updated", {
+      venueId: data.venueId,
+      userId: data.userId,
+    });
   }
 
   return res.status(200).json({ received: true });
