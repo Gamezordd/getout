@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import type { User, Venue, VotesByVenue } from "../lib/types";
+import type { TotalsByVenue, User, Venue, VotesByVenue } from "../lib/types";
 
 const DEFAULT_CENTER = { lng: -73.9857, lat: 40.7484 };
 
@@ -8,6 +8,7 @@ type Props = {
   suggestedVenues: Venue[];
   manualVenues: Venue[];
   votes: VotesByVenue;
+  totalsByVenue?: TotalsByVenue;
   fitAllTrigger?: number;
   selectedVenueId?: string | null;
   highlightedVenueId?: string | null;
@@ -20,6 +21,7 @@ export default function MapView({
   suggestedVenues,
   manualVenues,
   votes,
+  totalsByVenue = {},
   fitAllTrigger = 0,
   selectedVenueId,
   highlightedVenueId,
@@ -108,20 +110,22 @@ export default function MapView({
       hasPoints = true;
     });
 
+    const userById = new Map(users.map((user) => [user.id, user]));
+
     const addVoteBadge = (parent: HTMLDivElement, venueId: string) => {
       const voteCount = votes?.[venueId]?.length || 0;
       if (voteCount <= 0) return;
 
       const badge = document.createElement("div");
       badge.className =
-        "absolute -right-1 -top-2 flex h-5 min-w-[26px] items-center justify-center rounded-full border border-white bg-rose-500 px-1 text-[10px] font-bold text-white shadow";
+        "absolute -right-1 -top-2 flex h-5 min-w-[26px] items-center justify-center rounded-full border border-white bg-slate-700 px-1 text-[10px] font-bold text-white shadow";
 
       const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
       svg.setAttribute("viewBox", "0 0 20 20");
       svg.setAttribute("fill", "currentColor");
       svg.setAttribute("aria-hidden", "true");
-      svg.style.width = "10px";
-      svg.style.height = "10px";
+      svg.style.width = "8px";
+      svg.style.height = "8px";
 
       const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
       path.setAttribute(
@@ -135,7 +139,68 @@ export default function MapView({
 
       badge.appendChild(svg);
       badge.appendChild(text);
+      addVoteAvatars(badge, venueId);
       parent.appendChild(badge);
+    };
+
+    const addVoteAvatars = (parent: HTMLDivElement, venueId: string) => {
+      const voterIds = votes?.[venueId] || [];
+      if (voterIds.length === 0) return;
+      const stack = document.createElement("div");
+      stack.className = "ml-1 flex items-center";
+
+      const maxVisible = 5;
+      const visible = voterIds.slice(0, maxVisible);
+      visible.forEach((id, index) => {
+        const user = userById.get(id);
+        if (!user) return;
+        const avatar = document.createElement("div");
+        avatar.className = "h-3.5 w-3.5 rounded-full border border-white shadow-sm";
+        avatar.style.marginLeft = index === 0 ? "0" : "-7px";
+        avatar.style.backgroundImage = `url(${user.avatarUrl})`;
+        avatar.style.backgroundSize = "cover";
+        avatar.style.backgroundPosition = "center";
+        stack.appendChild(avatar);
+      });
+
+      if (voterIds.length > maxVisible) {
+        const more = document.createElement("div");
+        more.className =
+          "ml-1 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-ink px-1 text-[8px] font-bold text-white";
+        more.textContent = `+${voterIds.length - maxVisible}`;
+        stack.appendChild(more);
+      }
+
+      parent.appendChild(stack);
+    };
+
+    const totals = [...suggestedVenues, ...manualVenues]
+      .map((venue) => totalsByVenue?.[venue.id])
+      .filter((value): value is number => typeof value === "number");
+    const minTotal = totals.length ? Math.min(...totals) : 0;
+    const maxTotal = totals.length ? Math.max(...totals) : 0;
+    const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+    const toHex = (value: number) => value.toString(16).padStart(2, "0");
+    const mixColor = (t: number) => {
+      const clamped = clamp(t, 0, 1);
+      const start = { r: 22, g: 163, b: 74 };
+      const end = { r: 0, g: 0, b: 0 };
+      const r = Math.round(start.r + (end.r - start.r) * clamped);
+      const g = Math.round(start.g + (end.g - start.g) * clamped);
+      const b = Math.round(start.b + (end.b - start.b) * clamped);
+      return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+    };
+    const getVenueColor = (venueId: string) => {
+      const total = totalsByVenue?.[venueId];
+      if (typeof total !== "number" || maxTotal === minTotal) return "#16a34a";
+      return mixColor((total - minTotal) / (maxTotal - minTotal));
+    };
+    const shouldUseLightText = (hexColor: string) => {
+      const r = parseInt(hexColor.slice(1, 3), 16);
+      const g = parseInt(hexColor.slice(3, 5), 16);
+      const b = parseInt(hexColor.slice(5, 7), 16);
+      const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+      return luminance < 0.5;
     };
 
     suggestedVenues.forEach((venue, index) => {
@@ -152,10 +217,14 @@ export default function MapView({
 
       const el = document.createElement("div");
       el.className =
-        "flex h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-ink text-base font-bold text-white shadow-lg";
+        "flex h-9 w-9 items-center justify-center rounded-full border-2 border-white text-base font-bold shadow-lg";
       el.textContent = String(index + 1);
+      const color = getVenueColor(venue.id);
+      el.style.backgroundColor = color;
+      el.style.color = shouldUseLightText(color) ? "#ffffff" : "#0f172a";
       if (venue.id === highlightedVenueId) {
         el.style.backgroundColor = "#16a34a";
+        el.style.color = "#ffffff";
       }
       if (venue.id === selectedVenueId) {
         wrapper.style.transform = "scale(1.1)";
@@ -165,7 +234,6 @@ export default function MapView({
       pin.appendChild(el);
       addVoteBadge(pin, venue.id);
       wrapper.appendChild(pin);
-
       const label = document.createElement("div");
       label.className =
         "mt-1 max-w-[108px] rounded-md bg-white/95 px-2 py-0.5 text-center text-[10px] font-medium leading-tight text-ink shadow";
@@ -195,8 +263,11 @@ export default function MapView({
 
       const el = document.createElement("div");
       el.className =
-        "flex h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-sun text-base font-bold text-ink shadow-lg";
+        "flex h-9 w-9 items-center justify-center rounded-full border-2 border-white text-base font-bold shadow-lg";
       el.textContent = "M";
+      const color = getVenueColor(venue.id);
+      el.style.backgroundColor = color;
+      el.style.color = shouldUseLightText(color) ? "#ffffff" : "#0f172a";
       if (venue.id === selectedVenueId) {
         wrapper.style.transform = "scale(1.1)";
         el.style.borderColor = "#22c55e";
@@ -205,7 +276,6 @@ export default function MapView({
       pin.appendChild(el);
       addVoteBadge(pin, venue.id);
       wrapper.appendChild(pin);
-
       const label = document.createElement("div");
       label.className =
         "mt-1 max-w-[108px] rounded-md bg-white/95 px-2 py-0.5 text-center text-[10px] font-medium leading-tight text-ink shadow";

@@ -242,6 +242,7 @@ function HomePage() {
             suggestedVenues={store.topVenues}
             manualVenues={store.manualVenues}
             votes={store.votes}
+            totalsByVenue={store.totalsByVenue}
             fitAllTrigger={fitAllTrigger}
             selectedVenueId={store.selectedVenueId}
             highlightedVenueId={store.mostEfficientVenueId}
