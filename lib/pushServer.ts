@@ -77,9 +77,9 @@ export const sendVoteNotifications = async (params: {
   const staleUserIds: string[] = [];
   await Promise.all(
     Object.entries(subscriptions).map(async ([userId, subscription]) => {
-      if (userId === voterId) return;
+      if (userId === voterId || !subscription.endpoint) return;
       try {
-        await webpush.sendNotification(subscription, payload);
+        await webpush.sendNotification(subscription as webpush.PushSubscription, payload);
       } catch (error: any) {
         const statusCode = error?.statusCode;
         if (statusCode === 404 || statusCode === 410) {
@@ -112,9 +112,9 @@ export const sendVenueLockedNotifications = async (params: {
   const staleUserIds: string[] = [];
   await Promise.all(
     Object.entries(subscriptions).map(async ([userId, subscription]) => {
-      if (userId === organizerId) return;
+      if (userId === organizerId || !subscription.endpoint) return;
       try {
-        await webpush.sendNotification(subscription, payload);
+        await webpush.sendNotification(subscription as webpush.PushSubscription, payload);
       } catch (error: any) {
         const statusCode = error?.statusCode;
         if (statusCode === 404 || statusCode === 410) {
