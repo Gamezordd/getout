@@ -305,6 +305,9 @@ export default async function handler(
       reason: "venue-finalized",
       venueId: venue.id,
     });
+    await safeTrigger(channel, "venue-locked", {
+      venueId: venue.id,
+    });
     return res.status(200).json(toResponse(group));
   }
 

@@ -25,6 +25,9 @@ export default function usePusher() {
     };
 
     channel.bind("group-updated", refresh);
+    channel.bind("venue-locked", async () => {
+      await store.loadGroup();
+    });
     channel.bind(
       "votes-updated",
       (data: { userId?: string; venueId?: string }) => {
@@ -43,6 +46,7 @@ export default function usePusher() {
 
     return () => {
       channel.unbind("group-updated", refresh);
+      channel.unbind("venue-locked");
       channel.unbind("votes-updated", refresh);
       channel.unbind("client-vote");
       channel.unbind("pusher:subscription_succeeded");
