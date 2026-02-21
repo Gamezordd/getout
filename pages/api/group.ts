@@ -9,6 +9,7 @@ import type {
 } from "../../lib/types";
 import { getGroup, saveGroup, type GroupPayload } from "../../lib/groupStore";
 import { pusher } from "../../lib/pusherServer";
+import { sendVenueLockedNotifications } from "../../lib/pushServer";
 
 type InitRequest = {
   action: "init";
@@ -308,6 +309,20 @@ export default async function handler(
     await safeTrigger(channel, "venue-locked", {
       venueId: venue.id,
     });
+    const { staleUserIds } = await sendVenueLockedNotifications({
+      group,
+      sessionId: payload.sessionId,
+      organizerId: payload.userId,
+      venueId: venue.id,
+    });
+    if (staleUserIds.length > 0) {
+      staleUserIds.forEach((userId) => {
+        if (group.pushSubscriptions) {
+          delete group.pushSubscriptions[userId];
+        }
+      });
+      await saveGroup(payload.sessionId, group);
+    }
     return res.status(200).json(toResponse(group));
   }
 

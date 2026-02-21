@@ -39,6 +39,24 @@ const buildNotificationPayload = (params: {
   return { title, body, url };
 };
 
+const buildVenueLockedPayload = (params: {
+  group: GroupPayload;
+  sessionId: string;
+  organizerId: string;
+  venueId: string;
+}) => {
+  const { group, sessionId, organizerId, venueId } = params;
+  const organizer = group.users.find((user) => user.id === organizerId);
+  const allVenues = [...group.manualVenues, ...group.venues];
+  const venue = allVenues.find((item) => item.id === venueId);
+
+  const title = "Venue locked";
+  const body = `${organizer?.name || "Organizer"} locked ${venue?.name || "the venue"}`;
+  const url = `/?sessionId=${encodeURIComponent(sessionId)}`;
+
+  return { title, body, url };
+};
+
 export const sendVoteNotifications = async (params: {
   group: GroupPayload;
   sessionId: string;
@@ -60,6 +78,41 @@ export const sendVoteNotifications = async (params: {
   await Promise.all(
     Object.entries(subscriptions).map(async ([userId, subscription]) => {
       if (userId === voterId) return;
+      try {
+        await webpush.sendNotification(subscription, payload);
+      } catch (error: any) {
+        const statusCode = error?.statusCode;
+        if (statusCode === 404 || statusCode === 410) {
+          staleUserIds.push(userId);
+        }
+      }
+    }),
+  );
+
+  return { staleUserIds };
+};
+
+export const sendVenueLockedNotifications = async (params: {
+  group: GroupPayload;
+  sessionId: string;
+  organizerId: string;
+  venueId: string;
+}): Promise<SendResult> => {
+  const { group, sessionId, organizerId, venueId } = params;
+  const subscriptions = group.pushSubscriptions || {};
+  const configured = configureWebPush();
+  if (!configured || Object.keys(subscriptions).length === 0) {
+    return { staleUserIds: [] };
+  }
+
+  const payload = JSON.stringify(
+    buildVenueLockedPayload({ group, sessionId, organizerId, venueId }),
+  );
+
+  const staleUserIds: string[] = [];
+  await Promise.all(
+    Object.entries(subscriptions).map(async ([userId, subscription]) => {
+      if (userId === organizerId) return;
       try {
         await webpush.sendNotification(subscription, payload);
       } catch (error: any) {
