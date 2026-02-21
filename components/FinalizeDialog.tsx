@@ -25,22 +25,6 @@ const FinalizeDialog = observer(function FinalizeDialog({
       description="Select one of the voted venues to lock for this group."
     >
       <div className="flex flex-col">
-        <a
-          href="/create"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center justify-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600"
-        >
-          <svg
-            viewBox="0 0 20 20"
-            fill="currentColor"
-            aria-hidden="true"
-            className="h-4 w-4 text-slate-500"
-          >
-            <path d="M10 2a1 1 0 011 1v6h6a1 1 0 110 2h-6v6a1 1 0 11-2 0v-6H3a1 1 0 110-2h6V3a1 1 0 011-1z" />
-          </svg>
-          Create new group
-        </a>
         <div className="mt-4 max-h-56 space-y-2 overflow-y-auto">
           {store.votedVenues.length === 0 && (
             <p className="rounded-xl bg-slate-100 px-3 py-2 text-xs text-slate-600">

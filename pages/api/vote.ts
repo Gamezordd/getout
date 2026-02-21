@@ -2,6 +2,7 @@
 import type { VotesByVenue } from "../../lib/types";
 import { getGroup, saveGroup } from "../../lib/groupStore";
 import { pusher } from "../../lib/pusherServer";
+import { sendVoteNotifications } from "../../lib/pushServer";
 
 type VoteRequest = {
   sessionId: string;
@@ -63,6 +64,21 @@ export default async function handler(
     venueId: payload.venueId,
     userId: payload.userId,
   });
+
+  const { staleUserIds } = await sendVoteNotifications({
+    group,
+    sessionId: payload.sessionId,
+    voterId: payload.userId,
+    venueId: payload.venueId,
+  });
+  if (staleUserIds.length > 0) {
+    staleUserIds.forEach((userId) => {
+      if (group.pushSubscriptions) {
+        delete group.pushSubscriptions[userId];
+      }
+    });
+    await saveGroup(payload.sessionId, group);
+  }
 
   return res.status(200).json({ votes: group.votes });
 }

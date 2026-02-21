@@ -96,6 +96,7 @@ export default async function handler(
       venueId: data.venueId,
       userId: data.userId,
     });
+
   }
 
   return res.status(200).json({ received: true });

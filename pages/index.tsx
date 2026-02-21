@@ -13,6 +13,7 @@ import usePusher from "../hooks/usePusher";
 import useRedirections from "../hooks/useRedirections";
 import PickButton from "../components/PickButton";
 import { MapContainer } from "../components/MapContainer";
+import { registerPushSubscription } from "../lib/pushClient";
 
 function HomePage() {
   const store = useAppStore();
@@ -22,6 +23,7 @@ function HomePage() {
   const seenUserIdsRef = useRef<Set<string>>(new Set());
   const usersInitializedRef = useRef(false);
   const bottomSheetRef = useRef<BottomDrawerHandle>(null);
+  const pushInitRef = useRef(false);
 
   const channel = usePusher();
   useRedirections();
@@ -69,6 +71,18 @@ function HomePage() {
   useEffect(() => {
     store.loadGroup();
   }, [store, store.sessionId]);
+
+  useEffect(() => {
+    if (pushInitRef.current) return;
+    if (!store.sessionId || !store.currentUserId) return;
+    pushInitRef.current = true;
+    registerPushSubscription({
+      sessionId: store.sessionId,
+      userId: store.currentUserId,
+    }).catch(() => {
+      // Ignore subscription errors.
+    });
+  }, [store.currentUserId, store.sessionId]);
 
   useEffect(() => {
     const timeout = setTimeout(() => {

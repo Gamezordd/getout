@@ -25,6 +25,7 @@ function JoinPage() {
   const [error, setError] = useState<string | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [locating, setLocating] = useState(false);
 
   const organizerLocation = useMemo(() => {
     const organizer = store.users.find((user) => user.isOrganizer);
@@ -100,6 +101,45 @@ function JoinPage() {
     }
   };
 
+  const handleDetectLocation = async () => {
+    if (!("geolocation" in navigator)) {
+      setLocationError("Location services are not supported.");
+      return;
+    }
+    setLocating(true);
+    setLocationError(null);
+    setError(null);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const params = new URLSearchParams({
+            lat: String(position.coords.latitude),
+            lng: String(position.coords.longitude),
+          });
+          const response = await fetch(`/api/reverse-geocode?${params}`);
+          if (!response.ok) {
+            const payload = await response.json().catch(() => ({}));
+            throw new Error(payload.message || "Unable to detect address.");
+          }
+          const data = (await response.json()) as { result?: PlaceResult };
+          if (!data.result) {
+            throw new Error("Unable to detect address.");
+          }
+          setLocation(data.result);
+        } catch (err: any) {
+          setLocationError(err.message || "Unable to detect address.");
+        } finally {
+          setLocating(false);
+        }
+      },
+      () => {
+        setLocationError("Location permission denied.");
+        setLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000 },
+    );
+  };
+
   return (
     <main className="min-h-screen bg-mist px-4 pb-8 pt-6">
       <div className="mx-auto max-w-md rounded-3xl bg-white p-5 shadow-sm">
@@ -168,21 +208,20 @@ function JoinPage() {
               setError(null);
             }}
           />
+          <button
+            type="button"
+            onClick={handleDetectLocation}
+            disabled={locating}
+            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base font-semibold text-ink shadow-sm disabled:opacity-60"
+          >
+            {locating ? "Detecting location..." : "Detect my location"}
+          </button>
 
           {location && (
             <p className="text-base text-slate-500">
               Selected: {location.address}
             </p>
           )}
-          <label className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-base text-slate-600">
-            <input
-              type="checkbox"
-              checked={saveDetails}
-              onChange={(event) => setSaveDetails(event.target.checked)}
-              className="h-4 w-4 rounded border-slate-300 text-ink"
-            />
-            Save my details for next time
-          </label>
           {locationError && (
             <p className="text-base text-red-600">{locationError}</p>
           )}
@@ -196,6 +235,16 @@ function JoinPage() {
               )?.label || "Bars"}
             </span>
           </div>
+
+          <label className="flex items-center gap-3 text-xs text-slate-500">
+            <input
+              type="checkbox"
+              checked={saveDetails}
+              onChange={(event) => setSaveDetails(event.target.checked)}
+              className="h-4 w-4 rounded border-slate-300 text-ink"
+            />
+            Save my details for next time
+          </label>
 
           <button
             type="button"

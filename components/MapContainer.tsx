@@ -39,9 +39,30 @@ export const MapContainer = observer(function MapContainer() {
         <button
           type="button"
           onClick={store.toggleSuggestedVenues}
-          className="absolute right-4 top-28 z-[9] rounded-full bg-white/95 px-3 py-1 text-[11px] font-semibold text-ink shadow-md backdrop-blur"
+          className={`absolute right-4 top-28 z-[9] rounded-full p-2.5 shadow-md backdrop-blur ${
+            store.showSuggestedVenues
+              ? "bg-white/95 text-ink"
+              : "bg-slate-900/90 text-white"
+          }`}
+          aria-label={
+            store.showSuggestedVenues
+              ? "Hide suggestions"
+              : "Show suggestions"
+          }
         >
-          {store.showSuggestedVenues ? "Hide suggestions" : "Show suggestions"}
+          <span className="relative flex h-4 w-4 items-center justify-center">
+            <svg
+              viewBox="0 0 20 20"
+              fill="currentColor"
+              aria-hidden="true"
+              className="h-4 w-4"
+            >
+              <path d="M10 2a6 6 0 0 0-3.6 10.8c.34.26.55.66.55 1.08V15a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-1.12c0-.42.2-.82.55-1.08A6 6 0 0 0 10 2Zm-2 16a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-1H8v1Z" />
+            </svg>
+            {!store.showSuggestedVenues && (
+              <span className="pointer-events-none absolute h-0.5 w-5 -rotate-45 rounded-full bg-white" />
+            )}
+          </span>
         </button>
         <div className="absolute inset-x-0 top-16 z-[9] flex justify-center">
           <button

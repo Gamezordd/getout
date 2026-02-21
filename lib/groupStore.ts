@@ -12,6 +12,7 @@ type GroupPayload = {
   venues: Venue[];
   manualVenues: Venue[];
   votes: VotesByVenue;
+  pushSubscriptions?: Record<string, PushSubscriptionJSON>;
   ownerKey: string | null;
   venueCategory: VenueCategory | null;
   lockedVenue: LockedVenue | null;
@@ -24,6 +25,7 @@ const createEmptyGroup = (): GroupPayload => ({
   venues: [],
   manualVenues: [],
   votes: {},
+  pushSubscriptions: {},
   ownerKey: null,
   venueCategory: null,
   lockedVenue: null,
@@ -38,6 +40,7 @@ const getGroup = async (sessionId: string): Promise<GroupPayload> => {
     if (!Array.isArray(hydrated.users)) hydrated.users = [];
     if (!Array.isArray(hydrated.venues)) hydrated.venues = [];
     if (!hydrated.votes) hydrated.votes = {};
+    if (!hydrated.pushSubscriptions) hydrated.pushSubscriptions = {};
     if (
       hydrated.users.length > 0 &&
       !hydrated.users.some((user) => user.isOrganizer)
