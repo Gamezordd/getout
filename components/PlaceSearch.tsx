@@ -12,9 +12,15 @@ type Props = {
   label: string;
   placeholder: string;
   onSelect: (place: PlaceResult) => void;
+  locationBias?: { lat: number; lng: number; radiusKm?: number };
 };
 
-export default function PlaceSearch({ label, placeholder, onSelect }: Props) {
+export default function PlaceSearch({
+  label,
+  placeholder,
+  onSelect,
+  locationBias,
+}: Props) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<PlaceResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -32,7 +38,17 @@ export default function PlaceSearch({ label, placeholder, onSelect }: Props) {
       try {
         setLoading(true);
         setError(null);
-        const url = `/api/place-search?q=${encodeURIComponent(query)}`;
+        const params = new URLSearchParams({
+          q: query,
+        });
+        if (locationBias) {
+          params.set("lat", String(locationBias.lat));
+          params.set("lng", String(locationBias.lng));
+          if (locationBias.radiusKm) {
+            params.set("radiusKm", String(locationBias.radiusKm));
+          }
+        }
+        const url = `/api/place-search?${params.toString()}`;
         const response = await fetch(url, { signal: controller.signal });
         if (!response.ok) {
           throw new Error("Search failed. Please try again.");

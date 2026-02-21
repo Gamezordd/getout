@@ -67,6 +67,7 @@ export class AppStore {
   mapError: string | null = null;
   isLoadingGroup = false;
   isLoadingSuggestions = false;
+  showSuggestedVenues = true;
 
   constructor() {
     makeAutoObservable(this, {}, { autoBind: true });
@@ -491,6 +492,10 @@ export class AppStore {
 
   setSelectedVenue(venueId: string | null) {
     this.selectedVenueId = venueId;
+  }
+
+  toggleSuggestedVenues() {
+    this.showSuggestedVenues = !this.showSuggestedVenues;
   }
 
   setMapError(message: string | null) {

@@ -1,6 +1,6 @@
 import { observer } from "mobx-react-lite";
 import { useRouter } from "next/router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import PlaceSearch, { PlaceResult } from "../components/PlaceSearch";
 import { useAppStore } from "../lib/store/AppStoreProvider";
 import type { VenueCategory } from "../lib/types";
@@ -21,9 +21,31 @@ function JoinPage() {
   const addUser = router.query.addUser === "1";
   const [name, setName] = useState("");
   const [location, setLocation] = useState<PlaceResult | null>(null);
+  const [saveDetails, setSaveDetails] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const organizerLocation = useMemo(() => {
+    const organizer = store.users.find((user) => user.isOrganizer);
+    return organizer?.location;
+  }, [store.users]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stored = localStorage.getItem("getout-user-details");
+    if (!stored) return;
+    try {
+      const payload = JSON.parse(stored) as {
+        name?: string;
+        place?: PlaceResult;
+      };
+      if (payload?.name) setName(payload.name);
+      if (payload?.place) setLocation(payload.place);
+    } catch {
+      // ignore malformed storage
+    }
+  }, []);
 
   useEffect(() => {
     if (!router.isReady) return;
@@ -62,6 +84,14 @@ function JoinPage() {
       await store.joinGroup(name.trim(), location.location, undefined, {
         preserveCurrentUser: addUser,
       });
+      if (saveDetails) {
+        localStorage.setItem(
+          "getout-user-details",
+          JSON.stringify({ name: name.trim(), place: location }),
+        );
+      } else {
+        localStorage.removeItem("getout-user-details");
+      }
       router.push({ pathname: "/", query: { sessionId: store.sessionId } });
     } catch (err: any) {
       setError(err.message || "Unable to join group.");
@@ -123,6 +153,15 @@ function JoinPage() {
           <PlaceSearch
             label="Your location"
             placeholder="Search for your neighborhood"
+            locationBias={
+              organizerLocation
+                ? {
+                    lat: organizerLocation.lat,
+                    lng: organizerLocation.lng,
+                    radiusKm: 40,
+                  }
+                : undefined
+            }
             onSelect={(place) => {
               setLocation(place);
               setLocationError(null);
@@ -135,6 +174,15 @@ function JoinPage() {
               Selected: {location.address}
             </p>
           )}
+          <label className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-base text-slate-600">
+            <input
+              type="checkbox"
+              checked={saveDetails}
+              onChange={(event) => setSaveDetails(event.target.checked)}
+              className="h-4 w-4 rounded border-slate-300 text-ink"
+            />
+            Save my details for next time
+          </label>
           {locationError && (
             <p className="text-base text-red-600">{locationError}</p>
           )}

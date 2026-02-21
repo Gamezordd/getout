@@ -110,6 +110,23 @@ export const Header = observer(function Header({ onFinalizeClick }: Props) {
             </button>
             {menuOpen && (
               <div className="absolute right-0 top-10 z-20 w-40 rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
+                <a
+                  href="/create"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => setMenuOpen(false)}
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-ink hover:bg-slate-100"
+                >
+                  <svg
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    aria-hidden="true"
+                    className="h-4 w-4 text-slate-500"
+                  >
+                    <path d="M10 2a1 1 0 011 1v6h6a1 1 0 110 2h-6v6a1 1 0 11-2 0v-6H3a1 1 0 110-2h6V3a1 1 0 011-1z" />
+                  </svg>
+                  Create new group
+                </a>
                 <button
                   type="button"
                   onClick={() => {
@@ -124,7 +141,7 @@ export const Header = observer(function Header({ onFinalizeClick }: Props) {
                     aria-hidden="true"
                     className="h-4 w-4 text-slate-500"
                   >
-                    <path d="M10 2a1 1 0 011 1v6h6a1 1 0 110 2h-6v6a1 1 0 11-2 0v-6H3a1 1 0 110-2h6V3a1 1 0 011-1z" />
+                    <path d="M10 10a3 3 0 1 1 0-6 3 3 0 0 1 0 6Zm-7 6a6 6 0 0 1 12 0 1 1 0 1 1-2 0 4 4 0 0 0-8 0 1 1 0 0 1-2 0Zm13-5a1 1 0 0 1 1 1v1h1a1 1 0 1 1 0 2h-1v1a1 1 0 1 1-2 0v-1h-1a1 1 0 1 1 0-2h1v-1a1 1 0 0 1 1-1Z" />
                   </svg>
                   Add user
                 </button>

@@ -15,7 +15,16 @@ type SearchResponse = {
 const searchTextPlaces = async (
   apiKey: string,
   query: string,
+  bias?: { lat: number; lng: number; radiusKm: number },
 ): Promise<PlaceResult[]> => {
+  const locationBias = bias
+    ? {
+        circle: {
+          center: { latitude: bias.lat, longitude: bias.lng },
+          radius: bias.radiusKm * 1000,
+        },
+      }
+    : undefined;
   const response = await fetch(
     "https://places.googleapis.com/v1/places:searchText",
     {
@@ -29,6 +38,7 @@ const searchTextPlaces = async (
       body: JSON.stringify({
         textQuery: query,
         maxResultCount: 5,
+        ...(locationBias ? { locationBias } : {}),
       }),
     },
   );
@@ -61,12 +71,22 @@ const searchTextPlaces = async (
 const geocodeAddress = async (
   apiKey: string,
   query: string,
+  bias?: { lat: number; lng: number; radiusKm: number },
 ): Promise<PlaceResult[]> => {
+  const params = new URLSearchParams({
+    address: query,
+    key: apiKey,
+  });
+  if (bias) {
+    const latDelta = bias.radiusKm / 110.574;
+    const lngDelta =
+      bias.radiusKm / (111.32 * Math.cos((bias.lat * Math.PI) / 180));
+    const southWest = `${bias.lat - latDelta},${bias.lng - lngDelta}`;
+    const northEast = `${bias.lat + latDelta},${bias.lng + lngDelta}`;
+    params.set("bounds", `${southWest}|${northEast}`);
+  }
   const url =
-    "https://maps.googleapis.com/maps/api/geocode/json?address=" +
-    encodeURIComponent(query) +
-    "&key=" +
-    apiKey;
+    "https://maps.googleapis.com/maps/api/geocode/json?" + params.toString();
 
   const response = await fetch(url);
   if (!response.ok) {
@@ -113,13 +133,23 @@ export default async function handler(
   }
 
   try {
-    const places = await searchTextPlaces(apiKey, query);
+    const lat = Number(req.query.lat);
+    const lng = Number(req.query.lng);
+    const radiusKmRaw = Number(req.query.radiusKm);
+    const hasBias =
+      Number.isFinite(lat) && Number.isFinite(lng);
+    const radiusKm = Number.isFinite(radiusKmRaw) && radiusKmRaw > 0
+      ? radiusKmRaw
+      : 25;
+    const bias = hasBias ? { lat, lng, radiusKm } : undefined;
+
+    const places = await searchTextPlaces(apiKey, query, bias);
     if (places.length > 0) {
       return res.status(200).json({ results: places });
     }
 
     // Fallback when text search returns no POIs (e.g. neighborhoods/addresses).
-    const geocoded = await geocodeAddress(apiKey, query);
+    const geocoded = await geocodeAddress(apiKey, query, bias);
     return res.status(200).json({ results: geocoded });
   } catch {
     return res

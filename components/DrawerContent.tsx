@@ -21,10 +21,12 @@ const DrawerContent = observer(function DrawerContent({
     isLoadingSuggestions,
     users,
     suggestedVenues,
+    manualVenues,
     currentUserId,
     selectedVenue,
     etaMatrix,
     votes,
+    showSuggestedVenues,
     updateUserLocation,
   } = useAppStore();
   const isLoading = isLoadingGroup || isLoadingSuggestions;
@@ -55,6 +57,34 @@ const DrawerContent = observer(function DrawerContent({
     suggestedVenues.forEach((venue, idx) => index.set(venue.id, idx + 1));
     return index;
   }, [suggestedVenues]);
+  const medalNote = useMemo(() => {
+    if (!selectedVenue) return null;
+    const visibleSuggested = showSuggestedVenues ? suggestedVenues : [];
+    const visibleVenues = [...visibleSuggested, ...manualVenues];
+    const ranked = visibleVenues
+      .map((venue) => ({
+        venueId: venue.id,
+        total: totalsByVenue?.[venue.id],
+      }))
+      .filter((entry): entry is { venueId: string; total: number } =>
+        typeof entry.total === "number",
+      )
+      .sort((a, b) => a.total - b.total)
+      .slice(0, 3);
+    const index = ranked.findIndex(
+      (entry) => entry.venueId === selectedVenue.id,
+    );
+    if (index === -1) return null;
+    if (index === 0) return "🥇 Best based on ratings and travel time";
+    if (index === 1) return "🥈 Second best based on ratings and travel time";
+    return "🥉 Third best based on ratings and travel time";
+  }, [
+    manualVenues,
+    selectedVenue,
+    showSuggestedVenues,
+    suggestedVenues,
+    totalsByVenue,
+  ]);
 
   const formatVoterNames = (names: string[], maxVisible = 4) => {
     if (names.length === 0) return "";
@@ -121,6 +151,11 @@ const DrawerContent = observer(function DrawerContent({
                   <h2 className="text-sm font-semibold text-ink line-clamp-2 w-full">
                     {selectedVenue.name}
                   </h2>
+                  {medalNote && (
+                    <p className="mt-0.5 text-[11px] font-semibold text-slate-500">
+                      {medalNote}
+                    </p>
+                  )}
                 </div>
               </div>
               <div className="flex items-center gap-3 text-xs font-semibold text-slate-500">

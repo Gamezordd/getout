@@ -7,6 +7,7 @@ type Props = {
   users: User[];
   suggestedVenues: Venue[];
   manualVenues: Venue[];
+  showSuggestedVenues?: boolean;
   votes: VotesByVenue;
   totalsByVenue?: TotalsByVenue;
   fitAllTrigger?: number;
@@ -20,6 +21,7 @@ export default function MapView({
   users,
   suggestedVenues,
   manualVenues,
+  showSuggestedVenues = true,
   votes,
   totalsByVenue = {},
   fitAllTrigger = 0,
@@ -181,7 +183,11 @@ export default function MapView({
       parent.appendChild(stack);
     };
 
-    const totals = [...suggestedVenues, ...manualVenues]
+    const visibleSuggestedVenues = showSuggestedVenues
+      ? suggestedVenues
+      : [];
+    const visibleVenues = [...visibleSuggestedVenues, ...manualVenues];
+    const totals = visibleVenues
       .map((venue) => totalsByVenue?.[venue.id])
       .filter((value): value is number => typeof value === "number");
     const minTotal = totals.length ? Math.min(...totals) : 0;
@@ -210,8 +216,32 @@ export default function MapView({
       const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
       return luminance < 0.5;
     };
+    const rankedVenues = visibleVenues
+      .map((venue) => ({
+        venueId: venue.id,
+        total: totalsByVenue?.[venue.id],
+      }))
+      .filter((entry): entry is { venueId: string; total: number } =>
+        typeof entry.total === "number",
+      )
+      .sort((a, b) => a.total - b.total)
+      .slice(0, 3);
+    const medalByVenue = new Map<string, string>();
+    rankedVenues.forEach((entry, index) => {
+      const medal = index === 0 ? "🥇" : index === 1 ? "🥈" : "🥉";
+      medalByVenue.set(entry.venueId, medal);
+    });
+    const addMedal = (parent: HTMLDivElement, venueId: string) => {
+      const medal = medalByVenue.get(venueId);
+      if (!medal) return;
+      const badge = document.createElement("div");
+      badge.className =
+        "absolute -left-1 -top-2 flex h-5 min-w-[20px] items-center justify-center rounded-full border border-white bg-white/95 text-[11px] shadow";
+      badge.textContent = medal;
+      parent.appendChild(badge);
+    };
 
-    suggestedVenues.forEach((venue, index) => {
+    visibleSuggestedVenues.forEach((venue, index) => {
       venueCoordsRef.current[venue.id] = {
         lng: venue.location.lng,
         lat: venue.location.lat,
@@ -240,6 +270,7 @@ export default function MapView({
         el.style.boxShadow = "0 0 0 3px rgba(34, 197, 94, 0.3)";
       }
       pin.appendChild(el);
+      addMedal(pin, venue.id);
       addVoteBadge(pin, venue.id);
       wrapper.appendChild(pin);
       const label = document.createElement("div");
@@ -282,6 +313,7 @@ export default function MapView({
         el.style.boxShadow = "0 0 0 3px rgba(34, 197, 94, 0.3)";
       }
       pin.appendChild(el);
+      addMedal(pin, venue.id);
       addVoteBadge(pin, venue.id);
       wrapper.appendChild(pin);
       const label = document.createElement("div");
@@ -306,6 +338,7 @@ export default function MapView({
     users,
     suggestedVenues,
     manualVenues,
+    showSuggestedVenues,
     votes,
     highlightedVenueId,
     selectedVenueId,
@@ -319,7 +352,9 @@ export default function MapView({
 
     const points = [
       ...users.map((user) => user.location),
-      ...suggestedVenues.map((venue) => venue.location),
+      ...(showSuggestedVenues
+        ? suggestedVenues.map((venue) => venue.location)
+        : []),
       ...manualVenues.map((venue) => venue.location),
     ];
     if (points.length === 0) return;
@@ -327,7 +362,7 @@ export default function MapView({
     const bounds = new mapboxgl.LngLatBounds();
     points.forEach((point) => bounds.extend([point.lng, point.lat]));
     map.fitBounds(bounds, { padding: 80, maxZoom: 14, duration: 700 });
-  }, [fitAllTrigger, users, suggestedVenues, manualVenues]);
+  }, [fitAllTrigger, users, suggestedVenues, manualVenues, showSuggestedVenues]);
 
   useEffect(() => {
     const map = mapRef.current;

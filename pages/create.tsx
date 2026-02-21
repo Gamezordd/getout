@@ -1,6 +1,6 @@
 import { observer } from "mobx-react-lite";
 import { useRouter } from "next/router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import PlaceSearch, { PlaceResult } from "../components/PlaceSearch";
 import { useAppStore } from "../lib/store/AppStoreProvider";
 import type { VenueCategory } from "../lib/types";
@@ -19,9 +19,26 @@ function CreatePage() {
   const [name, setName] = useState("");
   const [location, setLocation] = useState<PlaceResult | null>(null);
   const [category, setCategory] = useState<VenueCategory>("bar");
+  const [saveDetails, setSaveDetails] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stored = localStorage.getItem("getout-user-details");
+    if (!stored) return;
+    try {
+      const payload = JSON.parse(stored) as {
+        name?: string;
+        place?: PlaceResult;
+      };
+      if (payload?.name) setName(payload.name);
+      if (payload?.place) setLocation(payload.place);
+    } catch {
+      // ignore malformed storage
+    }
+  }, []);
 
   const handleCreate = async () => {
     if (!name.trim()) {
@@ -40,6 +57,14 @@ function CreatePage() {
       store.setSession(sessionId, "/");
       await store.initGroup();
       await store.joinGroup(name.trim(), location.location, category);
+      if (saveDetails) {
+        localStorage.setItem(
+          "getout-user-details",
+          JSON.stringify({ name: name.trim(), place: location }),
+        );
+      } else {
+        localStorage.removeItem("getout-user-details");
+      }
       router.push({ pathname: "/", query: { sessionId } });
     } catch (err: any) {
       setError(err.message || "Unable to create group.");
@@ -85,6 +110,15 @@ function CreatePage() {
               Selected: {location.address}
             </p>
           )}
+          <label className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-base text-slate-600">
+            <input
+              type="checkbox"
+              checked={saveDetails}
+              onChange={(event) => setSaveDetails(event.target.checked)}
+              className="h-4 w-4 rounded border-slate-300 text-ink"
+            />
+            Save my details for next time
+          </label>
 
           <div>
             <label className="text-base font-semibold text-ink">

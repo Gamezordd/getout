@@ -26,6 +26,7 @@ export const MapContainer = observer(function MapContainer() {
             users={store.users}
             suggestedVenues={store.topVenues}
             manualVenues={store.manualVenues}
+            showSuggestedVenues={store.showSuggestedVenues}
             votes={store.votes}
             totalsByVenue={store.totalsByVenue}
             fitAllTrigger={fitAllTrigger}
@@ -35,6 +36,13 @@ export const MapContainer = observer(function MapContainer() {
             onError={store.setMapError}
           />
         </div>
+        <button
+          type="button"
+          onClick={store.toggleSuggestedVenues}
+          className="absolute right-4 top-28 z-[9] rounded-full bg-white/95 px-3 py-1 text-[11px] font-semibold text-ink shadow-md backdrop-blur"
+        >
+          {store.showSuggestedVenues ? "Hide suggestions" : "Show suggestions"}
+        </button>
         <div className="absolute inset-x-0 top-16 z-[9] flex justify-center">
           <button
             type="button"
