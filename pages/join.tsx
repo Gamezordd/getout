@@ -198,7 +198,7 @@ function JoinPage() {
               type="button"
               onClick={handleDetectLocation}
               disabled={locating}
-              className="text-xs font-semibold text-slate-500 hover:text-ink disabled:opacity-60"
+              className="text-xs font-semibold text-blue-500 hover:text-blue-600 disabled:opacity-60"
             >
               {locating ? "Detecting..." : "Detect location"}
             </button>

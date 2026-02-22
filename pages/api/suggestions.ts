@@ -264,7 +264,7 @@ export default async function handler(
 
     const etaMatrix: EtaMatrix = {};
     const totalsByVenue: TotalsByVenue = {};
-    const totals: Array<{ venueId: string; totalMinutes: number }> = [];
+    const totals: Array<{ venueId: string; totalMinutes: number, rating: number, userRatingCount: number }> = [];
 
     combinedDestinations.forEach((venue, venueIndex) => {
       let totalMinutes = 0;
@@ -283,15 +283,19 @@ export default async function handler(
       });
 
       totalsByVenue[venue.id] = totalMinutes;
-      totals.push({ venueId: venue.id, totalMinutes });
+      totals.push({ venueId: venue.id, totalMinutes, rating: venue.rating || 0, userRatingCount: venue.userRatingCount || 0});
     });
 
-    totals.sort((a, b) => a.totalMinutes - b.totalMinutes);
+    totals.sort((a, b) => {
+      const confidenceA = a.rating * Math.log10(a.userRatingCount + 1);
+      const confidenceB = b.rating * Math.log10(b.userRatingCount + 1);
+      return confidenceB - confidenceA;
+    });
 
     const rankedSuggested = totals
       .map((entry) => candidates.find((venue) => venue.id === entry.venueId))
       .filter(Boolean)
-      .slice(0, 10) as Venue[];
+      .slice(0, 6) as Venue[];
 
     const mergedVenues: Venue[] = [
       ...manualVenues,
