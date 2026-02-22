@@ -223,7 +223,7 @@ function JoinPage() {
           />
 
           {location && (
-            <p className="text-base text-slate-500">
+            <p className="text-sm text-slate-500">
               Selected: {location.address}
             </p>
           )}
