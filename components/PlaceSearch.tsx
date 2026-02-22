@@ -9,7 +9,7 @@ export type PlaceResult = {
 };
 
 type Props = {
-  label: string;
+  label?: string;
   placeholder: string;
   onSelect: (place: PlaceResult) => void;
   locationBias?: { lat: number; lng: number; radiusKm?: number };
@@ -77,7 +77,9 @@ export default function PlaceSearch({
 
   return (
     <div className="space-y-2">
-      <label className="text-base font-semibold text-ink">{label}</label>
+      {label ? (
+        <label className="text-base font-semibold text-ink">{label}</label>
+      ) : null}
       <input
         value={query}
         style={{ fontSize: 18 }}

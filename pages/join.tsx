@@ -190,8 +190,21 @@ function JoinPage() {
             />
           </div>
 
+          <div className="flex items-center justify-between">
+            <label className="text-base font-semibold text-ink">
+              Your location
+            </label>
+            <button
+              type="button"
+              onClick={handleDetectLocation}
+              disabled={locating}
+              className="text-xs font-semibold text-slate-500 hover:text-ink disabled:opacity-60"
+            >
+              {locating ? "Detecting..." : "Detect location"}
+            </button>
+          </div>
           <PlaceSearch
-            label="Your location"
+            label=""
             placeholder="Search for your neighborhood"
             locationBias={
               organizerLocation
@@ -208,14 +221,6 @@ function JoinPage() {
               setError(null);
             }}
           />
-          <button
-            type="button"
-            onClick={handleDetectLocation}
-            disabled={locating}
-            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base font-semibold text-ink shadow-sm disabled:opacity-60"
-          >
-            {locating ? "Detecting location..." : "Detect my location"}
-          </button>
 
           {location && (
             <p className="text-base text-slate-500">
