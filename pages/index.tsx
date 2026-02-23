@@ -1,12 +1,10 @@
 import { observer } from "mobx-react-lite";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import BottomDrawer, { BottomDrawerHandle } from "../components/BottomDrawer";
-import MapView from "../components/MapView";
 import { useAppStore } from "../lib/store/AppStoreProvider";
 import FinalizeDialog from "../components/FinalizeDialog";
 import { Header } from "../components/Header";
 import DrawerContent from "../components/DrawerContent";
-import GroupSettingsDialog from "../components/GroupSettingsDialog";
 import LockedVenueDialog from "../components/LockedVenueDialog";
 import InviteDialog from "../components/InviteDialog";
 import usePusher from "../hooks/usePusher";
@@ -26,6 +24,8 @@ function HomePage() {
   const pushInitRef = useRef(false);
 
   const channel = usePusher();
+
+  const {selectedVenue} = store;
   useRedirections();
 
   const handleEditUser = useCallback(
@@ -121,6 +121,8 @@ function HomePage() {
       {!store.lockedVenue && (
         <BottomDrawer
           ref={bottomSheetRef}
+          bottomOffset={selectedVenue ? 280 : 0}
+          allowScroll={!selectedVenue}
           render={(isExpanded) => (
             <DrawerContent
               isExpanded={isExpanded}

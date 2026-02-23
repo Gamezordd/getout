@@ -41,7 +41,7 @@ export default function useRedirections() {
     if (venueIdFromUrl !== store.selectedVenueId && !store.selectedVenueId) {
       store.setSelectedVenue(venueIdFromUrl);
     }
-  }, [router.isReady, router.query.venueId, store, store.selectedVenueId]);
+  }, [router.isReady, router.query.venueId, store]);
 
   useEffect(() => {
     if (!router.isReady || !store.sessionId) return;

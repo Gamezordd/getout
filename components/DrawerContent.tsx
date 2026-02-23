@@ -4,6 +4,7 @@ import { useAppStore } from "../lib/store/AppStoreProvider";
 import Dialog from "./Dialog";
 import PlaceSearch, { PlaceResult } from "./PlaceSearch";
 import { User } from "../lib/types";
+import PlaceList from "./PlaceList";
 
 interface Props {
   isExpanded: boolean;
@@ -28,6 +29,7 @@ const DrawerContent = observer(function DrawerContent({
     votes,
     showSuggestedVenues,
     updateUserLocation,
+    setSelectedVenue,
   } = useAppStore();
   const isLoading = isLoadingGroup || isLoadingSuggestions;
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
@@ -99,6 +101,19 @@ const DrawerContent = observer(function DrawerContent({
       ? etaMatrix?.[selectedVenue.id]?.[currentUserId]
       : undefined;
 
+  const travelTimeRange = useMemo(() => {
+    if (!selectedVenue) return null;
+    const etas = etaMatrix?.[selectedVenue.id];
+    if (!etas) return null;
+    const values = Object.values(etas).filter(
+      (value): value is number => typeof value === "number",
+    );
+    if (values.length === 0) return null;
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    return `${Math.round(min)} - ${Math.round(max)} min`;
+  }, [etaMatrix, selectedVenue]);
+
   useEffect(() => {
     if (!isExpanded) {
       setShowAllVoters(false);
@@ -107,7 +122,7 @@ const DrawerContent = observer(function DrawerContent({
 
   return (
     <>
-      <div className="mx-auto mt-2 h-1.5 w-12 rounded-full bg-slate-200" />
+      
       {editingUser && (
         <Dialog
           isOpen={!!editingUser}
@@ -166,13 +181,27 @@ const DrawerContent = observer(function DrawerContent({
                 </span>
               </div>
             </div>
-          ) : null}
+          ) : (
+            <div className="text-xs font-semibold text-slate-500">
+              Tap a place to see details.
+            </div>
+          )}
         </div>
       )}
       {!isLoading && (
         <div className="h-full px-5 pb-6">
           {etaError && <p className="mb-3 text-xs text-red-600">{etaError}</p>}
-          <div className="h-full min-h-0 space-y-4 overflow-y-auto pr-1">
+          <div className="h-full min-h-0 space-y-4 overflow-y-auto pr-1 flex flex-col">
+            {!selectedVenue && (
+              <PlaceList
+                suggestedVenues={suggestedVenues}
+                manualVenues={manualVenues}
+                totalsByVenue={totalsByVenue}
+                etaMatrix={etaMatrix}
+                showSuggestedVenues={showSuggestedVenues}
+                onSelect={setSelectedVenue}
+              />
+            )}
             {hasCurrentUserLocation &&
               selectedVenue &&
               voterNames.length > 0 && (
@@ -232,10 +261,7 @@ const DrawerContent = observer(function DrawerContent({
                         </p>
                       )}
                       <p className="mt-2 text-xs text-slate-500">
-                        Total drive time:{" "}
-                        {typeof totalsByVenue?.[selectedVenue.id] === "number"
-                          ? `${totalsByVenue[selectedVenue.id]} min`
-                          : "--"}
+                        Travel Time : {travelTimeRange || "--"}
                       </p>
                     </div>
                   </div>

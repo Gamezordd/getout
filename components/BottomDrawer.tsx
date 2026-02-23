@@ -3,6 +3,7 @@ import {
   useEffect,
   useImperativeHandle,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { motion, useAnimation, useMotionValue } from "framer-motion";
@@ -14,15 +15,18 @@ export type BottomDrawerHandle = {
 type Props = {
   onCollapse?: () => void;
   render: (isExpanded: boolean) => React.ReactNode;
+  bottomOffset?: number;
+  allowScroll?: boolean;
 };
 
 const BottomDrawer = forwardRef<BottomDrawerHandle, Props>(
-  function BottomDrawer({ onCollapse, render }: Props, ref) {
+  function BottomDrawer({ onCollapse, render, bottomOffset = 0, allowScroll = false }: Props, ref) {
     const [isMounted, setIsMounted] = useState(false);
     const [viewportHeight, setViewportHeight] = useState(0);
     const [activeSnapHeight, setActiveSnapHeight] = useState<number>(0);
     const controls = useAnimation();
     const y = useMotionValue(0);
+    const containerRef = useRef<HTMLDivElement>(null);
 
     const FOOTER_HEIGHT = 80;
     const MIN_SNAP = 64;
@@ -44,7 +48,7 @@ const BottomDrawer = forwardRef<BottomDrawerHandle, Props>(
 
     const maxHeight = useMemo(() => {
       if (!viewportHeight) return 0;
-      return Math.max(280, Math.round(viewportHeight * 0.85));
+      return Math.max(bottomOffset, Math.round(viewportHeight * 0.85));
     }, [viewportHeight]);
 
     const snapPoints = useMemo(() => {
@@ -66,18 +70,6 @@ const BottomDrawer = forwardRef<BottomDrawerHandle, Props>(
       }
       controls.set({ y: Math.max(0, maxHeight - activeSnapHeight) });
     }, [activeSnapHeight, controls, maxHeight, snapPoints]);
-
-    // useEffect(() => {
-    //   if (!selectedVenue) return;
-    //   const mid = snapPoints[Math.min(1, snapPoints.length - 1)];
-    //   setActiveSnapHeight(mid);
-    //   if (maxHeight) {
-    //     controls.start({
-    //       y: Math.max(0, maxHeight - mid),
-    //       transition: { type: "spring", stiffness: 320, damping: 32 },
-    //     });
-    //   }
-    // }, [selectedVenue, snapPoints, maxHeight, controls]);
 
     useImperativeHandle(
       ref,
@@ -123,13 +115,17 @@ const BottomDrawer = forwardRef<BottomDrawerHandle, Props>(
       });
     };
 
+    const containerHeight = window.innerHeight - (containerRef.current?.getBoundingClientRect().top ?? 0) - 40;
+
     return (
       <div
         className="pointer-events-none absolute inset-x-0 z-[60]"
         style={{ bottom: FOOTER_HEIGHT }}
+
       >
         <motion.div
           className="pointer-events-auto relative mx-auto flex w-full flex-col rounded-t-[28px] bg-white shadow-lg outline-none"
+          ref={containerRef}
           style={{ y, height: maxHeight || undefined }}
           animate={controls}
           drag="y"
@@ -139,8 +135,16 @@ const BottomDrawer = forwardRef<BottomDrawerHandle, Props>(
           }}
           dragElastic={0.06}
           onDragEnd={handleDragEnd}
+          
         >
-          {render(isExpanded)}
+          <div onTouchStart={e => {
+            e.stopPropagation();
+          }} onTouchMove={e => {
+            e.stopPropagation();
+          }} style={{ height: allowScroll ? containerHeight : undefined }}>
+            <div className="mx-auto mt-2 h-1.5 w-12 rounded-full bg-slate-200" />
+            {render(isExpanded)}
+          </div>
         </motion.div>
       </div>
     );

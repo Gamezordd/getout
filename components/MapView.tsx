@@ -13,7 +13,7 @@ type Props = {
   fitAllTrigger?: number;
   selectedVenueId?: string | null;
   highlightedVenueId?: string | null;
-  onSelectVenue?: (venueId: string) => void;
+  onSelectVenue?: (venueId: string | null) => void;
   onError?: (message: string) => void;
 };
 
@@ -37,6 +37,7 @@ export default function MapView({
   const venueCoordsRef = useRef<Record<string, { lng: number; lat: number }>>(
     {},
   );
+  const markerClickRef = useRef(false);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -67,13 +68,21 @@ export default function MapView({
         });
 
         mapRef.current = map;
+
+        map.on("click", () => {
+          if (markerClickRef.current) {
+            markerClickRef.current = false;
+            return;
+          }
+          onSelectVenue?.(null);
+        });
       } catch (err: any) {
         onError?.(err.message || "Map failed to load.");
       }
     };
 
     setupMap();
-  }, [onError]);
+  }, [onError, onSelectVenue]);
 
   useEffect(() => {
     console.log("Updating map markers");
@@ -278,7 +287,10 @@ export default function MapView({
         "mt-1 max-w-[108px] rounded-md bg-white/95 px-2 py-0.5 text-center text-[10px] font-medium leading-tight text-ink shadow";
       label.textContent = venue.name;
       wrapper.appendChild(label);
-      wrapper.addEventListener("click", () => onSelectVenue?.(venue.id));
+      wrapper.addEventListener("click", () => {
+        markerClickRef.current = true;
+        onSelectVenue?.(venue.id);
+      });
 
       const marker = new mapboxgl.Marker({ element: wrapper })
         .setLngLat([venue.location.lng, venue.location.lat])
@@ -321,7 +333,10 @@ export default function MapView({
         "mt-1 max-w-[108px] rounded-md bg-white/95 px-2 py-0.5 text-center text-[10px] font-medium leading-tight text-ink shadow";
       label.textContent = venue.name;
       wrapper.appendChild(label);
-      wrapper.addEventListener("click", () => onSelectVenue?.(venue.id));
+      wrapper.addEventListener("click", () => {
+        markerClickRef.current = true;
+        onSelectVenue?.(venue.id);
+      });
 
       const marker = new mapboxgl.Marker({ element: wrapper })
         .setLngLat([venue.location.lng, venue.location.lat])
