@@ -20,7 +20,10 @@ type Props = {
 };
 
 const BottomDrawer = forwardRef<BottomDrawerHandle, Props>(
-  function BottomDrawer({ onCollapse, render, bottomOffset = 0, allowScroll = false }: Props, ref) {
+  function BottomDrawer(
+    { onCollapse, render, bottomOffset = 0, allowScroll = false }: Props,
+    ref,
+  ) {
     const [isMounted, setIsMounted] = useState(false);
     const [viewportHeight, setViewportHeight] = useState(0);
     const [activeSnapHeight, setActiveSnapHeight] = useState<number>(0);
@@ -115,13 +118,15 @@ const BottomDrawer = forwardRef<BottomDrawerHandle, Props>(
       });
     };
 
-    const containerHeight = window.innerHeight - (containerRef.current?.getBoundingClientRect().top ?? 0) - 60;
+    const containerHeight =
+      viewportHeight -
+      (containerRef.current?.getBoundingClientRect().top ?? 0) -
+      40;
 
     return (
       <div
         className="pointer-events-none absolute inset-x-0 z-[60]"
         style={{ bottom: FOOTER_HEIGHT }}
-
       >
         <motion.div
           className="pointer-events-auto relative mx-auto flex w-full flex-col rounded-t-[28px] bg-white shadow-lg outline-none"
@@ -135,13 +140,16 @@ const BottomDrawer = forwardRef<BottomDrawerHandle, Props>(
           }}
           dragElastic={0.06}
           onDragEnd={handleDragEnd}
-          
         >
-          <div onTouchStart={e => {
-            e.stopPropagation();
-          }} onTouchMove={e => {
-            e.stopPropagation();
-          }} style={{ height: allowScroll ? containerHeight : undefined }}>
+          <div
+            onTouchStart={(e) => {
+              e.stopPropagation();
+            }}
+            onTouchMove={(e) => {
+              e.stopPropagation();
+            }}
+            style={{ height: allowScroll ? containerHeight : undefined }}
+          >
             <div className="mx-auto mt-2 h-1.5 w-12 rounded-full bg-slate-200" />
             {render(isExpanded)}
           </div>
