@@ -286,10 +286,16 @@ export default async function handler(
       totals.push({ venueId: venue.id, totalMinutes, rating: venue.rating || 0, userRatingCount: venue.userRatingCount || 0});
     });
 
+    const userCount = group.users.length || 1;
+    
     totals.sort((a, b) => {
       const confidenceA = a.rating * Math.log10(a.userRatingCount + 1);
       const confidenceB = b.rating * Math.log10(b.userRatingCount + 1);
-      return confidenceB - confidenceA;
+      const avgMinutesA = a.totalMinutes / userCount;
+      const avgMinutesB = b.totalMinutes / userCount;
+      const scoreA = avgMinutesA > 0 ? confidenceA / avgMinutesA : confidenceA;
+      const scoreB = avgMinutesB > 0 ? confidenceB / avgMinutesB : confidenceB;
+      return scoreB - scoreA;
     });
 
     const rankedSuggested = totals

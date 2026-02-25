@@ -47,7 +47,6 @@ export default function renderMapMarkers(
       (entry): entry is { venueId: string; total: number } =>
         typeof entry.total === "number",
     )
-    .sort((a, b) => a.total - b.total)
     .slice(0, 3);
 
   rankedVenues.forEach((entry, index) => {
@@ -137,3 +136,4 @@ export default function renderMapMarkers(
     setSelectedVenue,
   ]);
 }
+

@@ -45,12 +45,6 @@ export default function PlaceList({
         venue,
         total: totalsByVenue?.[venue.id],
       }))
-      .sort((a, b) => {
-        const aIndex = suggestedIndex.get(a.venue.id) ?? Number.POSITIVE_INFINITY;
-        const bIndex = suggestedIndex.get(b.venue.id) ?? Number.POSITIVE_INFINITY;
-        if (aIndex !== bIndex) return aIndex - bIndex;
-        return (b.total ?? 0) - (a.total ?? 0);
-      })
       .map((entry) => entry.venue);
   }, [manualVenues, showSuggestedVenues, suggestedVenues, totalsByVenue]);
 
@@ -65,7 +59,6 @@ export default function PlaceList({
       .filter((entry): entry is { venueId: string; total: number } =>
         typeof entry.total === "number",
       )
-      .sort((a, b) => a.total - b.total)
       .slice(0, 3);
     const noteByVenue = new Map<string, string>();
     ranked.forEach((entry, index) => {

@@ -48,7 +48,7 @@ const BottomDrawer = forwardRef<BottomDrawerHandle, Props>(
 
     const maxHeight = useMemo(() => {
       if (!viewportHeight) return 0;
-      return Math.max(bottomOffset, Math.round(viewportHeight * 0.85));
+      return Math.max(bottomOffset, Math.round(viewportHeight * 0.9));
     }, [viewportHeight]);
 
     const snapPoints = useMemo(() => {

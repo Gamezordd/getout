@@ -327,3 +327,4 @@ const DrawerContent = observer(function DrawerContent({
 });
 
 export default DrawerContent;
+
