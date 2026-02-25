@@ -23,17 +23,7 @@ export const MapContainer = observer(function MapContainer() {
       <main className="h-full">
         <div className="h-full w-full">
           <MapView
-            users={store.users}
-            suggestedVenues={store.topVenues}
-            manualVenues={store.manualVenues}
-            showSuggestedVenues={store.showSuggestedVenues}
-            votes={store.votes}
-            totalsByVenue={store.totalsByVenue}
             fitAllTrigger={fitAllTrigger}
-            selectedVenueId={store.selectedVenueId}
-            highlightedVenueId={store.mostEfficientVenueId}
-            onSelectVenue={store.setSelectedVenue}
-            onError={store.setMapError}
           />
         </div>
         <button
