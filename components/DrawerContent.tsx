@@ -111,6 +111,7 @@ const DrawerContent = observer(function DrawerContent({
     if (values.length === 0) return null;
     const min = Math.min(...values);
     const max = Math.max(...values);
+    if(Math.round(max) === Math.round(min)) return `${Math.round(min)} min`;
     return `${Math.round(min)} - ${Math.round(max)} min`;
   }, [etaMatrix, selectedVenue]);
 

@@ -3,7 +3,7 @@ export const addMedal = (parent: HTMLDivElement, venueId: string, medalByVenue: 
   if (!medal) return;
   const badge = document.createElement("div");
   badge.className =
-    "absolute -left-1 -top-2 flex h-5 min-w-[20px] items-center justify-center rounded-full border border-white bg-white/95 text-[11px] shadow";
+    "absolute -left-1 -bottom-2 z-10 flex h-5 min-w-[20px] items-center justify-center rounded-full border border-white bg-white/95 text-[11px] shadow";
   badge.textContent = medal;
   parent.appendChild(badge);
 };

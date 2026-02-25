@@ -115,7 +115,7 @@ const BottomDrawer = forwardRef<BottomDrawerHandle, Props>(
       });
     };
 
-    const containerHeight = window.innerHeight - (containerRef.current?.getBoundingClientRect().top ?? 0) - 40;
+    const containerHeight = window.innerHeight - (containerRef.current?.getBoundingClientRect().top ?? 0) - 60;
 
     return (
       <div

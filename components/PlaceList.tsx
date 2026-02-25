@@ -18,6 +18,8 @@ const getTravelRange = (etas?: Record<string, number>) => {
   if (values.length === 0) return "--";
   const min = Math.min(...values);
   const max = Math.max(...values);
+  if(Math.round(max) === Math.round(min)) return `${Math.round(min)} min`;
+
   return `${Math.round(min)} - ${Math.round(max)} min`;
 };
 
@@ -52,6 +54,43 @@ export default function PlaceList({
       .map((entry) => entry.venue);
   }, [manualVenues, showSuggestedVenues, suggestedVenues, totalsByVenue]);
 
+  const medalNoteByVenue = useMemo(() => {
+    const visibleSuggested = showSuggestedVenues ? suggestedVenues : [];
+    const visibleVenues = [...visibleSuggested, ...manualVenues];
+    const ranked = visibleVenues
+      .map((venue) => ({
+        venueId: venue.id,
+        total: totalsByVenue?.[venue.id],
+      }))
+      .filter((entry): entry is { venueId: string; total: number } =>
+        typeof entry.total === "number",
+      )
+      .sort((a, b) => a.total - b.total)
+      .slice(0, 3);
+    const noteByVenue = new Map<string, string>();
+    ranked.forEach((entry, index) => {
+      if (index === 0) {
+        noteByVenue.set(
+          entry.venueId,
+          "🥇 Best based on ratings and travel time",
+        );
+        return;
+      }
+      if (index === 1) {
+        noteByVenue.set(
+          entry.venueId,
+          "🥈 Second best based on ratings and travel time",
+        );
+        return;
+      }
+      noteByVenue.set(
+        entry.venueId,
+        "🥉 Third best based on ratings and travel time",
+      );
+    });
+    return noteByVenue;
+  }, [manualVenues, showSuggestedVenues, suggestedVenues, totalsByVenue]);
+
   if (rankedVenues.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-center text-xs text-slate-500">
@@ -80,8 +119,26 @@ export default function PlaceList({
               </div>
               <div className="flex-1">
                 <p className="text-sm font-semibold text-ink">{venue.name}</p>
+                {medalNoteByVenue.get(venue.id) && (
+                  <p className="mt-0.5 text-[11px] font-semibold text-slate-500">
+                    {medalNoteByVenue.get(venue.id)}
+                  </p>
+                )}
                 {venue.address && (
                   <p className="text-xs text-slate-500">{venue.address}</p>
+                )}
+                {venue.rating && (
+                  <p className="mt-1 flex items-center gap-1 text-xs text-slate-500">
+                    <svg
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                      aria-hidden="true"
+                      className="h-3.5 w-3.5 text-yellow-400"
+                    >
+                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.539 1.118l-2.8-2.034a1 1 0 00-1.176 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.462a1 1 0 00.95-.69l1.07-3.292z" />
+                    </svg>
+                    {venue.rating} ({venue.userRatingCount || 0})
+                  </p>
                 )}
                 <p className="mt-1 text-xs text-slate-500">
                   Travel Time : {getTravelRange(etaMatrix?.[venue.id])}
