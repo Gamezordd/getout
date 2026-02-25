@@ -1,4 +1,4 @@
-export default function addVoteAvatars(parent: HTMLDivElement, venueId: string, votes: Record<string, string[]>, userById: Map<string, { avatarUrl: string }> ) {
+export default function addVoterBadgeAvatars(parent: HTMLDivElement, venueId: string, votes: Record<string, string[]>, userById: Map<string, { avatarUrl: string }> ) {
   const voterIds = votes?.[venueId] || [];
   if (voterIds.length === 0) return;
   const stack = document.createElement("div");
