@@ -36,7 +36,7 @@ export default function Dialog({
           <div>
             <p className="text-base font-semibold text-ink">{title}</p>
             {description && (
-              <p className="mt-1 text-base text-slate-500">{description}</p>
+              <p className="mt-1 text-sm text-slate-500">{description}</p>
             )}
           </div>
           <button

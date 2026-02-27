@@ -9,6 +9,7 @@ import type {
   VenueCategory,
   VotesByVenue,
 } from "../types";
+import { shareLinkText } from "../constants";
 
 const OWNER_KEY_PREFIX = "getout-owner-";
 const USER_KEY_PREFIX = "getout-user-";
@@ -511,8 +512,10 @@ export class AppStore {
     } else {
       url.searchParams.delete("venueId");
     }
+
+    const copyText = `${shareLinkText}\n\n${url.toString()}`;
     try {
-      await navigator.clipboard.writeText(url.toString());
+      await navigator.clipboard.writeText(copyText);
       this.copyStatus = "Link copied!";
     } catch {
       this.copyStatus = "Copy failed. Long-press to copy.";

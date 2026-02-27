@@ -1,0 +1,1 @@
+export const shareLinkText = "I just created a meetup on GetOut! Join me to vote on where you want to go. Here's the link: ";

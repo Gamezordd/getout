@@ -37,8 +37,8 @@ const InviteDialog = observer(function InviteDialog() {
     <Dialog
       isOpen={showInviteDialog}
       onClose={handleClose}
-      title="getout is best enjoyed with friends"
-      description="Share your group link to get better meetup options."
+      title="You're the first one here!"
+      description="Invite friends to instantly calculate the best spots and vote to pick one."
     >
       <button
         type="button"
@@ -54,7 +54,7 @@ const InviteDialog = observer(function InviteDialog() {
           <path d="M7 3a2 2 0 00-2 2v1a1 1 0 11-2 0V5a4 4 0 014-4h6a4 4 0 014 4v6a4 4 0 01-4 4h-1a1 1 0 110-2h1a2 2 0 002-2V5a2 2 0 00-2-2H7z" />
           <path d="M3 9a4 4 0 014-4h6a4 4 0 014 4v6a4 4 0 01-4 4H7a4 4 0 01-4-4V9zm4-2a2 2 0 00-2 2v6a2 2 0 002 2h6a2 2 0 002-2V9a2 2 0 00-2-2H7z" />
         </svg>
-        {store.copyStatus || "Copy share link"}
+        {store.copyStatus || "Copy Invite Link"}
       </button>
     </Dialog>
   );
