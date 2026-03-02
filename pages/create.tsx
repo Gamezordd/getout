@@ -152,17 +152,13 @@ function CreatePage() {
           <PlaceSearch
             label=""
             placeholder="Search for your neighborhood"
+            selectedPlace={location}
             onSelect={(place) => {
               setLocation(place);
               setLocationError(null);
               setError(null);
             }}
           />
-          {location && (
-            <p className="text-sm text-slate-500">
-              Selected: {location.address}
-            </p>
-          )}
 
           <div>
             <label className="text-base font-semibold text-ink">

@@ -29,6 +29,14 @@ export const Header = observer(function Header({ onFinalizeClick }: Props) {
     });
   }, [router, store.sessionId]);
 
+  const handleEditLocation = useCallback(() => {
+    if (!store.sessionId) return;
+    router.push({
+      pathname: "/edit",
+      query: { sessionId: store.sessionId },
+    });
+  }, [router, store.sessionId]);
+
   useEffect(() => {
     if (!menuOpen) return;
 
@@ -162,6 +170,25 @@ export const Header = observer(function Header({ onFinalizeClick }: Props) {
                     <path d="M10 2a1 1 0 011 1v1.05A7.002 7.002 0 0116.95 10H18a1 1 0 110 2h-1.05A7.002 7.002 0 0111 17.95V19a1 1 0 11-2 0v-1.05A7.002 7.002 0 013.05 12H2a1 1 0 110-2h1.05A7.002 7.002 0 019 4.05V3a1 1 0 011-1zm0 4a4 4 0 100 8 4 4 0 000-8z" />
                   </svg>
                   Add venue
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    handleEditLocation();
+                  }}
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-ink hover:bg-slate-100"
+                >
+                  <svg
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    aria-hidden="true"
+                    className="h-4 w-4 text-slate-500"
+                  >
+                    <path d="M17.414 2.586a2 2 0 0 0-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 0 0 0-2.828z" />
+                    <path d="M5 14a1 1 0 0 0-1 1v2h2a1 1 0 0 0 1-1v-1.586l-2 2V14z" />
+                  </svg>
+                  Edit location
                 </button>
               </div>
             )}

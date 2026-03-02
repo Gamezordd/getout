@@ -3,50 +3,21 @@ import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
 import PlaceSearch, { PlaceResult } from "../components/PlaceSearch";
 import { useAppStore } from "../lib/store/AppStoreProvider";
-import type { VenueCategory } from "../lib/types";
 
-const CATEGORY_OPTIONS: Array<{ value: VenueCategory; label: string }> = [
-  { value: "bar", label: "Bars" },
-  { value: "restaurant", label: "Restaurants" },
-  { value: "cafe", label: "Cafes" },
-  { value: "night_club", label: "Night clubs" },
-  { value: "brewery", label: "Breweries" },
-];
-
-function JoinPage() {
+function EditPage() {
   const store = useAppStore();
   const router = useRouter();
   const sessionId =
     typeof router.query.sessionId === "string" ? router.query.sessionId : "";
-  const addUser = router.query.addUser === "1";
-  const [name, setName] = useState("");
   const [location, setLocation] = useState<PlaceResult | null>(null);
-  const [saveDetails, setSaveDetails] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [locating, setLocating] = useState(false);
 
-  const organizerLocation = useMemo(() => {
-    const organizer = store.users.find((user) => user.isOrganizer);
-    return organizer?.location;
-  }, [store.users]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const stored = localStorage.getItem("getout-user-details");
-    if (!stored) return;
-    try {
-      const payload = JSON.parse(stored) as {
-        name?: string;
-        place?: PlaceResult;
-      };
-      if (payload?.name) setName(payload.name);
-      if (payload?.place) setLocation(payload.place);
-    } catch {
-      // ignore malformed storage
-    }
-  }, []);
+  const currentUser = useMemo(() => {
+    return store.currentUser;
+  }, [store.currentUser]);
 
   useEffect(() => {
     if (!router.isReady) return;
@@ -61,45 +32,6 @@ function JoinPage() {
     if (!sessionId) return;
     store.loadGroup();
   }, [sessionId, store]);
-
-  const handleJoin = async () => {
-    if (!store.sessionId) {
-      setError("Missing session. Open this page from a group link.");
-      return;
-    }
-    if (!name.trim()) {
-      setError("Add your name to join.");
-      return;
-    }
-    if (!location) {
-      setLocationError("Pick a planning location to join.");
-      return;
-    }
-    if (!store.venueCategory) {
-      await store.loadGroup();
-    }
-
-    try {
-      setSubmitting(true);
-      setError(null);
-      await store.joinGroup(name.trim(), location.location, undefined, {
-        preserveCurrentUser: addUser,
-      });
-      if (saveDetails) {
-        localStorage.setItem(
-          "getout-user-details",
-          JSON.stringify({ name: name.trim(), place: location }),
-        );
-      } else {
-        localStorage.removeItem("getout-user-details");
-      }
-      router.push({ pathname: "/", query: { sessionId: store.sessionId } });
-    } catch (err: any) {
-      setError(err.message || "Unable to join group.");
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
   const handleDetectLocation = async () => {
     if (!("geolocation" in navigator)) {
@@ -140,13 +72,37 @@ function JoinPage() {
     );
   };
 
+  const handleUpdate = async () => {
+    if (!store.sessionId) {
+      setError("Missing session. Open this page from a group link.");
+      return;
+    }
+    if (!store.currentUserId) {
+      setError("Missing user. Join the group first.");
+      return;
+    }
+    if (!location) {
+      setLocationError("Pick a new planning location.");
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      setError(null);
+      await store.updateUserLocation(store.currentUserId, location.location);
+      router.push({ pathname: "/", query: { sessionId: store.sessionId } });
+    } catch (err: any) {
+      setError(err.message || "Unable to update location.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <main className="min-h-screen bg-mist px-4 pb-8 pt-6">
       <div className="mx-auto max-w-md rounded-3xl bg-white p-5 shadow-sm">
         <div className="flex items-center justify-between">
-          <h1 className="text-base font-semibold text-ink">
-            You've been invited
-          </h1>
+          <h1 className="text-base font-semibold text-ink">Update location</h1>
           <button
             type="button"
             onClick={() =>
@@ -172,24 +128,13 @@ function JoinPage() {
             </svg>
           </button>
         </div>
-        <p className="mt-2 text-base font-semibold text-slate-500">
-          {store.users.length}{" "}
-          {store.users.length === 1 ? "person is" : "people are"} waiting on you
+        <p className="mt-2 text-sm text-slate-500">
+          {currentUser?.name
+            ? `Updating for ${currentUser.name}`
+            : "Pick a new location for this session."}
         </p>
 
         <div className="mt-4 space-y-4">
-          <div>
-            <label className="text-base font-semibold text-ink">
-              Your name
-            </label>
-            <input
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              placeholder="Type your name"
-              className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base shadow-sm focus:border-slate-400 focus:outline-none"
-            />
-          </div>
-
           <div className="flex items-center justify-between">
             <label className="text-base font-semibold text-ink">
               Your location
@@ -206,15 +151,6 @@ function JoinPage() {
           <PlaceSearch
             label=""
             placeholder="Search for your neighborhood"
-            locationBias={
-              organizerLocation
-                ? {
-                    lat: organizerLocation.lat,
-                    lng: organizerLocation.lng,
-                    radiusKm: 40,
-                  }
-                : undefined
-            }
             selectedPlace={location}
             onSelect={(place) => {
               setLocation(place);
@@ -222,38 +158,18 @@ function JoinPage() {
               setError(null);
             }}
           />
-
           {locationError && (
             <p className="text-base text-red-600">{locationError}</p>
           )}
           {error && <p className="text-base text-red-600">{error}</p>}
 
-          <div className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2 text-base text-slate-600">
-            <span>Picking</span>
-            <span className="font-semibold text-ink">
-              {CATEGORY_OPTIONS.find(
-                (option) => option.value === store.venueCategory,
-              )?.label || "Bars"}
-            </span>
-          </div>
-
-          <label className="flex items-center gap-3 text-xs text-slate-500">
-            <input
-              type="checkbox"
-              checked={saveDetails}
-              onChange={(event) => setSaveDetails(event.target.checked)}
-              className="h-4 w-4 rounded border-slate-300 text-ink"
-            />
-            Save my details for next time
-          </label>
-
           <button
             type="button"
-            onClick={handleJoin}
+            onClick={handleUpdate}
             disabled={submitting}
             className="w-full rounded-full bg-ink px-5 py-3 text-base font-semibold text-white disabled:opacity-60"
           >
-            {submitting ? "Suii..." : "Join & Pick"}
+            {submitting ? "Saving..." : "Update location"}
           </button>
         </div>
       </div>
@@ -261,4 +177,4 @@ function JoinPage() {
   );
 }
 
-export default observer(JoinPage);
+export default observer(EditPage);

@@ -13,6 +13,7 @@ type Props = {
   placeholder: string;
   onSelect: (place: PlaceResult) => void;
   locationBias?: { lat: number; lng: number; radiusKm?: number };
+  selectedPlace?: PlaceResult | null;
 };
 
 export default function PlaceSearch({
@@ -20,13 +21,27 @@ export default function PlaceSearch({
   placeholder,
   onSelect,
   locationBias,
+  selectedPlace,
 }: Props) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<PlaceResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const selectedDisplay = selectedPlace ? selectedPlace.name : "";
 
   useEffect(() => {
+    if (!selectedPlace) return;
+    setQuery(selectedPlace.name);
+    setResults([]);
+    setError(null);
+  }, [selectedPlace]);
+
+  useEffect(() => {
+    if (selectedPlace && query.trim() === selectedDisplay) {
+      setResults([]);
+      setLoading(false);
+      return;
+    }
     if (!query.trim()) {
       setResults([]);
       setError(null);
@@ -73,39 +88,66 @@ export default function PlaceSearch({
       controller.abort();
       clearTimeout(debounce);
     };
-  }, [query]);
+  }, [query, selectedPlace, selectedDisplay]);
 
   return (
     <div className="space-y-2">
       {label ? (
         <label className="text-base font-semibold text-ink">{label}</label>
       ) : null}
-      <input
-        value={query}
-        style={{ fontSize: 18 }}
-        onChange={(event) => setQuery(event.target.value)}
-        placeholder={placeholder}
-        className="w-full rounded-xl border border-slate-200 bg-white text-base px-4 py-3 shadow-sm focus:border-slate-400 focus:outline-none"
-      />
+      <div className="relative">
+        <input
+          value={query}
+          style={{ fontSize: 18 }}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder={placeholder}
+          className={`w-full rounded-xl border bg-white text-base px-4 py-3 shadow-sm focus:border-slate-400 focus:outline-none ${
+            selectedPlace && query.trim() === selectedDisplay
+              ? "border-emerald-300 pr-10"
+              : "border-slate-200"
+          }`}
+        />
+        {selectedPlace && query.trim() === selectedDisplay && (
+          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-emerald-500">
+            <svg
+              viewBox="0 0 20 20"
+              fill="currentColor"
+              aria-hidden="true"
+              className="h-4 w-4"
+            >
+              <path
+                fillRule="evenodd"
+                d="M16.704 5.29a1 1 0 0 1 0 1.415l-7.5 7.5a1 1 0 0 1-1.415 0l-3-3a1 1 0 1 1 1.415-1.415l2.293 2.293 6.793-6.793a1 1 0 0 1 1.414 0z"
+                clipRule="evenodd"
+              />
+            </svg>
+          </span>
+        )}
+      </div>
+      {selectedPlace && query.trim() === selectedDisplay && selectedPlace.address ? (
+        <p className="text-xs text-slate-500">{selectedPlace.address}</p>
+      ) : null}
       {loading && <p className="text-base text-slate-500">Searching…</p>}
       {error && <p className="text-base text-red-600">{error}</p>}
-      <div className="space-y-2">
-        {results.map((place) => (
-          <button
-            key={place.id}
-            type="button"
-            onClick={() => {
+      {!selectedPlace || query.trim() !== selectedDisplay ? (
+        <div className="space-y-2">
+          {results.map((place) => (
+            <button
+              key={place.id}
+              type="button"
+              onClick={() => {
               onSelect(place);
-              setQuery("");
+              setQuery(place.name);
               setResults([]);
             }}
-            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-left text-base shadow-sm hover:border-slate-300"
-          >
-            <p className="font-semibold text-ink">{place.name}</p>
-            <p className="text-base text-slate-500">{place.address}</p>
-          </button>
-        ))}
-      </div>
+              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-left text-base shadow-sm hover:border-slate-300"
+            >
+              <p className="font-semibold text-ink">{place.name}</p>
+              <p className="text-base text-slate-500">{place.address}</p>
+            </button>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
