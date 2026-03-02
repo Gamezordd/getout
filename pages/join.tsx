@@ -26,6 +26,13 @@ function JoinPage() {
   const [locationError, setLocationError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [locating, setLocating] = useState(false);
+  const trimmedName = name.trim();
+  const normalizedName = trimmedName.toLowerCase();
+  const nameTooShort = trimmedName.length > 0 && trimmedName.length < 3;
+  const nameTaken = store.users.some(
+    (user) => user.name.trim().toLowerCase() === normalizedName,
+  );
+  const isNameValid = trimmedName.length >= 3 && !nameTaken;
 
   const organizerLocation = useMemo(() => {
     const organizer = store.users.find((user) => user.isOrganizer);
@@ -67,8 +74,16 @@ function JoinPage() {
       setError("Missing session. Open this page from a group link.");
       return;
     }
-    if (!name.trim()) {
+    if (!trimmedName) {
       setError("Add your name to join.");
+      return;
+    }
+    if (trimmedName.length < 3) {
+      setError("Name must be at least 3 characters.");
+      return;
+    }
+    if (nameTaken) {
+      setError("That name is already taken in this group.");
       return;
     }
     if (!location) {
@@ -82,13 +97,13 @@ function JoinPage() {
     try {
       setSubmitting(true);
       setError(null);
-      await store.joinGroup(name.trim(), location.location, undefined, {
+      await store.joinGroup(trimmedName, location.location, undefined, {
         preserveCurrentUser: addUser,
       });
       if (saveDetails) {
         localStorage.setItem(
           "getout-user-details",
-          JSON.stringify({ name: name.trim(), place: location }),
+          JSON.stringify({ name: trimmedName, place: location }),
         );
       } else {
         localStorage.removeItem("getout-user-details");
@@ -182,12 +197,45 @@ function JoinPage() {
             <label className="text-base font-semibold text-ink">
               Your name
             </label>
-            <input
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              placeholder="Type your name"
-              className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base shadow-sm focus:border-slate-400 focus:outline-none"
-            />
+            <div className="relative mt-2">
+              <input
+                value={name}
+                onChange={(event) => {
+                  setName(event.target.value);
+                  setError(null);
+                }}
+                placeholder="Type your name"
+                className={`w-full rounded-xl border bg-white px-4 py-3 text-base shadow-sm focus:border-slate-400 focus:outline-none ${
+                  isNameValid ? "border-emerald-300 pr-10" : "border-slate-200"
+                }`}
+              />
+              {isNameValid && (
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-emerald-500">
+                  <svg
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    aria-hidden="true"
+                    className="h-4 w-4"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M16.704 5.29a1 1 0 0 1 0 1.415l-7.5 7.5a1 1 0 0 1-1.415 0l-3-3a1 1 0 1 1 1.415-1.415l2.293 2.293 6.793-6.793a1 1 0 0 1 1.414 0z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                </span>
+              )}
+            </div>
+            {nameTooShort && (
+              <p className="mt-2 text-sm text-red-600">
+                Name must be at least 3 characters.
+              </p>
+            )}
+            {nameTaken && (
+              <p className="mt-2 text-sm text-red-600">
+                That name is already taken in this group.
+              </p>
+            )}
           </div>
 
           <div className="flex items-center justify-between">

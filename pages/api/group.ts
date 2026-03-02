@@ -166,6 +166,21 @@ export default async function handler(
         .status(400)
         .json({ message: "Name and location are required." });
     }
+    const trimmedName = payload.name.trim();
+    if (trimmedName.length < 3) {
+      return res
+        .status(400)
+        .json({ message: "Name must be at least 3 characters." });
+    }
+    const normalized = trimmedName.toLowerCase();
+    const nameTaken = group.users.some(
+      (user) => user.name.trim().toLowerCase() === normalized,
+    );
+    if (nameTaken) {
+      return res
+        .status(400)
+        .json({ message: "That name is already taken in this group." });
+    }
     if (
       payload.venueCategory &&
       !ALLOWED_CATEGORIES.has(payload.venueCategory)
@@ -187,8 +202,8 @@ export default async function handler(
 
     const user: User = {
       id: `u-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
-      name: payload.name.trim(),
-      avatarUrl: buildAvatarUrl(payload.name),
+      name: trimmedName,
+      avatarUrl: buildAvatarUrl(trimmedName),
       location: payload.location,
       isOrganizer: group.users.length === 0,
     };
