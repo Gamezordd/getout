@@ -18,6 +18,7 @@ export type Venue = {
   address?: string;
   rating?: number;
   userRatingCount?: number;
+  addedByUserId?: string;
 };
 
 export type LockedVenue = {

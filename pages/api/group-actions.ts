@@ -93,8 +93,12 @@ export const groupActions = (
         if (!payload.venue) {
       return res.status(400).json({ message: "Missing venue." });
     }
+    const normalizedVenue = {
+      ...payload.venue,
+      addedByUserId: payload.venue.addedByUserId || undefined,
+    };
     if (!group.manualVenues.find((venue) => venue.id === payload.venue.id)) {
-      group.manualVenues.push(payload.venue);
+      group.manualVenues.push(normalizedVenue);
     }
     await saveGroup(payload.sessionId, group);
     await safeTrigger(channel, "group-updated", { reason: "manual-venues" });

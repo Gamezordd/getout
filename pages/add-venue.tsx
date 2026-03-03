@@ -99,6 +99,7 @@ function AddVenuePage() {
           <PlaceSearch
             label="Venue"
             placeholder="Search for a specific bar"
+            clearOnSelect
             locationBias={
               organizerLocation
                 ? {
@@ -120,7 +121,7 @@ function AddVenuePage() {
           />
 
           {venues.length > 0 && (
-            <div className="space-y-2 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+            <div className="space-y-2 rounded-2xl border border-slate-200 bg-slate-50 p-3 max-h-[45vh] overflow-y-auto">
               <p className="text-base font-semibold text-ink">
                 Selected venues ({venues.length})
               </p>

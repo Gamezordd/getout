@@ -292,6 +292,7 @@ export class AppStore {
             name: place.name,
             address: place.address,
             location: place.location,
+            addedByUserId: this.currentUserId || undefined,
           },
         }),
       });

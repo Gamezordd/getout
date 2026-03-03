@@ -53,12 +53,23 @@ export default function renderVenueBadge(
   pinBody.style.borderRadius = "50% 50% 50% 0";
   pinBody.style.transform = "rotate(-45deg)";
 
-  const innerText = document.createElement("span");
-  innerText.style.transform = "rotate(45deg)";
-  innerText.style.display = "inline-block";
-  innerText.textContent = pinText;
-  pinBody.textContent = "";
-  pinBody.appendChild(innerText);
+  const manualUser = manualVenue
+    ? userById.get(venue.addedByUserId || "")
+    : null;
+
+  if (manualUser?.avatarUrl) {
+    pinBody.style.backgroundImage = `url(${manualUser.avatarUrl})`;
+    pinBody.style.backgroundSize = "cover";
+    pinBody.style.backgroundPosition = "center";
+    pinBody.textContent = "";
+  } else {
+    const innerText = document.createElement("span");
+    innerText.style.transform = "rotate(45deg)";
+    innerText.style.display = "inline-block";
+    innerText.textContent = pinText;
+    pinBody.textContent = "";
+    pinBody.appendChild(innerText);
+  }
 
   if (venue.id === selectedVenueId) {
     root.style.transform = "scale(1.1)";

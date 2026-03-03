@@ -14,6 +14,7 @@ type Props = {
   onSelect: (place: PlaceResult) => void;
   locationBias?: { lat: number; lng: number; radiusKm?: number };
   selectedPlace?: PlaceResult | null;
+  clearOnSelect?: boolean;
 };
 
 export default function PlaceSearch({
@@ -22,6 +23,7 @@ export default function PlaceSearch({
   onSelect,
   locationBias,
   selectedPlace,
+  clearOnSelect = false,
 }: Props) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<PlaceResult[]>([]);
@@ -137,7 +139,7 @@ export default function PlaceSearch({
               type="button"
               onClick={() => {
               onSelect(place);
-              setQuery(place.name);
+              setQuery(clearOnSelect ? "" : place.name);
               setResults([]);
             }}
               className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-left text-base shadow-sm hover:border-slate-300"
