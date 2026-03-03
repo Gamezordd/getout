@@ -7,21 +7,9 @@ import type {
   VenueCategory,
 } from "../../lib/types";
 import { getGroup, saveGroup } from "../../lib/groupStore";
+import { CacheEntry, DistanceMatrixRow, SuggestionsResponse } from "./types";
+import { CACHE_TTL_MS, MAX_FETCH_ATTEMPTS, NEGATIVE_KEYWORDS_BY_CATEGORY, RADIUS_OPTIONS_METERS, TARGET_SUGGESTION_COUNT } from "./constants";
 
-type SuggestionsResponse = {
-  venues: Venue[];
-  suggestedVenues: Venue[];
-  etaMatrix: EtaMatrix;
-  totalsByVenue: TotalsByVenue;
-  warning?: string;
-};
-
-type CacheEntry = {
-  timestamp: number;
-  payload: SuggestionsResponse;
-};
-
-const CACHE_TTL_MS = 2 * 60 * 1000;
 const suggestionsCache = new Map<string, CacheEntry>();
 
 const computeCentroid = (points: LatLng[]): LatLng => {
@@ -56,6 +44,8 @@ const fetchTopPlaces = async (
   centroid: LatLng,
   apiKey: string,
   venueCategory: VenueCategory,
+  radiusMeters: number,
+  pageToken?: string,
 ) => {
   try {
     console.log(
@@ -81,9 +71,10 @@ const fetchTopPlaces = async (
           locationRestriction: {
             circle: {
               center: { latitude: centroid.lat, longitude: centroid.lng },
-              radius: 5000,
+              radius: radiusMeters,
             },
           },
+          ...(pageToken ? { pageToken } : {}),
         }),
       },
     );
@@ -95,7 +86,7 @@ const fetchTopPlaces = async (
     const data = await response.json();
     const places = Array.isArray(data.places) ? data.places : [];
 
-    return places
+    const venues = places
       .map((place: any) => {
         const location = place.location;
         if (!location) return null;
@@ -112,27 +103,16 @@ const fetchTopPlaces = async (
       .filter(
         (venue: any) => venue.rating >= 4.2 && venue.userRatingCount >= 200,
       ) as Array<Venue & { rating: number; userRatingCount: number }>;
+
+    return {
+      venues,
+      nextPageToken: data.nextPageToken as string | undefined,
+    };
   } catch (error) {
     console.error("Error fetching places:", error);
-    return [];
+    return { venues: [], nextPageToken: undefined };
   }
 };
-
-interface DistanceMatrixElement {
-  status: string;
-  duration?: {
-    value: number;
-    text: string;
-  };
-  distance?: {
-    value: number;
-    text: string;
-  };
-}
-
-interface DistanceMatrixRow {
-  elements: DistanceMatrixElement[];
-}
 
 const fetchDriveTimesInternal = async (
   apiKey: string,
@@ -232,7 +212,53 @@ export default async function handler(
   try {
     const centroid = computeCentroid(group.users.map((user) => user.location));
     const category = group.venueCategory || "bar";
-    const candidates = await fetchTopPlaces(centroid, apiKey, category);
+    const negativeKeywords = NEGATIVE_KEYWORDS_BY_CATEGORY[category] || [];
+    const isRelevantPlace = (name: string) => {
+      const normalized = name.toLowerCase();
+      return !negativeKeywords.some((keyword) =>
+        normalized.includes(keyword),
+      );
+    };
+
+    const candidates: Venue[] = [];
+    let attempts = 0;
+    let radiusIndex = 0;
+    let pageToken: string | undefined;
+
+    while (
+      candidates.length < TARGET_SUGGESTION_COUNT &&
+      attempts < MAX_FETCH_ATTEMPTS
+    ) {
+      const radiusMeters =
+        RADIUS_OPTIONS_METERS[radiusIndex] ??
+        RADIUS_OPTIONS_METERS[RADIUS_OPTIONS_METERS.length - 1];
+      const result = await fetchTopPlaces(
+        centroid,
+        apiKey,
+        category,
+        radiusMeters,
+        pageToken,
+      );
+      const filtered = result.venues.filter((venue) =>
+        isRelevantPlace(venue.name),
+      );
+      filtered.forEach((venue) => {
+        if (!candidates.find((item) => item.id === venue.id)) {
+          candidates.push(venue);
+        }
+      });
+
+      if (candidates.length >= TARGET_SUGGESTION_COUNT) break;
+
+      if (result.nextPageToken) {
+        pageToken = result.nextPageToken;
+      } else {
+        radiusIndex += 1;
+        pageToken = undefined;
+      }
+
+      attempts += 1;
+    }
 
     const manualVenues = group.manualVenues || [];
     const combinedDestinations = [...manualVenues, ...candidates].reduce<
@@ -301,7 +327,7 @@ export default async function handler(
     const rankedSuggested = totals
       .map((entry) => candidates.find((venue) => venue.id === entry.venueId))
       .filter(Boolean)
-      .slice(0, 6) as Venue[];
+      .slice(0, TARGET_SUGGESTION_COUNT) as Venue[];
 
     const mergedVenues: Venue[] = [
       ...manualVenues,
