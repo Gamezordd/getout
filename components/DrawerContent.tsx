@@ -71,7 +71,6 @@ const DrawerContent = observer(function DrawerContent({
       .filter((entry): entry is { venueId: string; total: number } =>
         typeof entry.total === "number",
       )
-      .sort((a, b) => a.total - b.total)
       .slice(0, 3);
     const index = ranked.findIndex(
       (entry) => entry.venueId === selectedVenue.id,

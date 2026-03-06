@@ -29,6 +29,14 @@ export const Header = observer(function Header({ onFinalizeClick }: Props) {
     });
   }, [router, store.sessionId]);
 
+  const handleAddVenue = useCallback(() => {
+    if (!store.sessionId) return;
+    router.push({
+      pathname: "/add-venue",
+      query: { sessionId: store.sessionId },
+    });
+  }, [router, store.sessionId]);
+
   useEffect(() => {
     if (!menuOpen) return;
 
@@ -90,6 +98,25 @@ export const Header = observer(function Header({ onFinalizeClick }: Props) {
               }`}
             >
               Finalize
+            </button>
+          )}
+          {store.sessionId && (
+            <button
+              type="button"
+              onClick={handleAddVenue}
+              className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 px-3 py-1 text-[11px] font-semibold text-slate-600"
+              aria-label="Add venue"
+            >
+              <svg
+                viewBox="0 0 20 20"
+                fill="currentColor"
+                aria-hidden="true"
+                className="h-3.5 w-3.5 text-slate-500"
+              >
+                <path d="M10 2a6 6 0 0 1 6 6c0 4.418-4.5 8.667-5.37 9.46a1 1 0 0 1-1.26 0C8.5 16.667 4 12.418 4 8a6 6 0 0 1 6-6zm0 3a3 3 0 1 0 0 6 3 3 0 0 0 0-6z" />
+                <path d="M10 6.5a.5.5 0 0 1 .5.5v1.5H12a.5.5 0 0 1 0 1h-1.5V11a.5.5 0 0 1-1 0V9.5H8a.5.5 0 0 1 0-1h1.5V7a.5.5 0 0 1 .5-.5z" />
+              </svg>
+              <span>Add venue</span>
             </button>
           )}
           <div ref={menuRef} className="relative">
