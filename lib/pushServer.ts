@@ -34,7 +34,7 @@ const buildNotificationPayload = (params: {
 
   const title = "New vote";
   const body = `${voter?.name || "Someone"} picked ${venue?.name || "a venue"}`;
-  const url = `/?sessionId=${encodeURIComponent(sessionId)}`;
+  const url = `/?sessionId=${encodeURIComponent(sessionId)}&venueId=${encodeURIComponent(venueId)}`;
 
   return { title, body, url };
 };
