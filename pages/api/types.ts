@@ -20,6 +20,7 @@ export type SuggestionsResponse = {
 export type CacheEntry = {
   timestamp: number;
   payload: SuggestionsResponse;
+  seenVenueIds: string[];
 };
 
 export interface DistanceMatrixElement {

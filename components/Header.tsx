@@ -3,11 +3,7 @@ import { observer } from "mobx-react-lite";
 import { useAppStore } from "../lib/store/AppStoreProvider";
 import { useRouter } from "next/router";
 
-interface Props {
-  onFinalizeClick: () => void;
-}
-
-export const Header = observer(function Header({ onFinalizeClick }: Props) {
+export const Header = observer(function Header() {
   const store = useAppStore();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -56,11 +52,6 @@ export const Header = observer(function Header({ onFinalizeClick }: Props) {
     };
   }, [menuOpen]);
 
-  const canFinalize =
-    store.isCurrentUserOrganizer &&
-    store.hasFinalizeQuorum &&
-    !store.lockedVenue;
-
   return (
     <header className="inset-x-0 w-full top-0 z-10 bg-white/90 px-4 py-2.5 shadow-sm backdrop-blur">
       <div className="relative flex items-center justify-between gap-3">
@@ -82,22 +73,6 @@ export const Header = observer(function Header({ onFinalizeClick }: Props) {
                 <path d="M3 9a4 4 0 014-4h6a4 4 0 014 4v6a4 4 0 01-4 4H7a4 4 0 01-4-4V9zm4-2a2 2 0 00-2 2v6a2 2 0 002 2h6a2 2 0 002-2V9a2 2 0 00-2-2H7z" />
               </svg>
               <span>{store.copyStatus || "Copy link"}</span>
-            </button>
-          )}
-          {store.isCurrentUserOrganizer && (
-            <button
-              type="button"
-              disabled={!canFinalize}
-              onClick={() => {
-                onFinalizeClick();
-              }}
-              className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
-                canFinalize
-                  ? "bg-emerald-600 text-white shadow-sm"
-                  : "border border-slate-200 text-slate-400"
-              }`}
-            >
-              Finalize
             </button>
           )}
           {store.sessionId && (

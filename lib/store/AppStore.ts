@@ -215,7 +215,7 @@ export class AppStore {
     }
   }
 
-  async fetchSuggestions() {
+  async fetchSuggestions(options?: { refresh?: boolean }) {
     if (!this.sessionId || this.users.length === 0) {
       this.venues = [];
       this.suggestedVenues = [];
@@ -228,9 +228,14 @@ export class AppStore {
       this.isLoadingSuggestions = true;
       this.etaError = null;
       this.suggestionWarning = null;
-      const response = await fetch(
-        `/api/suggestions?sessionId=${this.sessionId}`,
-      );
+      const params = new URLSearchParams({ sessionId: this.sessionId });
+      if (options?.refresh) {
+        params.set("refresh", "1");
+        if (this.currentUserId) {
+          params.set("userId", this.currentUserId);
+        }
+      }
+      const response = await fetch(`/api/suggestions?${params.toString()}`);
       if (!response.ok) {
         const payload = await response.json().catch(() => ({}));
         throw new Error(payload.message || "Unable to fetch suggestions.");
@@ -270,6 +275,11 @@ export class AppStore {
         this.isLoadingSuggestions = false;
       });
     }
+  }
+
+  refreshSuggestions() {
+    this.votes = {};
+    return this.fetchSuggestions({ refresh: true });
   }
 
   async addManualVenue(place: {

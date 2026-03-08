@@ -9,6 +9,7 @@ import type {
 import { getGroup, saveGroup } from "../../lib/groupStore";
 import { CacheEntry, DistanceMatrixRow, SuggestionsResponse } from "./types";
 import { CACHE_TTL_MS, MAX_FETCH_ATTEMPTS, NEGATIVE_KEYWORDS_BY_CATEGORY, RADIUS_OPTIONS_METERS, TARGET_SUGGESTION_COUNT } from "./constants";
+import { safeTrigger } from "./utils";
 
 const suggestionsCache = new Map<string, CacheEntry>();
 
@@ -183,6 +184,9 @@ export default async function handler(
   if (typeof sessionId !== "string") {
     return res.status(400).json({ message: "Missing sessionId." });
   }
+  const refresh =
+    req.query.refresh === "1" || req.query.refresh === "true";
+  const userId = typeof req.query.userId === "string" ? req.query.userId : null;
 
   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
   if (!apiKey) {
@@ -205,11 +209,25 @@ export default async function handler(
     group.manualVenues,
   );
   const cached = suggestionsCache.get(cacheKey);
-  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+  if (cached && !refresh && Date.now() - cached.timestamp < CACHE_TTL_MS) {
     return res.status(200).json(cached.payload);
   }
 
   try {
+    if (refresh) {
+      const organizer = group.users.find((user) => user.id === userId);
+      if (!organizer?.isOrganizer) {
+        return res.status(403).json({ message: "Only organizers can refresh." });
+      }
+    }
+    if (refresh) {
+      group.votes = {};
+    }
+    const excludedVenueIds = new Set<string>();
+    if (cached?.seenVenueIds?.length) {
+      cached.seenVenueIds.forEach((id) => excludedVenueIds.add(id));
+    }
+    group.venues.forEach((venue) => excludedVenueIds.add(venue.id));
     const centroid = computeCentroid(group.users.map((user) => user.location));
     const category = group.venueCategory || "bar";
     const negativeKeywords = NEGATIVE_KEYWORDS_BY_CATEGORY[category] || [];
@@ -239,9 +257,9 @@ export default async function handler(
         radiusMeters,
         pageToken,
       );
-      const filtered = result.venues.filter((venue) =>
-        isRelevantPlace(venue.name),
-      );
+      const filtered = result.venues
+        .filter((venue) => isRelevantPlace(venue.name))
+        .filter((venue) => !excludedVenueIds.has(venue.id));
       filtered.forEach((venue) => {
         if (!candidates.find((item) => item.id === venue.id)) {
           candidates.push(venue);
@@ -271,6 +289,13 @@ export default async function handler(
     }, []);
 
     if (combinedDestinations.length === 0) {
+      if (refresh) {
+        await saveGroup(sessionId, group);
+        const channel = `private-group-${sessionId}`;
+        await safeTrigger(channel, "group-updated", {
+          reason: "suggestions-refreshed",
+        });
+      }
       const payload: SuggestionsResponse = {
         venues: [],
         suggestedVenues: [],
@@ -278,7 +303,11 @@ export default async function handler(
         totalsByVenue: {},
         warning: "No places matched the rating and review filters.",
       };
-      suggestionsCache.set(cacheKey, { timestamp: Date.now(), payload });
+      suggestionsCache.set(cacheKey, {
+        timestamp: Date.now(),
+        payload,
+        seenVenueIds: cached?.seenVenueIds || [],
+      });
       return res.status(200).json(payload);
     }
 
@@ -344,8 +373,25 @@ export default async function handler(
       suggestedVenues: rankedSuggested,
       etaMatrix,
       totalsByVenue,
+      warning:
+        rankedSuggested.length === 0 && excludedVenueIds.size > 0
+          ? "No new suggestions available right now."
+          : undefined,
     };
-    suggestionsCache.set(cacheKey, { timestamp: Date.now(), payload });
+    const nextSeen = new Set(excludedVenueIds);
+    rankedSuggested.forEach((venue) => nextSeen.add(venue.id));
+    suggestionsCache.set(cacheKey, {
+      timestamp: Date.now(),
+      payload,
+      seenVenueIds: Array.from(nextSeen),
+    });
+
+    if (refresh) {
+      const channel = `private-group-${sessionId}`;
+      await safeTrigger(channel, "group-updated", {
+        reason: "suggestions-refreshed",
+      });
+    }
 
     return res.status(200).json(payload);
   } catch {

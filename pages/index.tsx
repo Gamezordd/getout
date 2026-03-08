@@ -105,8 +105,8 @@ function HomePage() {
 
   return (
     <div className="relative flex flex-col h-full overflow-clip bg-mist">
-      <Header onFinalizeClick={() => setShowFinalizeDialog(true)} />
-      <MapContainer />
+      <Header />
+      <MapContainer onFinalizeClick={() => setShowFinalizeDialog(true)} />
 
       {errorBanner && (
         <div className="pointer-events-none absolute inset-x-4 top-16 z-20 rounded-2xl bg-amber-50 px-4 py-3 text-xs text-amber-800">
