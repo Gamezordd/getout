@@ -100,10 +100,9 @@ export default function PlaceSearch({
       <div className="relative">
         <input
           value={query}
-          style={{ fontSize: 18 }}
           onChange={(event) => setQuery(event.target.value)}
           placeholder={placeholder}
-          className={`w-full rounded-xl border bg-white text-base px-4 py-3 shadow-sm focus:border-slate-400 focus:outline-none ${
+          className={`w-full rounded-xl border bg-white text-base text-ink px-4 py-3 shadow-sm focus:border-slate-400 focus:outline-none ${
             selectedPlace && query.trim() === selectedDisplay
               ? "border-emerald-300 pr-10"
               : "border-slate-200"

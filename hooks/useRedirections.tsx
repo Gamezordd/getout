@@ -14,11 +14,8 @@ export default function useRedirections() {
         : null;
 
     if (!sessionId) {
-      const hasSeenLanding =
-        typeof window !== "undefined" &&
-        window.localStorage.getItem("getout-seen-landing") === "1";
       router.replace(
-        { pathname: hasSeenLanding ? "/create" : "/landing" },
+        { pathname: "/landing" },
         undefined,
         { shallow: true },
       );
