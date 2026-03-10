@@ -132,8 +132,8 @@ function LandingPage() {
   return (
     <div className="relative min-h-[100svh] bg-slate-900 text-white">
       <div
-        className={`absolute inset-0 bg-cover bg-center blur-${step === "intro" ? "[0.8px]" : "[1.2px]"} brightness-75`}
-        style={{ backgroundImage: "url(/bg_img.jpg)" }}
+        className={`absolute inset-0 bg-cover bg-center`}
+        style={{ backgroundImage: "url(/bg_img.jpg)", filter: `blur(${step === "intro" ? "0.7px" : "1.2px"}) brightness(0.7)` }}
       />
       <div className="absolute inset-0 bg-gradient-to-b from-slate-900/75 via-slate-900/30 to-slate-900/60" />
       <main className="relative mx-auto flex min-h-[100svh] w-full max-w-5xl flex-col justify-center px-5 py-12 text-left sm:px-8 sm:py-16">
