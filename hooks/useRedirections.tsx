@@ -14,7 +14,14 @@ export default function useRedirections() {
         : null;
 
     if (!sessionId) {
-      router.replace({ pathname: "/create" }, undefined, { shallow: true });
+      const hasSeenLanding =
+        typeof window !== "undefined" &&
+        window.localStorage.getItem("getout-seen-landing") === "1";
+      router.replace(
+        { pathname: hasSeenLanding ? "/create" : "/landing" },
+        undefined,
+        { shallow: true },
+      );
       return;
     }
 
