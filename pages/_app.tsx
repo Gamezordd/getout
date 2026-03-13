@@ -26,6 +26,8 @@ export default function App({ Component, pageProps }: AppProps) {
         <meta property="og:type" content="website" />
         {siteUrl && <meta property="og:url" content={siteUrl} />}
         <meta property="og:image" content={ogImage} />
+        <meta property="og:image:width" content="240" />
+        <meta property="og:image:height" content="240" />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="GetOut" />
         <meta
