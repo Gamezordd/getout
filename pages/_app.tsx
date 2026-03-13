@@ -6,7 +6,7 @@ import "mapbox-gl/dist/mapbox-gl.css";
 
 export default function App({ Component, pageProps }: AppProps) {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "";
-  const ogImage = siteUrl ? `${siteUrl}/icons/getout_icon_sm.png` : "/icons/getout_icon_sm.png";
+  const ogImage = siteUrl ? `${siteUrl}/icons/getout_icon_md.png` : "/icons/getout_icon_md.png";
 
   return (
     <AppStoreProvider>
@@ -26,8 +26,8 @@ export default function App({ Component, pageProps }: AppProps) {
         <meta property="og:type" content="website" />
         {siteUrl && <meta property="og:url" content={siteUrl} />}
         <meta property="og:image" content={ogImage} />
-        <meta property="og:image:width" content="240" />
-        <meta property="og:image:height" content="240" />
+        <meta property="og:image:width" content="512" />
+        <meta property="og:image:height" content="512" />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="GetOut" />
         <meta
