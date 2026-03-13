@@ -6,7 +6,7 @@ import "mapbox-gl/dist/mapbox-gl.css";
 
 export default function App({ Component, pageProps }: AppProps) {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "";
-  const ogImage = siteUrl ? `${siteUrl}/icons/getout_icon.png` : "/icons/getout_icon.png";
+  const ogImage = siteUrl ? `${siteUrl}/icons/getout_icon_sm.png` : "/icons/getout_icon_sm.png";
 
   return (
     <AppStoreProvider>
