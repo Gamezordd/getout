@@ -23,7 +23,7 @@ export const MapContainer = observer(function MapContainer({
     !store.lockedVenue;
 
   const pickedCountText = (function () {
-    const count = store.votedVenues.length;
+    const count = store.uniqueVoterCount;
     const total = store.users.length || 0;
     if (total === 0) return "0/0 Voted";
     if (canFinalize)
