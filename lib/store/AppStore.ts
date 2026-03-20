@@ -11,8 +11,7 @@ import type {
 } from "../types";
 import { shareLinkText } from "../constants";
 
-const OWNER_KEY_PREFIX = "getout-owner-";
-const USER_KEY_PREFIX = "getout-user-";
+const BROWSER_ID_KEY = "getout-id";
 
 type GroupPayload = {
   users: User[];
@@ -22,6 +21,7 @@ type GroupPayload = {
   venueCategory?: VenueCategory | null;
   lockedVenue?: LockedVenue | null;
   currentUserId?: string;
+  isOwner?: boolean;
 };
 
 type SuggestionsPayload = {
@@ -40,17 +40,19 @@ const generateSessionId = () => {
   return `sess-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
 };
 
-const generateOwnerKey = () => {
+const generateBrowserId = () => {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID();
   }
-  return `owner-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+  return `browser-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
 };
 
 export class AppStore {
   sessionId: string | null = null;
-  ownerKey: string | null = null;
+  browserId: string | null = null;
   currentUserId: string | null = null;
+  isOwner = false;
+  identityResolved = false;
   shareUrl: string | null = null;
   users: User[] = [];
   manualVenues: Venue[] = [];
@@ -73,10 +75,6 @@ export class AppStore {
 
   constructor() {
     makeAutoObservable(this, {}, { autoBind: true });
-  }
-
-  get isOwner() {
-    return Boolean(this.ownerKey);
   }
 
   get currentUser() {
@@ -146,21 +144,18 @@ export class AppStore {
     this.sessionId = sessionId;
     this.venueCategory = null;
     this.lockedVenue = null;
+    this.currentUserId = null;
+    this.isOwner = false;
+    this.identityResolved = false;
     if (typeof window !== "undefined") {
       this.shareUrl = `${window.location.origin}${pathname}?sessionId=${sessionId}`;
-      const storedOwner = localStorage.getItem(
-        `${OWNER_KEY_PREFIX}${sessionId}`,
-      );
-      if (storedOwner) {
-        this.ownerKey = storedOwner;
+      const storedBrowserId = localStorage.getItem(BROWSER_ID_KEY);
+      if (storedBrowserId) {
+        this.browserId = storedBrowserId;
       } else {
-        const created = generateOwnerKey();
-        localStorage.setItem(`${OWNER_KEY_PREFIX}${sessionId}`, created);
-        this.ownerKey = created;
-      }
-      const storedUser = localStorage.getItem(`${USER_KEY_PREFIX}${sessionId}`);
-      if (storedUser) {
-        this.currentUserId = storedUser;
+        const created = generateBrowserId();
+        localStorage.setItem(BROWSER_ID_KEY, created);
+        this.browserId = created;
       }
     }
   }
@@ -169,29 +164,17 @@ export class AppStore {
     return existing || generateSessionId();
   }
 
-  async initGroup() {
-    if (!this.sessionId || !this.ownerKey) return;
-    try {
-      await fetch("/api/group", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "init",
-          sessionId: this.sessionId,
-          ownerKey: this.ownerKey,
-        }),
-      });
-    } catch {
-      // Ignore init errors.
-    }
-  }
 
   async loadGroup() {
-    if (!this.sessionId) return;
+    if (!this.sessionId || !this.browserId) return;
     try {
       this.isLoadingGroup = true;
       this.groupError = null;
-      const response = await fetch(`/api/group?sessionId=${this.sessionId}`);
+      const params = new URLSearchParams({
+        sessionId: this.sessionId,
+        browserId: this.browserId,
+      });
+      const response = await fetch(`/api/group?${params.toString()}`);
       if (!response.ok) {
         const payload = await response.json().catch(() => ({}));
         throw new Error(payload.message || "Unable to load group.");
@@ -203,18 +186,15 @@ export class AppStore {
         this.reconcileVotes(data.votes || {});
         this.venueCategory = data.venueCategory || null;
         this.lockedVenue = data.lockedVenue || null;
+        this.currentUserId = data.currentUserId || null;
+        this.isOwner = Boolean(data.isOwner);
+        this.identityResolved = true;
         this.isLoadingGroup = false;
-        if (data.currentUserId && this.sessionId) {
-          localStorage.setItem(
-            `${USER_KEY_PREFIX}${this.sessionId}`,
-            data.currentUserId,
-          );
-          this.currentUserId = data.currentUserId;
-        }
       });
     } catch (err: any) {
       runInAction(() => {
         this.groupError = err.message || "Unable to load group.";
+        this.identityResolved = true;
         this.isLoadingGroup = false;
       });
     }
@@ -236,8 +216,8 @@ export class AppStore {
       const params = new URLSearchParams({ sessionId: this.sessionId });
       if (options?.refresh) {
         params.set("refresh", "1");
-        if (this.currentUserId) {
-          params.set("userId", this.currentUserId);
+        if (this.browserId) {
+          params.set("browserId", this.browserId);
         }
       }
       const response = await fetch(`/api/suggestions?${params.toString()}`);
@@ -377,7 +357,7 @@ export class AppStore {
   }
 
   async removeUser(userId: string) {
-    if (!this.sessionId || !this.ownerKey) return;
+    if (!this.sessionId || !this.browserId || !this.isOwner) return;
     try {
       this.groupError = null;
       const response = await fetch("/api/group", {
@@ -387,7 +367,7 @@ export class AppStore {
           action: "removeUser",
           sessionId: this.sessionId,
           userId,
-          ownerKey: this.ownerKey,
+          browserId: this.browserId,
         }),
       });
       if (!response.ok) {
@@ -455,9 +435,8 @@ export class AppStore {
     name: string,
     location: LatLng,
     venueCategory?: VenueCategory,
-    options?: { preserveCurrentUser?: boolean },
   ) {
-    if (!this.sessionId) {
+    if (!this.sessionId || !this.browserId) {
       throw new Error("Missing session. Open this page from a group link.");
     }
     const response = await fetch("/api/group", {
@@ -466,6 +445,7 @@ export class AppStore {
       body: JSON.stringify({
         action: "join",
         sessionId: this.sessionId,
+        browserId: this.browserId,
         name: name.trim(),
         location,
         venueCategory,
@@ -475,21 +455,22 @@ export class AppStore {
       const payload = await response.json().catch(() => ({}));
       throw new Error(payload.message || "Unable to join group.");
     }
-    const data = (await response.json()) as { currentUserId?: string };
-    if (data.currentUserId && this.sessionId && !options?.preserveCurrentUser) {
-      localStorage.setItem(
-        `${USER_KEY_PREFIX}${this.sessionId}`,
-        data.currentUserId,
-      );
-      runInAction(() => {
-        this.currentUserId = data.currentUserId || null;
-      });
-    }
+    const data = (await response.json()) as GroupPayload;
+    runInAction(() => {
+      this.users = data.users || [];
+      this.manualVenues = data.manualVenues || [];
+      this.reconcileVotes(data.votes || {});
+      this.venueCategory = data.venueCategory || null;
+      this.lockedVenue = data.lockedVenue || null;
+      this.currentUserId = data.currentUserId || null;
+      this.isOwner = Boolean(data.isOwner);
+      this.identityResolved = true;
+    });
   }
 
   async finalizeVenue(venueId: string) {
-    if (!this.sessionId || !this.currentUserId) {
-      throw new Error("Missing session or user.");
+    if (!this.sessionId || !this.browserId) {
+      throw new Error("Missing session or browser identity.");
     }
     const response = await fetch("/api/group", {
       method: "POST",
@@ -497,7 +478,7 @@ export class AppStore {
       body: JSON.stringify({
         action: "finalizeVenue",
         sessionId: this.sessionId,
-        userId: this.currentUserId,
+        browserId: this.browserId,
         venueId,
       }),
     });

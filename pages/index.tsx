@@ -68,10 +68,6 @@ function HomePage() {
     seenUserIdsRef.current = currentIds;
   }, [store.currentUserId, store.users]);
 
-  useEffect(() => {
-    if (!store.sessionId || !store.ownerKey) return;
-    store.initGroup();
-  }, [store, store.sessionId, store.ownerKey]);
 
   useEffect(() => {
     store.loadGroup();

@@ -26,7 +26,7 @@ export default function useRedirections() {
   }, [router.isReady, router.pathname, router.query.sessionId, store]);
 
   useEffect(() => {
-    if (!router.isReady || !store.sessionId) return;
+    if (!router.isReady || !store.sessionId || !store.identityResolved) return;
     if (store.currentUserId) return;
 
     router.replace(
@@ -36,7 +36,13 @@ export default function useRedirections() {
         shallow: true,
       },
     );
-  }, [router, router.isReady, store.currentUserId, store.sessionId]);
+  }, [
+    router,
+    router.isReady,
+    store.currentUserId,
+    store.identityResolved,
+    store.sessionId,
+  ]);
 
   useEffect(() => {
     if (!router.isReady) return;

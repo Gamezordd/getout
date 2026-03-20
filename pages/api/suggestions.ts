@@ -194,7 +194,8 @@ export default async function handler(
   }
   const refresh =
     req.query.refresh === "1" || req.query.refresh === "true";
-  const userId = typeof req.query.userId === "string" ? req.query.userId : null;
+  const browserId =
+    typeof req.query.browserId === "string" ? req.query.browserId : null;
 
   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
   if (!apiKey) {
@@ -226,8 +227,10 @@ export default async function handler(
 
   try {
     if (refresh) {
-      const organizer = group.users.find((user) => user.id === userId);
-      if (!organizer?.isOrganizer) {
+      const actingMember = browserId
+        ? group.sessionMembers.find((member) => member.browserId === browserId)
+        : null;
+      if (!actingMember?.isOwner) {
         return res.status(403).json({ message: "Only organizers can refresh." });
       }
     }

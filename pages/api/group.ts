@@ -1,4 +1,4 @@
-﻿import type { NextApiRequest, NextApiResponse } from "next";
+import type { NextApiRequest, NextApiResponse } from "next";
 import { getGroup } from "../../lib/groupStore";
 import { GroupRequest } from "./types";
 import { groupActions } from "./group-actions";
@@ -13,8 +13,21 @@ export default async function handler(
     if (typeof sessionId !== "string") {
       return res.status(400).json({ message: "Missing sessionId." });
     }
+    const browserId =
+      typeof req.query.browserId === "string" ? req.query.browserId : null;
     const group = await getGroup(sessionId);
-    return res.status(200).json(buildGroupResponse(group));
+    const sessionMember = browserId
+      ? group.sessionMembers.find((member) => member.browserId === browserId)
+      : null;
+    return res
+      .status(200)
+      .json(
+        buildGroupResponse(
+          group,
+          sessionMember?.userId,
+          Boolean(sessionMember?.isOwner),
+        ),
+      );
   }
 
   if (req.method !== "POST") {
@@ -30,10 +43,6 @@ export default async function handler(
   const group = await getGroup(payload.sessionId);
   const channel = `private-group-${payload.sessionId}`;
   const actions = groupActions(req, res, channel);
-
-  if (payload.action === "init") {
-    return actions.init(payload, group);
-  }
 
   if (payload.action === "join") {
     return actions.join(payload, group);

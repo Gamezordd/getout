@@ -18,7 +18,6 @@ function JoinPage() {
   const router = useRouter();
   const sessionId =
     typeof router.query.sessionId === "string" ? router.query.sessionId : "";
-  const addUser = router.query.addUser === "1";
   const [name, setName] = useState("");
   const [location, setLocation] = useState<PlaceResult | null>(null);
   const [saveDetails, setSaveDetails] = useState(true);
@@ -97,9 +96,7 @@ function JoinPage() {
     try {
       setSubmitting(true);
       setError(null);
-      await store.joinGroup(trimmedName, location.location, undefined, {
-        preserveCurrentUser: addUser,
-      });
+      await store.joinGroup(trimmedName, location.location);
       if (saveDetails) {
         localStorage.setItem(
           "getout-user-details",

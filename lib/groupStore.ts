@@ -7,13 +7,19 @@ import type {
 } from "./types";
 import { redis } from "./redis";
 
+type SessionMember = {
+  browserId: string;
+  userId: string;
+  isOwner: boolean;
+};
+
 type GroupPayload = {
   users: User[];
   venues: Venue[];
   manualVenues: Venue[];
   votes: VotesByVenue;
   pushSubscriptions?: Record<string, PushSubscriptionJSON>;
-  ownerKey: string | null;
+  sessionMembers: SessionMember[];
   venueCategory: VenueCategory | null;
   lockedVenue: LockedVenue | null;
 };
@@ -26,7 +32,7 @@ const createEmptyGroup = (): GroupPayload => ({
   manualVenues: [],
   votes: {},
   pushSubscriptions: {},
-  ownerKey: null,
+  sessionMembers: [],
   venueCategory: null,
   lockedVenue: null,
 });
@@ -41,6 +47,7 @@ const getGroup = async (sessionId: string): Promise<GroupPayload> => {
     if (!Array.isArray(hydrated.venues)) hydrated.venues = [];
     if (!hydrated.votes) hydrated.votes = {};
     if (!hydrated.pushSubscriptions) hydrated.pushSubscriptions = {};
+    if (!Array.isArray(hydrated.sessionMembers)) hydrated.sessionMembers = [];
     if (
       hydrated.users.length > 0 &&
       !hydrated.users.some((user) => user.isOrganizer)
@@ -48,6 +55,17 @@ const getGroup = async (sessionId: string): Promise<GroupPayload> => {
       hydrated.users = hydrated.users.map((user, index) => ({
         ...user,
         isOrganizer: index === 0,
+      }));
+    }
+    if (
+      hydrated.sessionMembers.length > 0 &&
+      !hydrated.sessionMembers.some((member) => member.isOwner) &&
+      hydrated.users.length > 0
+    ) {
+      const organizer = hydrated.users.find((user) => user.isOrganizer) || hydrated.users[0];
+      hydrated.sessionMembers = hydrated.sessionMembers.map((member) => ({
+        ...member,
+        isOwner: member.userId === organizer?.id,
       }));
     }
     await redis.set(key, hydrated);
@@ -64,4 +82,4 @@ const saveGroup = async (sessionId: string, group: GroupPayload) => {
 };
 
 export { getGroup, saveGroup };
-export type { GroupPayload };
+export type { GroupPayload, SessionMember };

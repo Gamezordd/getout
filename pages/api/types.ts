@@ -40,15 +40,10 @@ export interface DistanceMatrixRow {
   elements: DistanceMatrixElement[];
 }
 
-export type InitRequest = {
-  action: "init";
-  sessionId: string;
-  ownerKey: string;
-};
-
 export type JoinRequest = {
   action: "join";
   sessionId: string;
+  browserId: string;
   name: string;
   location: LatLng;
   venueCategory?: VenueCategory;
@@ -83,18 +78,17 @@ export type RemoveUserRequest = {
   action: "removeUser";
   sessionId: string;
   userId: string;
-  ownerKey: string;
+  browserId: string;
 };
 
 export type FinalizeVenueRequest = {
   action: "finalizeVenue";
   sessionId: string;
-  userId: string;
+  browserId: string;
   venueId: string;
 };
 
 export type GroupRequest =
-  | InitRequest
   | JoinRequest
   | SetManualVenuesRequest
   | AddManualVenueRequest
@@ -111,4 +105,5 @@ export type GroupResponse = {
   venueCategory: VenueCategory | null;
   lockedVenue: LockedVenue | null;
   currentUserId?: string;
+  isOwner?: boolean;
 };

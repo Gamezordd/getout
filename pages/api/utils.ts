@@ -10,6 +10,7 @@ export const buildAvatarUrl = (name: string) => {
 export const buildGroupResponse = (
   group: GroupPayload,
   currentUserId?: string,
+  isOwner = false,
 ): GroupResponse => ({
   users: group.users,
   venues: group.venues,
@@ -18,6 +19,7 @@ export const buildGroupResponse = (
   venueCategory: group.venueCategory,
   lockedVenue: group.lockedVenue,
   currentUserId,
+  isOwner,
 });
 
 export const safeTrigger = async (

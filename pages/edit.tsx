@@ -33,6 +33,24 @@ function EditPage() {
     store.loadGroup();
   }, [sessionId, store]);
 
+  useEffect(() => {
+    if (!router.isReady || !store.sessionId || !store.identityResolved) return;
+    if (store.currentUserId) return;
+    router.replace(
+      { pathname: "/join", query: { sessionId: store.sessionId } },
+      undefined,
+      {
+        shallow: true,
+      },
+    );
+  }, [
+    router,
+    router.isReady,
+    store.currentUserId,
+    store.identityResolved,
+    store.sessionId,
+  ]);
+
   const handleDetectLocation = async () => {
     if (!("geolocation" in navigator)) {
       setLocationError("Location services are not supported.");

@@ -28,7 +28,12 @@ function AddVenuePage() {
   }, [router, router.isReady, sessionId, store]);
 
   useEffect(() => {
-    if (!router.isReady || !store.sessionId) return;
+    if (!sessionId) return;
+    store.loadGroup();
+  }, [sessionId, store]);
+
+  useEffect(() => {
+    if (!router.isReady || !store.sessionId || !store.identityResolved) return;
     if (store.currentUserId) return;
     router.replace(
       { pathname: "/join", query: { sessionId: store.sessionId } },
@@ -37,7 +42,13 @@ function AddVenuePage() {
         shallow: true,
       },
     );
-  }, [router, router.isReady, store.currentUserId, store.sessionId]);
+  }, [
+    router,
+    router.isReady,
+    store.currentUserId,
+    store.identityResolved,
+    store.sessionId,
+  ]);
 
   const handleAddVenue = async () => {
     if (!store.sessionId) {

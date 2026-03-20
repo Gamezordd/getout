@@ -3,7 +3,6 @@ import { GroupPayload, saveGroup } from "../../lib/groupStore";
 import {
   AddManualVenueRequest,
   FinalizeVenueRequest,
-  InitRequest,
   JoinRequest,
   RemoveManualVenueRequest,
   RemoveUserRequest,
@@ -20,17 +19,18 @@ export const groupActions = (
   res: NextApiResponse,
   channel: string,
 ) => ({
-  init: async (payload: InitRequest, group: GroupPayload) => {
-    if (!payload.ownerKey) {
-      return res.status(400).json({ message: "Missing owner key." });
-    }
-    if (!group.ownerKey) {
-      group.ownerKey = payload.ownerKey;
-      await saveGroup(payload.sessionId, group);
-    }
-    return res.status(200).json(buildGroupResponse(group));
-  },
   join: async (payload: JoinRequest, group: GroupPayload) => {
+    if (!payload.browserId) {
+      return res.status(400).json({ message: "Missing browser id." });
+    }
+    const existingMember = group.sessionMembers.find(
+      (member) => member.browserId === payload.browserId,
+    );
+    if (existingMember) {
+      return res
+        .status(200)
+        .json(buildGroupResponse(group, existingMember.userId, existingMember.isOwner));
+    }
     if (!payload.name || !payload.location) {
       return res
         .status(400)
@@ -70,18 +70,24 @@ export const groupActions = (
       group.venueCategory = payload.venueCategory;
     }
 
+    const isOwner = group.sessionMembers.length === 0 && group.users.length === 0;
     const user: User = {
       id: `u-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
       name: trimmedName,
       avatarUrl: buildAvatarUrl(trimmedName),
       location: payload.location,
-      isOrganizer: group.users.length === 0,
+      isOrganizer: isOwner,
     };
 
     group.users.push(user);
+    group.sessionMembers.push({
+      browserId: payload.browserId,
+      userId: user.id,
+      isOwner,
+    });
     await saveGroup(payload.sessionId, group);
     await safeTrigger(channel, "group-updated", { reason: "join" });
-    return res.status(200).json(buildGroupResponse(group, user.id));
+    return res.status(200).json(buildGroupResponse(group, user.id, isOwner));
   },
   setManualVenues: async (payload: SetManualVenuesRequest, group: GroupPayload) => {
     group.manualVenues = payload.venues || [];
@@ -90,7 +96,7 @@ export const groupActions = (
     return res.status(200).json(buildGroupResponse(group));
   },
   addManualVenue: async (payload: AddManualVenueRequest, group: GroupPayload) => {
-        if (!payload.venue) {
+    if (!payload.venue) {
       return res.status(400).json({ message: "Missing venue." });
     }
     const normalizedVenue = {
@@ -126,7 +132,10 @@ export const groupActions = (
     return res.status(200).json(buildGroupResponse(group));
   },
   removeUser: async (payload: RemoveUserRequest, group: GroupPayload) => {
-    if (!group.ownerKey || payload.ownerKey !== group.ownerKey) {
+    const actingMember = group.sessionMembers.find(
+      (member) => member.browserId === payload.browserId,
+    );
+    if (!actingMember?.isOwner) {
       return res
         .status(403)
         .json({ message: "Only the group owner can remove users." });
@@ -136,13 +145,21 @@ export const groupActions = (
       return res.status(404).json({ message: "User not found." });
     }
     group.users.splice(index, 1);
+    group.sessionMembers = group.sessionMembers.filter(
+      (member) => member.userId !== payload.userId,
+    );
     if (
       group.users.length > 0 &&
       !group.users.some((user) => user.isOrganizer)
     ) {
+      const nextOwnerId = group.users[0]?.id;
       group.users = group.users.map((user, userIndex) => ({
         ...user,
         isOrganizer: userIndex === 0,
+      }));
+      group.sessionMembers = group.sessionMembers.map((member) => ({
+        ...member,
+        isOwner: member.userId === nextOwnerId,
       }));
     }
     Object.keys(group.votes).forEach((venueId) => {
@@ -160,8 +177,10 @@ export const groupActions = (
         .status(400)
         .json({ message: "Venue already locked for this group." });
     }
-    const organizer = group.users.find((user) => user.isOrganizer);
-    if (!organizer || organizer.id !== payload.userId) {
+    const actingMember = group.sessionMembers.find(
+      (member) => member.browserId === payload.browserId,
+    );
+    if (!actingMember?.isOwner) {
       return res
         .status(403)
         .json({ message: "Only organizer can finalize a venue." });
@@ -198,7 +217,7 @@ export const groupActions = (
     const { staleUserIds } = await sendVenueLockedNotifications({
       group,
       sessionId: payload.sessionId,
-      organizerId: payload.userId,
+      organizerId: actingMember.userId,
       venueId: venue.id,
     });
     if (staleUserIds.length > 0) {

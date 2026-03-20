@@ -72,7 +72,6 @@ function LandingPage() {
       setSubmitting(true);
       setError(null);
       store.setSession(sessionId, "/");
-      await store.initGroup();
       await store.joinGroup(trimmedName, location.location, category);
       if (saveDetails) {
         localStorage.setItem(
