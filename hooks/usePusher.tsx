@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { createPusherClient } from "../lib/pusherClient";
 import { useAppStore } from "../lib/store/AppStoreProvider";
 import { Channel } from "pusher-js";
+import type { VotesByVenue } from "../lib/types";
 
 export default function usePusher() {
   const store = useAppStore();
@@ -29,26 +30,17 @@ export default function usePusher() {
       await store.loadGroup();
     });
     channel.bind(
-      "votes-updated",
-      (data: { userId?: string; venueId?: string }) => {
-        if (!data?.userId || !data?.venueId) return;
-        store.applyVote(data.userId, data.venueId);
-      },
-    );
-    channel.bind(
-      "client-vote",
-      (data: { userId?: string; venueId?: string }) => {
-        if (!data?.userId || !data?.venueId) return;
-        console.log("Received client-vote event", data);
-        store.applyVote(data.userId, data.venueId);
+      "votes-update",
+      (data: { votes?: VotesByVenue }) => {
+        if (!data?.votes) return;
+        store.reconcileVotes(data.votes);
       },
     );
 
     return () => {
       channel.unbind("group-updated", refresh);
       channel.unbind("venue-locked");
-      channel.unbind("votes-updated", refresh);
-      channel.unbind("client-vote");
+      channel.unbind("votes-update");
       channel.unbind("pusher:subscription_succeeded");
       channel.unbind("pusher:subscription_error");
       client.unsubscribe(`private-group-${store.sessionId}`);

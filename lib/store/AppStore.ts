@@ -118,6 +118,10 @@ export class AppStore {
     );
   }
 
+  reconcileVotes(votes: VotesByVenue) {
+    this.votes = { ...(votes || {}) };
+  }
+
   get topVenues() {
     return this.suggestedVenues;
   }
@@ -195,7 +199,7 @@ export class AppStore {
       runInAction(() => {
         this.users = data.users || [];
         this.manualVenues = data.manualVenues || [];
-        this.votes = data.votes || {};
+        this.reconcileVotes(data.votes || {});
         this.venueCategory = data.venueCategory || null;
         this.lockedVenue = data.lockedVenue || null;
         this.isLoadingGroup = false;
@@ -418,7 +422,7 @@ export class AppStore {
       }
       const data = (await response.json()) as { votes: VotesByVenue };
       runInAction(() => {
-        this.votes = data.votes || {};
+        this.reconcileVotes(data.votes || {});
       });
     } catch (err: any) {
       runInAction(() => {
@@ -428,9 +432,9 @@ export class AppStore {
   }
 
   applyVote(userId: string, venueId: string) {
-    const votes: VotesByVenue = this.votes || {};
+    const votes: VotesByVenue = { ...(this.votes || {}) };
     Object.keys(votes).forEach((existingVenueId) => {
-      votes[existingVenueId] = votes[existingVenueId].filter(
+      votes[existingVenueId] = (votes[existingVenueId] || []).filter(
         (id) => id !== userId,
       );
     });
@@ -442,7 +446,7 @@ export class AppStore {
       votes[venueId].push(userId);
     }
 
-    this.votes = { ...votes };
+    this.reconcileVotes(votes);
   }
 
   async joinGroup(

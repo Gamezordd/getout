@@ -1,12 +1,8 @@
 import { useCallback } from "react";
 import { observer } from "mobx-react-lite";
 import { useAppStore } from "../lib/store/AppStoreProvider";
-import { Channel } from "pusher-js";
 
-interface Props {
-  channel: Channel | null;
-}
-const PickButton = observer(function PickButton({ channel }: Props) {
+const PickButton = observer(function PickButton() {
   const store = useAppStore();
   const triggerHaptic = useCallback(() => {
     if (typeof navigator !== "undefined" && "vibrate" in navigator) {
@@ -17,13 +13,8 @@ const PickButton = observer(function PickButton({ channel }: Props) {
   const handleVote = useCallback(() => {
     if (!store.selectedVenue || !store.currentUserId) return;
     store.applyVote(store.currentUserId, store.selectedVenue.id);
-    if (!channel || !channel.subscribed) return;
-    channel.trigger("client-vote", {
-      userId: store.currentUserId,
-      venueId: store.selectedVenue.id,
-    });
     store.vote(store.selectedVenue.id);
-  }, [store.currentUserId, store.selectedVenue]);
+  }, [store]);
 
   return (
     <div className="w-full inset-x-0 bottom-0 z-[100] bg-mist/95 px-4 pb-3 pt-2 backdrop-blur border-t border-slate-200">

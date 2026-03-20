@@ -23,7 +23,7 @@ function HomePage() {
   const bottomSheetRef = useRef<BottomDrawerHandle>(null);
   const pushInitRef = useRef(false);
 
-  const channel = usePusher();
+  usePusher();
 
   const {selectedVenue} = store;
   useRedirections();
@@ -131,7 +131,7 @@ function HomePage() {
           )}
         />
       )}
-      {showVoteFooter && <PickButton channel={channel} />}
+      {showVoteFooter && <PickButton />}
       <FinalizeDialog
         showFinalizeDialog={showFinalizeDialog}
         setShowFinalizeDialog={setShowFinalizeDialog}

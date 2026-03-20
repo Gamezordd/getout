@@ -1,8 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import crypto from "crypto";
-import { getGroup, saveGroup } from "../../../lib/groupStore";
-import { pusher } from "../../../lib/pusherServer";
-import type { VotesByVenue } from "../../../lib/types";
 
 export const config = {
   api: {
@@ -20,19 +17,6 @@ const readRawBody = (req: NextApiRequest): Promise<string> =>
     req.on("end", () => resolve(data));
     req.on("error", reject);
   });
-
-const safeTrigger = async (
-  channel: string,
-  event: string,
-  payload: unknown,
-) => {
-  if (!process.env.PUSHER_APP_ID) return;
-  try {
-    await pusher.trigger(channel, event, payload);
-  } catch {
-    // Ignore realtime errors.
-  }
-};
 
 export default async function handler(
   req: NextApiRequest,
@@ -59,45 +43,7 @@ export default async function handler(
     return res.status(401).json({ message: "Invalid signature." });
   }
 
-  const payload = JSON.parse(rawBody) as {
-    events?: Array<{ name: string; channel: string; data: string }>;
-  };
-
-  const events = payload.events || [];
-  for (const event of events) {
-    if (event.name !== "client-vote") continue;
-    if (!event.channel.startsWith("private-group-")) continue;
-
-    const sessionId = event.channel.replace("private-group-", "");
-    const data = JSON.parse(event.data || "{}") as {
-      userId?: string;
-      venueId?: string;
-    };
-    if (!data.userId || !data.venueId) continue;
-
-    const group = await getGroup(sessionId);
-    if (group.lockedVenue) continue;
-
-    const votes: VotesByVenue = group.votes || {};
-    Object.keys(votes).forEach((venueId) => {
-      votes[venueId] = votes[venueId].filter((id) => id !== data.userId);
-    });
-
-    if (!votes[data.venueId]) {
-      votes[data.venueId] = [];
-    }
-    if (!votes[data.venueId].includes(data.userId)) {
-      votes[data.venueId].push(data.userId);
-    }
-
-    group.votes = votes;
-    await saveGroup(sessionId, group);
-    await safeTrigger(event.channel, "votes-updated", {
-      venueId: data.venueId,
-      userId: data.userId,
-    });
-
-  }
+  JSON.parse(rawBody);
 
   return res.status(200).json({ received: true });
 }
