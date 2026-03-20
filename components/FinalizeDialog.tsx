@@ -31,24 +31,32 @@ const FinalizeDialog = observer(function FinalizeDialog({
               No voted venues yet.
             </p>
           )}
-          {store.votedVenues.map((venue) => (
-            <label
-              key={venue.id}
-              className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 px-3 py-2"
-            >
-              <input
-                type="radio"
-                name="finalize-venue"
-                checked={finalizeVenueId === venue.id}
-                onChange={() => setFinalizeVenueId(venue.id)}
-                className="mt-0.5"
-              />
-              <div>
-                <p className="text-sm font-semibold text-iletnk">{venue.name}</p>
-                <p className="text-xs text-slate-500">{venue.address}</p>
-              </div>
-            </label>
-          ))}
+          {store.votedVenues.map((venue) => {
+            const voteCount = store.votes?.[venue.id]?.length || 0;
+            return (
+              <label
+                key={venue.id}
+                className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 px-3 py-2"
+              >
+                <input
+                  type="radio"
+                  name="finalize-venue"
+                  checked={finalizeVenueId === venue.id}
+                  onChange={() => setFinalizeVenueId(venue.id)}
+                  className="mt-0.5"
+                />
+                <div className="flex-1">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-sm font-semibold text-iletnk">{venue.name}</p>
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+                      {voteCount} {voteCount === 1 ? "vote" : "votes"}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500">{venue.address}</p>
+                </div>
+              </label>
+            );
+          })}
         </div>
         <button
           type="button"

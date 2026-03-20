@@ -1,5 +1,7 @@
 import type {
+  EtaMatrix,
   LockedVenue,
+  TotalsByVenue,
   User,
   Venue,
   VenueCategory,
@@ -13,6 +15,14 @@ type SessionMember = {
   isOwner: boolean;
 };
 
+type SuggestionsSnapshot = {
+  suggestedVenues: Venue[];
+  etaMatrix: EtaMatrix;
+  totalsByVenue: TotalsByVenue;
+  warning?: string;
+  seenVenueIds: string[];
+};
+
 type GroupPayload = {
   users: User[];
   venues: Venue[];
@@ -20,11 +30,19 @@ type GroupPayload = {
   votes: VotesByVenue;
   pushSubscriptions?: Record<string, PushSubscriptionJSON>;
   sessionMembers: SessionMember[];
+  suggestions: SuggestionsSnapshot;
   venueCategory: VenueCategory | null;
   lockedVenue: LockedVenue | null;
 };
 
 const GROUP_PREFIX = "group:";
+
+const createEmptySuggestionsSnapshot = (): SuggestionsSnapshot => ({
+  suggestedVenues: [],
+  etaMatrix: {},
+  totalsByVenue: {},
+  seenVenueIds: [],
+});
 
 const createEmptyGroup = (): GroupPayload => ({
   users: [],
@@ -33,6 +51,7 @@ const createEmptyGroup = (): GroupPayload => ({
   votes: {},
   pushSubscriptions: {},
   sessionMembers: [],
+  suggestions: createEmptySuggestionsSnapshot(),
   venueCategory: null,
   lockedVenue: null,
 });
@@ -48,6 +67,21 @@ const getGroup = async (sessionId: string): Promise<GroupPayload> => {
     if (!hydrated.votes) hydrated.votes = {};
     if (!hydrated.pushSubscriptions) hydrated.pushSubscriptions = {};
     if (!Array.isArray(hydrated.sessionMembers)) hydrated.sessionMembers = [];
+
+    const rawSuggestions = group.suggestions;
+    hydrated.suggestions = {
+      suggestedVenues: Array.isArray(rawSuggestions?.suggestedVenues)
+        ? rawSuggestions.suggestedVenues
+        : hydrated.venues,
+      etaMatrix: rawSuggestions?.etaMatrix || {},
+      totalsByVenue: rawSuggestions?.totalsByVenue || {},
+      warning: rawSuggestions?.warning,
+      seenVenueIds: Array.isArray(rawSuggestions?.seenVenueIds)
+        ? rawSuggestions.seenVenueIds
+        : hydrated.venues.map((venue) => venue.id),
+    };
+    hydrated.venues = hydrated.suggestions.suggestedVenues;
+
     if (
       hydrated.users.length > 0 &&
       !hydrated.users.some((user) => user.isOrganizer)
@@ -62,7 +96,8 @@ const getGroup = async (sessionId: string): Promise<GroupPayload> => {
       !hydrated.sessionMembers.some((member) => member.isOwner) &&
       hydrated.users.length > 0
     ) {
-      const organizer = hydrated.users.find((user) => user.isOrganizer) || hydrated.users[0];
+      const organizer =
+        hydrated.users.find((user) => user.isOrganizer) || hydrated.users[0];
       hydrated.sessionMembers = hydrated.sessionMembers.map((member) => ({
         ...member,
         isOwner: member.userId === organizer?.id,
@@ -81,5 +116,5 @@ const saveGroup = async (sessionId: string, group: GroupPayload) => {
   await redis.set(key, group);
 };
 
-export { getGroup, saveGroup };
-export type { GroupPayload, SessionMember };
+export { createEmptySuggestionsSnapshot, getGroup, saveGroup };
+export type { GroupPayload, SessionMember, SuggestionsSnapshot };

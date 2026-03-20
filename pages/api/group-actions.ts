@@ -1,5 +1,11 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import { GroupPayload, saveGroup } from "../../lib/groupStore";
+import { User, Venue } from "../../lib/types";
+import { sendVenueLockedNotifications } from "../../lib/pushServer";
+import {
+  recomputeSuggestionsForGroup,
+  syncManualVenueMetricsForGroup,
+} from "./suggestions";
 import {
   AddManualVenueRequest,
   FinalizeVenueRequest,
@@ -11,8 +17,6 @@ import {
 } from "./types";
 import { ALLOWED_CATEGORIES } from "./constants";
 import { buildAvatarUrl, buildGroupResponse, safeTrigger } from "./utils";
-import { User } from "../../lib/types";
-import { sendVenueLockedNotifications } from "../../lib/pushServer";
 
 export const groupActions = (
   req: NextApiRequest,
@@ -29,7 +33,9 @@ export const groupActions = (
     if (existingMember) {
       return res
         .status(200)
-        .json(buildGroupResponse(group, existingMember.userId, existingMember.isOwner));
+        .json(
+          buildGroupResponse(group, existingMember.userId, existingMember.isOwner),
+        );
     }
     if (!payload.name || !payload.location) {
       return res
@@ -85,13 +91,19 @@ export const groupActions = (
       userId: user.id,
       isOwner,
     });
-    await saveGroup(payload.sessionId, group);
+    await recomputeSuggestionsForGroup(payload.sessionId, group, {
+      rotateSuggestions: false,
+    });
     await safeTrigger(channel, "group-updated", { reason: "join" });
     return res.status(200).json(buildGroupResponse(group, user.id, isOwner));
   },
   setManualVenues: async (payload: SetManualVenuesRequest, group: GroupPayload) => {
     group.manualVenues = payload.venues || [];
-    await saveGroup(payload.sessionId, group);
+    await syncManualVenueMetricsForGroup(
+      payload.sessionId,
+      group,
+      group.manualVenues,
+    );
     await safeTrigger(channel, "group-updated", { reason: "manual-venues" });
     return res.status(200).json(buildGroupResponse(group));
   },
@@ -99,15 +111,16 @@ export const groupActions = (
     if (!payload.venue) {
       return res.status(400).json({ message: "Missing venue." });
     }
-    const normalizedVenue = {
+    const normalizedVenue: Venue = {
       ...payload.venue,
       addedByUserId: payload.venue.addedByUserId || undefined,
     };
-    if (!group.manualVenues.find((venue) => venue.id === payload.venue.id)) {
+    const exists = group.manualVenues.find((venue) => venue.id === payload.venue.id);
+    if (!exists) {
       group.manualVenues.push(normalizedVenue);
+      await syncManualVenueMetricsForGroup(payload.sessionId, group, [normalizedVenue]);
+      await safeTrigger(channel, "group-updated", { reason: "manual-venues" });
     }
-    await saveGroup(payload.sessionId, group);
-    await safeTrigger(channel, "group-updated", { reason: "manual-venues" });
     return res.status(200).json(buildGroupResponse(group));
   },
   removeManualVenue: async (
@@ -117,7 +130,7 @@ export const groupActions = (
     group.manualVenues = group.manualVenues.filter(
       (venue) => venue.id !== payload.venueId,
     );
-    await saveGroup(payload.sessionId, group);
+    await syncManualVenueMetricsForGroup(payload.sessionId, group, []);
     await safeTrigger(channel, "group-updated", { reason: "manual-venues" });
     return res.status(200).json(buildGroupResponse(group));
   },
@@ -127,7 +140,9 @@ export const groupActions = (
       return res.status(404).json({ message: "User not found." });
     }
     group.users[index] = { ...group.users[index], location: payload.location };
-    await saveGroup(payload.sessionId, group);
+    await recomputeSuggestionsForGroup(payload.sessionId, group, {
+      rotateSuggestions: false,
+    });
     await safeTrigger(channel, "group-updated", { reason: "update-user" });
     return res.status(200).json(buildGroupResponse(group));
   },
@@ -167,7 +182,9 @@ export const groupActions = (
         (id) => id !== payload.userId,
       );
     });
-    await saveGroup(payload.sessionId, group);
+    await recomputeSuggestionsForGroup(payload.sessionId, group, {
+      rotateSuggestions: false,
+    });
     await safeTrigger(channel, "group-updated", { reason: "remove-user" });
     return res.status(200).json(buildGroupResponse(group));
   },
@@ -229,5 +246,5 @@ export const groupActions = (
       await saveGroup(payload.sessionId, group);
     }
     return res.status(200).json(buildGroupResponse(group));
-  }
+  },
 });
