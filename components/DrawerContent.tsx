@@ -198,6 +198,8 @@ const DrawerContent = observer(function DrawerContent({
                 manualVenues={manualVenues}
                 totalsByVenue={totalsByVenue}
                 etaMatrix={etaMatrix}
+                votes={votes}
+                users={users}
                 showSuggestedVenues={showSuggestedVenues}
                 onSelect={setSelectedVenue}
               />

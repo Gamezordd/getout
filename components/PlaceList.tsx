@@ -1,11 +1,13 @@
 import { useMemo } from "react";
-import type { EtaMatrix, TotalsByVenue, Venue } from "../lib/types";
+import type { EtaMatrix, TotalsByVenue, User, Venue, VotesByVenue } from "../lib/types";
 
 type Props = {
   suggestedVenues: Venue[];
   manualVenues: Venue[];
   totalsByVenue: TotalsByVenue;
   etaMatrix: EtaMatrix;
+  votes: VotesByVenue;
+  users: User[];
   showSuggestedVenues: boolean;
   onSelect: (venueId: string) => void;
 };
@@ -23,11 +25,21 @@ const getTravelRange = (etas?: Record<string, number>) => {
   return `${Math.round(min)} - ${Math.round(max)} min`;
 };
 
+const formatVoterNames = (names: string[], maxVisible = 3) => {
+  if (names.length === 0) return "";
+  const visible = names.slice(0, maxVisible);
+  if (visible.length === 1) return `${visible[0]} picked`;
+  if (visible.length === 2) return `${visible[0]} and ${visible[1]} picked`;
+  return `${visible.slice(0, -1).join(", ")} and ${visible[visible.length - 1]} picked`;
+};
+
 export default function PlaceList({
   suggestedVenues,
   manualVenues,
   totalsByVenue,
   etaMatrix,
+  votes,
+  users,
   showSuggestedVenues,
   onSelect,
 }: Props) {
@@ -47,6 +59,34 @@ export default function PlaceList({
       }))
       .map((entry) => entry.venue);
   }, [manualVenues, showSuggestedVenues, suggestedVenues, totalsByVenue]);
+
+  const userById = useMemo(
+    () => new Map(users.map((user) => [user.id, user])),
+    [users],
+  );
+
+  const voteSummaryByVenue = useMemo(() => {
+    const summaryByVenue = new Map<
+      string,
+      { count: number; names: string[]; label: string }
+    >();
+
+    Object.entries(votes || {}).forEach(([venueId, voterIds]) => {
+      const names = (voterIds || [])
+        .map((id) => userById.get(id))
+        .filter((user): user is User => Boolean(user))
+        .map((user) => user.name);
+      const count = (voterIds || []).length;
+      if (count === 0) return;
+      summaryByVenue.set(venueId, {
+        count,
+        names,
+        label: formatVoterNames(names),
+      });
+    });
+
+    return summaryByVenue;
+  }, [userById, votes]);
 
   const medalNoteByVenue = useMemo(() => {
     const visibleSuggested = showSuggestedVenues ? suggestedVenues : [];
@@ -136,6 +176,28 @@ export default function PlaceList({
                 <p className="mt-1 text-xs text-slate-500">
                   Travel Time : {getTravelRange(etaMatrix?.[venue.id])}
                 </p>
+                {voteSummaryByVenue.get(venue.id) && (
+                  <div className="mt-2 flex items-start gap-2 text-xs font-semibold text-slate-600 leading-tight">
+                    <svg
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                      aria-hidden="true"
+                      className="mt-0.5 h-3.5 w-3.5 text-rose-500"
+                    >
+                      <path d="m9.653 16.915-.005-.003-.019-.01a20.759 20.759 0 0 1-1.162-.682 22.045 22.045 0 0 1-2.582-1.9C4.045 12.733 2 10.352 2 7.5a4.5 4.5 0 0 1 8-2.828A4.5 4.5 0 0 1 18 7.5c0 2.852-2.044 5.233-3.885 6.82a22.049 22.049 0 0 1-3.744 2.582l-.019.01-.005.003h-.002a.739.739 0 0 1-.69.001l-.002-.001Z" />
+                    </svg>
+                    <div>
+                      <p>
+                        {voteSummaryByVenue.get(venue.id)?.count} {voteSummaryByVenue.get(venue.id)?.count === 1 ? "vote" : "votes"}
+                      </p>
+                      {voteSummaryByVenue.get(venue.id)?.label && (
+                        <p className="mt-0.5 text-[11px] font-medium text-slate-500">
+                          {voteSummaryByVenue.get(venue.id)?.label}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </button>
