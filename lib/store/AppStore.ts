@@ -29,6 +29,7 @@ type SuggestionsPayload = {
   suggestedVenues: Venue[];
   etaMatrix: EtaMatrix;
   totalsByVenue: TotalsByVenue;
+  votes?: VotesByVenue;
   warning?: string;
 };
 
@@ -250,6 +251,7 @@ export class AppStore {
         this.suggestedVenues = data.suggestedVenues || [];
         this.totalsByVenue = data.totalsByVenue || {};
         this.etaMatrix = data.etaMatrix || {};
+        this.reconcileVotes(data.votes || {});
         this.suggestionWarning = data.warning || null;
         this.isLoadingSuggestions = false;
         const hasSelected =

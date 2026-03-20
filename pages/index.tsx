@@ -9,6 +9,7 @@ import LockedVenueDialog from "../components/LockedVenueDialog";
 import InviteDialog from "../components/InviteDialog";
 import usePusher from "../hooks/usePusher";
 import useRedirections from "../hooks/useRedirections";
+import useForegroundResume from "../hooks/useForegroundResume";
 import PickButton from "../components/PickButton";
 import { MapContainer } from "../components/MapContainer";
 import { registerPushSubscription } from "../lib/pushClient";
@@ -27,6 +28,10 @@ function HomePage() {
 
   const {selectedVenue} = store;
   useRedirections();
+  useForegroundResume(() => {
+    if (!store.sessionId || store.users.length === 0) return;
+    store.fetchSuggestions();
+  });
 
   const handleEditUser = useCallback(
     (userId: string) => {
@@ -90,6 +95,7 @@ function HomePage() {
     }, 400);
     return () => clearTimeout(timeout);
   }, [store, store.sessionId, store.users.length, store.manualVenues.length]);
+
 
   const showVoteFooter =
     !store.lockedVenue && store.hasCurrentUserLocation && store.selectedVenue;

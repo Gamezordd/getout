@@ -13,6 +13,14 @@ import { safeTrigger } from "./utils";
 
 const suggestionsCache = new Map<string, CacheEntry>();
 
+const buildSuggestionsResponse = (
+  payload: Omit<SuggestionsResponse, "votes">,
+  votes: SuggestionsResponse["votes"],
+): SuggestionsResponse => ({
+  ...payload,
+  votes,
+});
+
 const computeCentroid = (points: LatLng[]): LatLng => {
   const total = points.reduce(
     (acc, point) => {
@@ -200,6 +208,7 @@ export default async function handler(
       suggestedVenues: [],
       etaMatrix: {},
       totalsByVenue: {},
+      votes: group.votes || {},
     });
   }
 
@@ -210,7 +219,9 @@ export default async function handler(
   );
   const cached = suggestionsCache.get(cacheKey);
   if (cached && !refresh && Date.now() - cached.timestamp < CACHE_TTL_MS) {
-    return res.status(200).json(cached.payload);
+    return res.status(200).json(
+      buildSuggestionsResponse(cached.payload, group.votes || {}),
+    );
   }
 
   try {
@@ -296,19 +307,21 @@ export default async function handler(
           reason: "suggestions-refreshed",
         });
       }
-      const payload: SuggestionsResponse = {
+      const payload = {
         venues: [],
         suggestedVenues: [],
         etaMatrix: {},
         totalsByVenue: {},
         warning: "No places matched the rating and review filters.",
-      };
+      } satisfies Omit<SuggestionsResponse, "votes">;
       suggestionsCache.set(cacheKey, {
         timestamp: Date.now(),
         payload,
         seenVenueIds: cached?.seenVenueIds || [],
       });
-      return res.status(200).json(payload);
+      return res.status(200).json(
+        buildSuggestionsResponse(payload, group.votes || {}),
+      );
     }
 
     const rows = await fetchDriveTimes(
@@ -368,7 +381,7 @@ export default async function handler(
     group.venues = rankedSuggested;
     await saveGroup(sessionId, group);
 
-    const payload: SuggestionsResponse = {
+    const payload = {
       venues: mergedVenues,
       suggestedVenues: rankedSuggested,
       etaMatrix,
@@ -377,7 +390,7 @@ export default async function handler(
         rankedSuggested.length === 0 && excludedVenueIds.size > 0
           ? "No new suggestions available right now."
           : undefined,
-    };
+    } satisfies Omit<SuggestionsResponse, "votes">;
     const nextSeen = new Set(excludedVenueIds);
     rankedSuggested.forEach((venue) => nextSeen.add(venue.id));
     suggestionsCache.set(cacheKey, {
@@ -393,7 +406,9 @@ export default async function handler(
       });
     }
 
-    return res.status(200).json(payload);
+    return res.status(200).json(
+      buildSuggestionsResponse(payload, group.votes || {}),
+    );
   } catch {
     return res.status(500).json({ message: "Unable to compute suggestions." });
   }

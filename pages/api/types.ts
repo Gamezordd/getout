@@ -14,12 +14,13 @@ export type SuggestionsResponse = {
   suggestedVenues: Venue[];
   etaMatrix: EtaMatrix;
   totalsByVenue: TotalsByVenue;
+  votes: VotesByVenue;
   warning?: string;
 };
 
 export type CacheEntry = {
   timestamp: number;
-  payload: SuggestionsResponse;
+  payload: Omit<SuggestionsResponse, "votes">;
   seenVenueIds: string[];
 };
 
