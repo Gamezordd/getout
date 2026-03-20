@@ -25,10 +25,11 @@ export const MapContainer = observer(function MapContainer({
   const pickedCountText = (function () {
     const count = store.uniqueVoterCount;
     const total = store.users.length || 0;
-    if (total === 0) return "0/0 Voted";
-    if (canFinalize)
-      return `${count}/${total} Voted. Ready to finalize`;
-    return `${count}/${total} Voted`;
+    const baseText = total === 0 ? "0/0 Voted" : `${count}/${total} Voted`;
+    const finalizedText = canFinalize
+      ? `${baseText}. Ready to finalize`
+      : baseText;
+    return store.isLoadingSuggestions ? `${finalizedText} · Syncing...` : finalizedText;
   })();
 
   return (

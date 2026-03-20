@@ -5,6 +5,7 @@ import Dialog from "./Dialog";
 import PlaceSearch, { PlaceResult } from "./PlaceSearch";
 import { User } from "../lib/types";
 import PlaceList from "./PlaceList";
+import Loader from "./Loader";
 
 interface Props {
   isExpanded: boolean;
@@ -141,12 +142,14 @@ const DrawerContent = observer(function DrawerContent({
         </Dialog>
       )}
       {isLoading && (
-        <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-5 text-center shadow-sm">
-          <p className="text-sm font-semibold text-ink">Loading group...</p>
-          <p className="mt-2 text-xs text-slate-500">
-            Fetching members and venues.
-          </p>
-        </div>
+        <Loader
+          title={isLoadingGroup ? "Loading group..." : "Syncing..."}
+          description={
+            isLoadingGroup
+              ? "Fetching members, votes, and venues."
+              : "Pulling the latest votes and venue data."
+          }
+        />
       )}
       {!isLoading && (
         <div className="px-5 pb-2 pt-2">
