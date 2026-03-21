@@ -1,23 +1,67 @@
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect } from "react";
 import { observer } from "mobx-react-lite";
 import Dialog from "./Dialog";
 import { useAppStore } from "../lib/store/AppStoreProvider";
 
-const InviteDialog = observer(function InviteDialog() {
+type ShareActionProps = {
+  label: string;
+  onClick: () => void | Promise<void>;
+  className: string;
+  children: ReactNode;
+};
+
+type InviteDialogProps = {
+  isOpen: boolean;
+  title: string;
+  onOpen: () => void;
+  onClose: () => void;
+};
+
+function ShareAction({ label, onClick, className, children }: ShareActionProps) {
+  const handleClick = () => {
+    if (
+      typeof navigator !== "undefined" &&
+      typeof navigator.vibrate === "function"
+    ) {
+      navigator.vibrate(12);
+    }
+    void onClick();
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      aria-label={label}
+      title={label}
+      className={`inline-flex items-center justify-center rounded-full text-ink transition active:scale-[0.97] ${className}`}
+    >
+      {children}
+    </button>
+  );
+}
+
+const InviteDialog = observer(function InviteDialog({
+  isOpen,
+  title,
+  onOpen,
+  onClose,
+}: InviteDialogProps) {
   const store = useAppStore();
-  const [showInviteDialog, setShowInviteDialog] = useState(false);
 
   const handleClose = () => {
     if (store.sessionId && typeof window !== "undefined") {
       localStorage.setItem(`getout-invite-shown-${store.sessionId}`, "1");
     }
-    setShowInviteDialog(false);
+    onClose();
   };
 
   useEffect(() => {
     if (!store.sessionId || !store.currentUserId) return;
     if (store.users.length !== 1) {
-      setShowInviteDialog(false);
+      if (isOpen) {
+        onClose();
+      }
       return;
     }
     const onlyUser = store.users[0];
@@ -26,36 +70,61 @@ const InviteDialog = observer(function InviteDialog() {
     const key = `getout-invite-shown-${store.sessionId}`;
     const alreadyShown =
       typeof window !== "undefined" ? localStorage.getItem(key) === "1" : false;
-    if (!alreadyShown) {
-      setShowInviteDialog(true);
+    if (!alreadyShown && !isOpen) {
+      onOpen();
     }
-  }, [store.currentUserId, store.sessionId, store.users]);
+  }, [
+    isOpen,
+    onClose,
+    onOpen,
+    store.currentUserId,
+    store.sessionId,
+    store.users,
+  ]);
 
-  if (!showInviteDialog) return null;
+  if (!isOpen) return null;
 
   return (
     <Dialog
-      isOpen={showInviteDialog}
+      isOpen={isOpen}
       onClose={handleClose}
-      title="You're the first one here!"
+      title={title}
       description="Invite friends to instantly calculate the best spots and vote to pick one."
     >
-      <button
-        type="button"
-        onClick={store.copyShareLink}
-        className="mt-4 inline-flex w-full items-center justify-center gap-1.5 rounded-full bg-ink px-4 py-3 text-sm font-semibold text-white"
-      >
-        <svg
-          viewBox="0 0 20 20"
-          fill="currentColor"
-          aria-hidden="true"
-          className="h-4 w-4"
-        >
-          <path d="M7 3a2 2 0 00-2 2v1a1 1 0 11-2 0V5a4 4 0 014-4h6a4 4 0 014 4v6a4 4 0 01-4 4h-1a1 1 0 110-2h1a2 2 0 002-2V5a2 2 0 00-2-2H7z" />
-          <path d="M3 9a4 4 0 014-4h6a4 4 0 014 4v6a4 4 0 01-4 4H7a4 4 0 01-4-4V9zm4-2a2 2 0 00-2 2v6a2 2 0 002 2h6a2 2 0 002-2V9a2 2 0 00-2-2H7z" />
-        </svg>
-        {store.copyStatus || "Copy Invite Link"}
-      </button>
+      <div className="mt-4 flex w-full flex-col gap-3">
+        <div className="flex w-full items-center justify-center gap-3">
+          <ShareAction
+            label="Social Share"
+            onClick={() => store.socialShare()}
+            className="gap-2 border border-slate-200 bg-ink flex-grow px-4 py-3 text-sm font-semibold text-white shadow-sm"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              aria-hidden="true"
+              className="h-3.5 w-3.5 text-white"
+            >
+              <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7a2.98 2.98 0 0 0 0-1.39l7-4.11A2.99 2.99 0 1 0 14 5a3 3 0 0 0 .05.54l-7 4.11a3 3 0 1 0 0 4.7l7.05 4.14c-.03.17-.05.34-.05.51a3 3 0 1 0 3-2.92Z" />
+            </svg>
+            <span>Share Invite Link</span>
+          </ShareAction>
+
+          <ShareAction
+            label="Copy invite link"
+            onClick={() => store.copyShareLink()}
+            className="h-10 w-10 border border-slate-200 bg-white shadow-sm"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              aria-hidden="true"
+              className="h-5 w-5 text-slate-700"
+            >
+              <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1Zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2Zm0 16H8V7h11v14Z" />
+            </svg>
+          </ShareAction>
+        </div>
+      </div>
     </Dialog>
   );
 });

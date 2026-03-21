@@ -501,8 +501,8 @@ export class AppStore {
     this.mapError = message;
   }
 
-  async copyShareLink() {
-    if (!this.shareUrl || !this.sessionId) return;
+  buildShareUrl() {
+    if (!this.shareUrl || !this.sessionId) return null;
     const url = new URL(this.shareUrl);
     url.searchParams.set("sessionId", this.sessionId);
     if (this.selectedVenueId) {
@@ -510,16 +510,69 @@ export class AppStore {
     } else {
       url.searchParams.delete("venueId");
     }
+    return url;
+  }
 
-    const copyText = `${shareLinkText}\n\n${url.toString()}`;
-    try {
-      await navigator.clipboard.writeText(copyText);
-      this.copyStatus = "Link copied!";
-    } catch {
-      this.copyStatus = "Copy failed. Long-press to copy.";
-    }
+  buildShareText() {
+    const url = this.buildShareUrl();
+    if (!url) return null;
+    return `${shareLinkText}
+
+${url.toString()}`;
+  }
+
+  setCopyStatus(message: string) {
+    this.copyStatus = message;
     setTimeout(() => {
-      this.copyStatus = null;
+      runInAction(() => {
+        if (this.copyStatus === message) {
+          this.copyStatus = null;
+        }
+      });
     }, 2000);
   }
+
+  async copyShareLink(successMessage = "Link copied!") {
+    const shareText = this.buildShareText();
+    if (!shareText) return;
+    try {
+      await navigator.clipboard.writeText(shareText);
+      runInAction(() => {
+        this.setCopyStatus(successMessage);
+      });
+    } catch {
+      runInAction(() => {
+        this.setCopyStatus("Copy failed. Long-press to copy.");
+      });
+    }
+  }
+
+  shareToWhatsApp() {
+    const shareText = this.buildShareText();
+    if (!shareText || typeof window === "undefined") return;
+    const url = `https://wa.me/?text=${encodeURIComponent(shareText)}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+
+  async socialShare() {
+    const shareUrl = this.buildShareUrl();
+    if (!shareUrl) return;
+
+    if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+      try {
+        await navigator.share({
+          text: shareLinkText,
+          url: shareUrl.toString(),
+        });
+        return;
+      } catch (error) {
+        if ((error as DOMException)?.name === "AbortError") {
+          return;
+        }
+      }
+    }
+
+    await this.copyShareLink("Shared to social!");
+  }
+
 }

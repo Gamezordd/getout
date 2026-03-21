@@ -3,7 +3,11 @@ import { observer } from "mobx-react-lite";
 import { useAppStore } from "../lib/store/AppStoreProvider";
 import { useRouter } from "next/router";
 
-export const Header = observer(function Header() {
+type HeaderProps = {
+  onInviteClick: () => void;
+};
+
+export const Header = observer(function Header({ onInviteClick }: HeaderProps) {
   const store = useAppStore();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -52,19 +56,18 @@ export const Header = observer(function Header() {
           {store.shareUrl && (
             <button
               type="button"
-              onClick={store.copyShareLink}
+              onClick={onInviteClick}
               className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 px-3 py-1 text-[11px] font-semibold text-slate-600"
             >
               <svg
-                viewBox="0 0 20 20"
+                viewBox="0 0 24 24"
                 fill="currentColor"
                 aria-hidden="true"
                 className="h-3.5 w-3.5 text-slate-500"
               >
-                <path d="M7 3a2 2 0 00-2 2v1a1 1 0 11-2 0V5a4 4 0 014-4h6a4 4 0 014 4v6a4 4 0 01-4 4h-1a1 1 0 110-2h1a2 2 0 002-2V5a2 2 0 00-2-2H7z" />
-                <path d="M3 9a4 4 0 014-4h6a4 4 0 014 4v6a4 4 0 01-4 4H7a4 4 0 01-4-4V9zm4-2a2 2 0 00-2 2v6a2 2 0 002 2h6a2 2 0 002-2V9a2 2 0 00-2-2H7z" />
+                <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7a2.98 2.98 0 0 0 0-1.39l7-4.11A2.99 2.99 0 1 0 14 5a3 3 0 0 0 .05.54l-7 4.11a3 3 0 1 0 0 4.7l7.05 4.14c-.03.17-.05.34-.05.51a3 3 0 1 0 3-2.92Z" />
               </svg>
-              <span>{store.copyStatus || "Copy link"}</span>
+              <span>Invite</span>
             </button>
           )}
           {store.sessionId && (

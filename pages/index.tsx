@@ -18,6 +18,8 @@ import { registerPushSubscription } from "../lib/pushClient";
 function HomePage() {
   const store = useAppStore();
   const [showFinalizeDialog, setShowFinalizeDialog] = useState(false);
+  const [showInviteDialog, setShowInviteDialog] = useState(false);
+  const [inviteDialogTitle, setInviteDialogTitle] = useState("You're the first one here!");
 
   const bottomSheetRef = useRef<BottomDrawerHandle>(null);
   const pushInitRef = useRef(false);
@@ -104,7 +106,12 @@ function HomePage() {
 
   return (
     <div className="relative flex flex-col h-full overflow-clip bg-mist">
-      <Header />
+      <Header
+        onInviteClick={() => {
+          setInviteDialogTitle("Leave no one behind!");
+          setShowInviteDialog(true);
+        }}
+      />
       <MapContainer onFinalizeClick={() => setShowFinalizeDialog(true)} />
 
       {errorBanner && (
@@ -132,7 +139,15 @@ function HomePage() {
       />
 
       <LockedVenueDialog />
-      <InviteDialog />
+      <InviteDialog
+        isOpen={showInviteDialog}
+        title={inviteDialogTitle}
+        onOpen={() => {
+          setInviteDialogTitle("You're the first one here!");
+          setShowInviteDialog(true);
+        }}
+        onClose={() => setShowInviteDialog(false)}
+      />
     </div>
   );
 }
