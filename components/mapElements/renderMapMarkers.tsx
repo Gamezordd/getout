@@ -65,7 +65,6 @@ export default function renderMapMarkers(
     venueCoordsRef.current = {};
 
     const bounds = new mapboxgl.LngLatBounds();
-    let hasPoints = false;
 
     users.forEach((user) => {
       renderVoterAvatar(
@@ -73,8 +72,8 @@ export default function renderMapMarkers(
         map,
         markersRef,
         bounds,
-        hasPoints,
-        (has) => (hasPoints = has),
+        false,
+        () => undefined,
       );
     });
 
@@ -93,7 +92,7 @@ export default function renderMapMarkers(
         minTotal,
         maxTotal,
         userById,
-        (has) => (hasPoints = has),
+        () => undefined,
         medalByVenue,
         index,
         false,
@@ -115,16 +114,13 @@ export default function renderMapMarkers(
         minTotal,
         maxTotal,
         userById,
-        (has) => (hasPoints = has),
+        () => undefined,
         medalByVenue,
         -1,
         true,
       );
     });
 
-    if (hasPoints) {
-      map.fitBounds(bounds, { padding: 80, maxZoom: 14, duration: 800 });
-    }
   }, [
     users,
     suggestedVenues,
