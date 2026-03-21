@@ -62,6 +62,7 @@ export default async function handler(
 
   await safeTrigger(`private-group-${payload.sessionId}`, "votes-update", {
     votes: group.votes,
+    voterId: payload.userId,
   });
 
   const { staleUserIds } = await sendVoteNotifications({

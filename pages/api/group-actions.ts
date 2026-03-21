@@ -94,7 +94,7 @@ export const groupActions = (
     await recomputeSuggestionsForGroup(payload.sessionId, group, {
       rotateSuggestions: false,
     });
-    await safeTrigger(channel, "group-updated", { reason: "join" });
+    await safeTrigger(channel, "group-updated", { reason: "join", userId: user.id });
     return res.status(200).json(buildGroupResponse(group, user.id, isOwner));
   },
   setManualVenues: async (payload: SetManualVenuesRequest, group: GroupPayload) => {

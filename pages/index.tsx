@@ -1,4 +1,5 @@
 import { observer } from "mobx-react-lite";
+import { toast } from "sonner";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import BottomDrawer, { BottomDrawerHandle } from "../components/BottomDrawer";
 import { useAppStore } from "../lib/store/AppStoreProvider";
@@ -16,15 +17,32 @@ import { registerPushSubscription } from "../lib/pushClient";
 
 function HomePage() {
   const store = useAppStore();
-  const [joinNotice, setJoinNotice] = useState<string | null>(null);
   const [showFinalizeDialog, setShowFinalizeDialog] = useState(false);
 
-  const seenUserIdsRef = useRef<Set<string>>(new Set());
-  const usersInitializedRef = useRef(false);
   const bottomSheetRef = useRef<BottomDrawerHandle>(null);
   const pushInitRef = useRef(false);
 
-  usePusher();
+  const handleJoinEvent = useCallback(
+    (userId: string) => {
+      if (userId === store.currentUserId) return;
+      const joinedUser = store.users.find((user) => user.id === userId);
+      toast.success(`${joinedUser?.name || "Someone"} has joined!`, {
+        description: "Suggestions have been updated",
+      });
+    },
+    [store.currentUserId, store.users],
+  );
+
+  const handleVoteEvent = useCallback(
+    (voterId: string) => {
+      if (voterId === store.currentUserId) return;
+      const voter = store.users.find((user) => user.id === voterId);
+      toast.info(`${voter?.name || "Someone"} has voted`,);
+    },
+    [store.currentUserId, store.users],
+  );
+
+  usePusher(handleJoinEvent, handleVoteEvent);
 
   const {selectedVenue} = store;
   useRedirections();
@@ -46,27 +64,6 @@ function HomePage() {
       bottomSheetRef.current?.snapTo("mid");
     }
   }, [store.selectedVenue]);
-
-  useEffect(() => {
-    const currentIds = new Set(store.users.map((user) => user.id));
-    if (!usersInitializedRef.current) {
-      seenUserIdsRef.current = currentIds;
-      usersInitializedRef.current = true;
-      return;
-    }
-
-    const addedUsers = store.users.filter(
-      (user) => !seenUserIdsRef.current.has(user.id),
-    );
-    const joinedByOthers = addedUsers.find(
-      (user) => user.id !== store.currentUserId,
-    );
-    if (joinedByOthers) {
-      setJoinNotice(`${joinedByOthers.name} joined the group`);
-      setTimeout(() => setJoinNotice(null), 2500);
-    }
-    seenUserIdsRef.current = currentIds;
-  }, [store.currentUserId, store.users]);
 
 
   useEffect(() => {
@@ -113,11 +110,6 @@ function HomePage() {
       {errorBanner && (
         <div className="pointer-events-none absolute inset-x-4 top-16 z-20 rounded-2xl bg-amber-50 px-4 py-3 text-xs text-amber-800">
           {errorBanner}
-        </div>
-      )}
-      {joinNotice && (
-        <div className="pointer-events-none absolute inset-x-4 top-28 z-20 rounded-2xl bg-emerald-50 px-4 py-3 text-xs font-semibold text-emerald-800">
-          {joinNotice}
         </div>
       )}
       {!store.lockedVenue && (

@@ -1,10 +1,23 @@
 import { useEffect, useRef } from "react";
-import { createPusherClient } from "../lib/pusherClient";
-import { useAppStore } from "../lib/store/AppStoreProvider";
 import { Channel } from "pusher-js";
 import type { VotesByVenue } from "../lib/types";
+import { createPusherClient } from "../lib/pusherClient";
+import { useAppStore } from "../lib/store/AppStoreProvider";
 
-export default function usePusher() {
+type GroupUpdatedPayload = {
+  reason?: string;
+  userId?: string;
+};
+
+type VoteUpdatedPayload = {
+  votes?: VotesByVenue;
+  voterId?: string;
+};
+
+export default function usePusher(
+  onJoin?: (userId: string) => void,
+  onVote?: (voterId: string) => void,
+) {
   const store = useAppStore();
   const channelRef = useRef<Channel | null>(null);
 
@@ -20,22 +33,25 @@ export default function usePusher() {
       channelRef.current = null;
     });
 
-    const refresh = async () => {
+    const refresh = async (data?: GroupUpdatedPayload) => {
       await store.loadGroup();
       await store.fetchSuggestions();
+      if (data?.reason === "join" && data.userId) {
+        onJoin?.(data.userId);
+      }
     };
 
     channel.bind("group-updated", refresh);
     channel.bind("venue-locked", async () => {
       await store.loadGroup();
     });
-    channel.bind(
-      "votes-update",
-      (data: { votes?: VotesByVenue }) => {
-        if (!data?.votes) return;
-        store.reconcileVotes(data.votes);
-      },
-    );
+    channel.bind("votes-update", (data?: VoteUpdatedPayload) => {
+      if (!data?.votes) return;
+      store.reconcileVotes(data.votes);
+      if (data.voterId) {
+        onVote?.(data.voterId);
+      }
+    });
 
     return () => {
       channel.unbind("group-updated", refresh);
@@ -47,7 +63,7 @@ export default function usePusher() {
       client.disconnect();
       channelRef.current = null;
     };
-  }, [store, store.sessionId]);
+  }, [onJoin, onVote, store, store.sessionId]);
 
   return channelRef.current;
 }
