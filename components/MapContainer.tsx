@@ -27,7 +27,7 @@ export const MapContainer = observer(function MapContainer({
     const total = store.users.length || 0;
     const baseText = total === 0 ? "0/0 Voted" : `${count}/${total} Voted`;
     const finalizedText = canFinalize
-      ? `${baseText}. Ready to finalize`
+      ? `${baseText}. Tap to lock.`
       : baseText;
     return store.isLoadingSuggestions ? `${finalizedText} · Syncing...` : finalizedText;
   })();
