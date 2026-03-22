@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import type { LatLng } from "../lib/types";
 
 export type PlaceResult = {
@@ -15,6 +15,7 @@ type Props = {
   locationBias?: { lat: number; lng: number; radiusKm?: number };
   selectedPlace?: PlaceResult | null;
   clearOnSelect?: boolean;
+  resultFilter?: (place: PlaceResult) => boolean;
 };
 
 export default function PlaceSearch({
@@ -24,6 +25,7 @@ export default function PlaceSearch({
   locationBias,
   selectedPlace,
   clearOnSelect = false,
+  resultFilter,
 }: Props) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<PlaceResult[]>([]);
@@ -75,7 +77,7 @@ export default function PlaceSearch({
         const places: PlaceResult[] = Array.isArray(data.results)
           ? data.results
           : [];
-        setResults(places);
+        setResults(resultFilter ? places.filter(resultFilter) : places);
       } catch (err: any) {
         if (err.name !== "AbortError") {
           setError(err.message || "Search error. Try again.");
@@ -90,7 +92,7 @@ export default function PlaceSearch({
       controller.abort();
       clearTimeout(debounce);
     };
-  }, [query, selectedPlace, selectedDisplay]);
+  }, [query, resultFilter, selectedPlace, selectedDisplay]);
 
   return (
     <div className="space-y-2">

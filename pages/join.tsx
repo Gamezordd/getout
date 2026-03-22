@@ -2,6 +2,7 @@ import { observer } from "mobx-react-lite";
 import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
 import PlaceSearch, { PlaceResult } from "../components/PlaceSearch";
+import { getDistanceKm } from "../lib/distance";
 import { useAppStore } from "../lib/store/AppStoreProvider";
 import type { VenueCategory } from "../lib/types";
 
@@ -12,6 +13,10 @@ const CATEGORY_OPTIONS: Array<{ value: VenueCategory; label: string }> = [
   { value: "night_club", label: "Night clubs" },
   { value: "brewery", label: "Breweries" },
 ];
+
+const MAX_JOIN_DISTANCE_KM = 80;
+const LOCATION_DISTANCE_ERROR =
+  "Provided location is too far from the group location.";
 
 function JoinPage() {
   const store = useAppStore();
@@ -37,6 +42,13 @@ function JoinPage() {
     const organizer = store.users.find((user) => user.isOrganizer);
     return organizer?.location;
   }, [store.users]);
+
+  const isLocationTooFar = useMemo(() => {
+    if (!location || !organizerLocation) return false;
+    return (
+      getDistanceKm(location.location, organizerLocation) > MAX_JOIN_DISTANCE_KM
+    );
+  }, [location, organizerLocation]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -68,6 +80,17 @@ function JoinPage() {
     store.loadGroup();
   }, [sessionId, store]);
 
+  useEffect(() => {
+    if (!location) return;
+    if (isLocationTooFar) {
+      setLocationError(LOCATION_DISTANCE_ERROR);
+      return;
+    }
+    setLocationError((current) =>
+      current === LOCATION_DISTANCE_ERROR ? null : current,
+    );
+  }, [isLocationTooFar, location]);
+
   const handleJoin = async () => {
     if (!store.sessionId) {
       setError("Missing session. Open this page from a group link.");
@@ -87,6 +110,10 @@ function JoinPage() {
     }
     if (!location) {
       setLocationError("Pick a planning location to join.");
+      return;
+    }
+    if (isLocationTooFar) {
+      setLocationError(LOCATION_DISTANCE_ERROR);
       return;
     }
     if (!store.venueCategory) {
@@ -260,6 +287,13 @@ function JoinPage() {
                   }
                 : undefined
             }
+            resultFilter={(place) => {
+              if (!organizerLocation) return true;
+              return (
+                getDistanceKm(place.location, organizerLocation) <=
+                MAX_JOIN_DISTANCE_KM
+              );
+            }}
             selectedPlace={location}
             onSelect={(place) => {
               setLocation(place);
@@ -295,7 +329,7 @@ function JoinPage() {
           <button
             type="button"
             onClick={handleJoin}
-            disabled={submitting}
+            disabled={submitting || isLocationTooFar}
             className="w-full rounded-full bg-ink px-5 py-3 text-base font-semibold text-white disabled:opacity-60"
           >
             {submitting ? "Suii..." : "Join & Pick"}
