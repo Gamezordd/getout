@@ -1,13 +1,25 @@
 import type { AppProps } from "next/app";
 import Head from "next/head";
+import { useEffect } from "react";
+import { Toaster } from "sonner";
+import { initInstallPrompt } from "../lib/installPrompt";
+import { registerAppServiceWorker } from "../lib/serviceWorker";
 import { AppStoreProvider } from "../lib/store/AppStoreProvider";
 import "../styles/globals.css";
 import "mapbox-gl/dist/mapbox-gl.css";
-import { Toaster } from "sonner";
 
 export default function App({ Component, pageProps }: AppProps) {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "";
-  const ogImage = siteUrl ? `${siteUrl}/icons/getout_icon_md.png` : "/icons/getout_icon_md.png";
+  const ogImage = siteUrl
+    ? `${siteUrl}/icons/getout_icon_md.png`
+    : "/icons/getout_icon_md.png";
+
+  useEffect(() => {
+    initInstallPrompt();
+    registerAppServiceWorker().catch(() => {
+      // Ignore service worker registration errors.
+    });
+  }, []);
 
   return (
     <AppStoreProvider>
@@ -17,8 +29,14 @@ export default function App({ Component, pageProps }: AppProps) {
           name="description"
           content="Find the best spot for everyone. Fast, simple, and free."
         />
+        <meta name="theme-color" content="#111827" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-title" content="GetOut" />
+        <link rel="manifest" href="/manifest.webmanifest" />
         <link rel="icon" href="/icons/getout_icon.png" />
-        <link rel="apple-touch-icon" href="/icons/getout_icon.png" />
+        <link rel="apple-touch-icon" href="/icons/getout_icon_md.png" />
         <meta property="og:title" content="GetOut" />
         <meta
           property="og:description"

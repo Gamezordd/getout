@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { observer } from "mobx-react-lite";
-import { useAppStore } from "../lib/store/AppStoreProvider";
 import { useRouter } from "next/router";
+import useInstallPrompt from "../hooks/useInstallPrompt";
+import { useAppStore } from "../lib/store/AppStoreProvider";
 
 type HeaderProps = {
   onInviteClick: () => void;
@@ -12,6 +13,7 @@ export const Header = observer(function Header({ onInviteClick }: HeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const router = useRouter();
+  const { canInstall, triggerInstall } = useInstallPrompt();
 
   const handleEditLocation = useCallback(() => {
     if (!store.sessionId) return;
@@ -106,7 +108,28 @@ export const Header = observer(function Header({ onInviteClick }: HeaderProps) {
               </svg>
             </button>
             {menuOpen && (
-              <div className="absolute right-0 top-10 z-20 w-40 rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
+              <div className="absolute right-0 top-10 z-20 w-48 rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
+                {canInstall && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      void triggerInstall();
+                    }}
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-ink hover:bg-slate-100"
+                  >
+                    <svg
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                      aria-hidden="true"
+                      className="h-4 w-4 text-slate-500"
+                    >
+                      <path d="M10 2a1 1 0 0 1 1 1v7.59l2.3-2.3a1 1 0 1 1 1.4 1.42l-4 3.99a1 1 0 0 1-1.4 0l-4-4a1 1 0 1 1 1.4-1.41L9 10.6V3a1 1 0 0 1 1-1Z" />
+                      <path d="M4 14a1 1 0 0 1 1 1v1h10v-1a1 1 0 1 1 2 0v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1a1 1 0 0 1 1-1Z" />
+                    </svg>
+                    Add to homescreen
+                  </button>
+                )}
                 <a
                   href="/create"
                   target="_blank"

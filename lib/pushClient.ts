@@ -1,3 +1,5 @@
+import { registerAppServiceWorker } from "./serviceWorker";
+
 const urlBase64ToUint8Array = (value: string) => {
   const padding = "=".repeat((4 - (value.length % 4)) % 4);
   const base64 = (value + padding).replace(/-/g, "+").replace(/_/g, "/");
@@ -28,9 +30,10 @@ export const registerPushSubscription = async (params: {
       : await Notification.requestPermission();
   if (permission !== "granted") return;
 
-  const registration = await navigator.serviceWorker.register("/sw.js");
-  const existingSubscription =
-    await registration.pushManager.getSubscription();
+  const registration = await registerAppServiceWorker();
+  if (!registration) return;
+
+  const existingSubscription = await registration.pushManager.getSubscription();
 
   const subscription =
     existingSubscription ||
