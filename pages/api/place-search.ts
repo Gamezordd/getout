@@ -6,25 +6,37 @@ type PlaceResult = {
   name: string;
   address?: string;
   area?: string;
+  photos?: string[];
   location: LatLng;
 };
 
-const getAreaFromAddressComponents = (components?: Array<{
+type SearchResponse = {
+  results: PlaceResult[];
+};
+
+type AddressComponent = {
   longText?: string;
   shortText?: string;
   types?: string[];
-}>): string | undefined => {
+};
+
+type PlacePhoto = {
+  name?: string;
+};
+
+const getAreaFromAddressComponents = (
+  components?: AddressComponent[],
+): string | undefined => {
   if (!Array.isArray(components)) return undefined;
 
   const preferredOrder = [
+    "locality",
     "sublocality_level_1",
     "sublocality",
     "neighborhood",
     "administrative_area_level_2",
     "administrative_area_level_1",
   ];
-
-  console.log("Address components:", components); 
 
   for (const type of preferredOrder) {
     const match = components.find((component) => component.types?.includes(type));
@@ -35,8 +47,35 @@ const getAreaFromAddressComponents = (components?: Array<{
   return undefined;
 };
 
-type SearchResponse = {
-  results: PlaceResult[];
+const getPhotoMediaUrl = async (
+  apiKey: string,
+  photoName: string,
+): Promise<string | null> => {
+  const response = await fetch(
+    `https://places.googleapis.com/v1/${photoName}/media?maxHeightPx=1200&skipHttpRedirect=true&key=${encodeURIComponent(apiKey)}`,
+  );
+
+  if (!response.ok) return null;
+
+  const data = await response.json().catch(() => null);
+  return typeof data?.photoUri === "string" ? data.photoUri : null;
+};
+
+const resolvePhotoUrls = async (
+  apiKey: string,
+  photos?: PlacePhoto[],
+): Promise<string[]> => {
+  if (!Array.isArray(photos) || photos.length === 0) return [];
+
+  const urls = await Promise.all(
+    photos
+      .map((photo) => photo.name)
+      .filter((name): name is string => Boolean(name))
+      .slice(0, 5)
+      .map((photoName) => getPhotoMediaUrl(apiKey, photoName)),
+  );
+
+  return urls.filter((url): url is string => Boolean(url));
 };
 
 const searchTextPlaces = async (
@@ -60,7 +99,7 @@ const searchTextPlaces = async (
         "Content-Type": "application/json",
         "X-Goog-Api-Key": apiKey,
         "X-Goog-FieldMask":
-          "places.id,places.displayName,places.formattedAddress,places.addressComponents,places.location",
+          "places.id,places.displayName,places.formattedAddress,places.addressComponents,places.location,places.photos",
       },
       body: JSON.stringify({
         textQuery: query,
@@ -77,8 +116,8 @@ const searchTextPlaces = async (
   const data = await response.json();
   const places = Array.isArray(data.places) ? data.places : [];
 
-  return places
-    .map((place: any) => {
+  const results = await Promise.all(
+    places.map(async (place: any) => {
       const location = place.location;
       if (!location) return null;
       return {
@@ -87,13 +126,16 @@ const searchTextPlaces = async (
           place.displayName?.text || place.formattedAddress || "Unknown place",
         address: place.formattedAddress || undefined,
         area: getAreaFromAddressComponents(place.addressComponents),
+        photos: await resolvePhotoUrls(apiKey, place.photos),
         location: {
           lat: location.latitude,
           lng: location.longitude,
         },
       };
-    })
-    .filter(Boolean) as PlaceResult[];
+    }),
+  );
+
+  return results.filter(Boolean) as PlaceResult[];
 };
 
 const geocodeAddress = async (
@@ -138,6 +180,7 @@ const geocodeAddress = async (
             })),
           )
         : undefined,
+      photos: [],
       location: {
         lat: result.geometry?.location?.lat,
         lng: result.geometry?.location?.lng,
@@ -173,8 +216,7 @@ export default async function handler(
     const lat = Number(req.query.lat);
     const lng = Number(req.query.lng);
     const radiusKmRaw = Number(req.query.radiusKm);
-    const hasBias =
-      Number.isFinite(lat) && Number.isFinite(lng);
+    const hasBias = Number.isFinite(lat) && Number.isFinite(lng);
     const radiusKm = Number.isFinite(radiusKmRaw) && radiusKmRaw > 0
       ? radiusKmRaw
       : 25;
@@ -185,7 +227,6 @@ export default async function handler(
       return res.status(200).json({ results: places });
     }
 
-    // Fallback when text search returns no POIs (e.g. neighborhoods/addresses).
     const geocoded = await geocodeAddress(apiKey, query, bias);
     return res.status(200).json({ results: geocoded });
   } catch {

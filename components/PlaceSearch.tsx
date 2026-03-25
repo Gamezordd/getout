@@ -6,6 +6,7 @@ export type PlaceResult = {
   name: string;
   address?: string;
   area?: string;
+  photos?: string[];
   location: LatLng;
 };
 
