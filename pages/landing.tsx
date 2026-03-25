@@ -2,6 +2,7 @@ import { observer } from "mobx-react-lite";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import PlaceSearch, { PlaceResult } from "../components/PlaceSearch";
+import TranslucentSelect from "../components/TranslucentSelect";
 import { useAppStore } from "../lib/store/AppStoreProvider";
 import type { VenueCategory } from "../lib/types";
 
@@ -295,43 +296,25 @@ function LandingPage() {
                     }}
                   />
 
-                  <div>
-                    <label className="text-sm font-semibold text-white">
-                      Looking for
-                    </label>
-                    <select
-                      value={category}
-                      onChange={(event) =>
-                        setCategory(event.target.value as VenueCategory)
-                      }
-                      className="mt-2 w-full rounded-xl border border-white/10 bg-white px-4 py-3 text-base text-ink shadow-sm focus:border-slate-400 focus:outline-none"
-                    >
-                      {CATEGORY_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  <TranslucentSelect
+                    label="Looking for"
+                    value={category}
+                    onChange={(event) =>
+                      setCategory(event.target.value as VenueCategory)
+                    }
+                    options={CATEGORY_OPTIONS}
+                    variant="dark"
+                  />
 
-                  <div>
-                    <label className="text-sm font-semibold text-white">
-                      Close voting in?
-                    </label>
-                    <select
-                      value={closeVotingInHours}
-                      onChange={(event) =>
-                        setCloseVotingInHours(Number(event.target.value))
-                      }
-                      className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-base text-white shadow-sm focus:border-white/30 focus:outline-none"
-                    >
-                      {CLOSE_VOTING_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value} className="text-slate-900">
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  <TranslucentSelect
+                    label="Close voting in?"
+                    value={closeVotingInHours}
+                    onChange={(event) =>
+                      setCloseVotingInHours(Number(event.target.value))
+                    }
+                    options={CLOSE_VOTING_OPTIONS}
+                    variant="dark"
+                  />
 
                   {locationError && (
                     <p className="text-xs text-rose-200">{locationError}</p>
