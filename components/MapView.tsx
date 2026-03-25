@@ -8,11 +8,13 @@ const DEFAULT_CENTER = { lng: -73.9857, lat: 40.7484 };
 type Props = {
   fitAllTrigger?: number;
   resizeTrigger?: number;
+  interactive?: boolean;
 };
 
 const MapView = observer(function MapView({
   fitAllTrigger = 0,
   resizeTrigger = 0,
+  interactive = true,
 }: Props) {
   const {
     users,
@@ -126,6 +128,30 @@ const MapView = observer(function MapView({
     const map = mapRef.current;
     if (!map) return;
 
+    const gestureHandlers = [
+      map.boxZoom,
+      map.doubleClickZoom,
+      map.dragPan,
+      map.dragRotate,
+      map.keyboard,
+      map.scrollZoom,
+      map.touchPitch,
+      map.touchZoomRotate,
+    ].filter(Boolean);
+
+    gestureHandlers.forEach((handler) => {
+      if (interactive) {
+        handler.enable();
+      } else {
+        handler.disable();
+      }
+    });
+  }, [interactive]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
     const timeout = window.setTimeout(() => {
       map.resize();
     }, 0);
@@ -133,7 +159,12 @@ const MapView = observer(function MapView({
     return () => window.clearTimeout(timeout);
   }, [resizeTrigger]);
 
-  return <div ref={containerRef} className="h-full w-full" />;
+  return (
+    <div
+      ref={containerRef}
+      className={`h-full w-full ${interactive ? "pointer-events-auto" : "pointer-events-none"}`}
+    />
+  );
 });
 
 export default MapView;

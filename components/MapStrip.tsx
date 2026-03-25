@@ -49,7 +49,11 @@ const MapStrip = observer(function MapStrip() {
         </div>
       </div>
       <div className={`relative transition-[height] duration-300 ${isExpanded ? "h-[260px]" : "h-[92px]"}`}>
-        <MapView fitAllTrigger={fitAllTrigger} resizeTrigger={resizeTrigger} />
+        <MapView
+          fitAllTrigger={fitAllTrigger}
+          resizeTrigger={resizeTrigger}
+          interactive={isExpanded}
+        />
         {!isExpanded && (
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#141418] via-transparent to-[#141418]" />
         )}
