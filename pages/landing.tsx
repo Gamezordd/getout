@@ -13,6 +13,14 @@ const CATEGORY_OPTIONS: Array<{ value: VenueCategory; label: string }> = [
   { value: "brewery", label: "Breweries" },
 ];
 
+const CLOSE_VOTING_OPTIONS = Array.from({ length: 12 }, (_, index) => {
+  const hours = index + 1;
+  return {
+    value: hours,
+    label: `${hours} ${hours === 1 ? "hour" : "hours"}`,
+  };
+});
+
 function LandingPage() {
   const store = useAppStore();
   const router = useRouter();
@@ -20,6 +28,7 @@ function LandingPage() {
   const [name, setName] = useState("");
   const [location, setLocation] = useState<PlaceResult | null>(null);
   const [category, setCategory] = useState<VenueCategory>("bar");
+  const [closeVotingInHours, setCloseVotingInHours] = useState(3);
   const [saveDetails, setSaveDetails] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
@@ -72,7 +81,12 @@ function LandingPage() {
       setSubmitting(true);
       setError(null);
       store.setSession(sessionId, "/");
-      await store.joinGroup(trimmedName, location.location, category);
+      await store.joinGroup(
+        trimmedName,
+        location.location,
+        category,
+        closeVotingInHours,
+      );
       if (saveDetails) {
         localStorage.setItem(
           "getout-user-details",
@@ -294,6 +308,25 @@ function LandingPage() {
                     >
                       {CATEGORY_OPTIONS.map((option) => (
                         <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-semibold text-white">
+                      Close voting in?
+                    </label>
+                    <select
+                      value={closeVotingInHours}
+                      onChange={(event) =>
+                        setCloseVotingInHours(Number(event.target.value))
+                      }
+                      className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-base text-white shadow-sm focus:border-white/30 focus:outline-none"
+                    >
+                      {CLOSE_VOTING_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value} className="text-slate-900">
                           {option.label}
                         </option>
                       ))}

@@ -3,6 +3,7 @@ import { getGroup } from "../../lib/groupStore";
 import { GroupRequest } from "./types";
 import { groupActions } from "./group-actions";
 import { buildGroupResponse } from "./utils";
+import { ensureVotingDeadlineState } from "./venue-lock";
 
 export default async function handler(
   req: NextApiRequest,
@@ -16,6 +17,7 @@ export default async function handler(
     const browserId =
       typeof req.query.browserId === "string" ? req.query.browserId : null;
     const group = await getGroup(sessionId);
+    await ensureVotingDeadlineState({ sessionId, group });
     const sessionMember = browserId
       ? group.sessionMembers.find((member) => member.browserId === browserId)
       : null;
@@ -41,6 +43,7 @@ export default async function handler(
   }
 
   const group = await getGroup(payload.sessionId);
+  await ensureVotingDeadlineState({ sessionId: payload.sessionId, group });
   const channel = `private-group-${payload.sessionId}`;
   const actions = groupActions(req, res, channel);
 

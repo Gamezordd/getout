@@ -22,6 +22,7 @@ import {
   TARGET_SUGGESTION_COUNT,
 } from "./constants";
 import { safeTrigger } from "./utils";
+import { ensureVotingDeadlineState } from "./venue-lock";
 
 const suggestionsCache = new Map<string, CacheEntry>();
 
@@ -153,6 +154,7 @@ const buildPayloadFromGroup = (group: GroupPayload): SuggestionsPayload => ({
   suggestedVenues: group.suggestions?.suggestedVenues || [],
   etaMatrix: group.suggestions?.etaMatrix || {},
   totalsByVenue: group.suggestions?.totalsByVenue || {},
+  votingClosesAt: group.votingClosesAt,
   warning: group.suggestions?.warning,
 });
 
@@ -575,6 +577,7 @@ export default async function handler(
     typeof req.query.browserId === "string" ? req.query.browserId : null;
 
   const group = await getGroup(sessionId);
+  await ensureVotingDeadlineState({ sessionId, group });
   if (group.users.length === 0) {
     return res.status(200).json({
       venues: [],
@@ -582,6 +585,7 @@ export default async function handler(
       etaMatrix: {},
       totalsByVenue: {},
       votes: group.votes || {},
+      votingClosesAt: group.votingClosesAt,
     });
   }
 

@@ -3,6 +3,7 @@ import type { VotesByVenue } from "../../lib/types";
 import { getGroup, saveGroup } from "../../lib/groupStore";
 import { pusher } from "../../lib/pusherServer";
 import { sendVoteNotifications } from "../../lib/pushServer";
+import { ensureVotingDeadlineState } from "./venue-lock";
 
 type VoteRequest = {
   sessionId: string;
@@ -38,6 +39,7 @@ export default async function handler(
   }
 
   const group = await getGroup(payload.sessionId);
+  await ensureVotingDeadlineState({ sessionId: payload.sessionId, group });
   if (group.lockedVenue) {
     return res
       .status(400)

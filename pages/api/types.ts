@@ -15,6 +15,7 @@ export type SuggestionsResponse = {
   etaMatrix: EtaMatrix;
   totalsByVenue: TotalsByVenue;
   votes: VotesByVenue;
+  votingClosesAt?: string | null;
   warning?: string;
 };
 
@@ -47,6 +48,7 @@ export type JoinRequest = {
   name: string;
   location: LatLng;
   venueCategory?: VenueCategory;
+  closeVotingInHours?: number;
 };
 
 export type SetManualVenuesRequest = {
@@ -102,6 +104,7 @@ export type GroupResponse = {
   venues: Venue[];
   manualVenues: Venue[];
   votes: VotesByVenue;
+  votingClosesAt?: string | null;
   venueCategory: VenueCategory | null;
   lockedVenue: LockedVenue | null;
   currentUserId?: string;

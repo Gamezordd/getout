@@ -28,6 +28,7 @@ type GroupPayload = {
   venues: Venue[];
   manualVenues: Venue[];
   votes: VotesByVenue;
+  votingClosesAt: string | null;
   pushSubscriptions?: Record<string, PushSubscriptionJSON>;
   sessionMembers: SessionMember[];
   suggestions: SuggestionsSnapshot;
@@ -49,6 +50,7 @@ const createEmptyGroup = (): GroupPayload => ({
   venues: [],
   manualVenues: [],
   votes: {},
+  votingClosesAt: null,
   pushSubscriptions: {},
   sessionMembers: [],
   suggestions: createEmptySuggestionsSnapshot(),
@@ -65,6 +67,7 @@ const getGroup = async (sessionId: string): Promise<GroupPayload> => {
     if (!Array.isArray(hydrated.users)) hydrated.users = [];
     if (!Array.isArray(hydrated.venues)) hydrated.venues = [];
     if (!hydrated.votes) hydrated.votes = {};
+    if (typeof hydrated.votingClosesAt !== "string") hydrated.votingClosesAt = null;
     if (!hydrated.pushSubscriptions) hydrated.pushSubscriptions = {};
     if (!Array.isArray(hydrated.sessionMembers)) hydrated.sessionMembers = [];
 

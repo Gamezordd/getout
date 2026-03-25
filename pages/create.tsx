@@ -13,12 +13,21 @@ const CATEGORY_OPTIONS: Array<{ value: VenueCategory; label: string }> = [
   { value: "brewery", label: "Breweries" },
 ];
 
+const CLOSE_VOTING_OPTIONS = Array.from({ length: 12 }, (_, index) => {
+  const hours = index + 1;
+  return {
+    value: hours,
+    label: `${hours} ${hours === 1 ? "hour" : "hours"}`,
+  };
+});
+
 function CreatePage() {
   const store = useAppStore();
   const router = useRouter();
   const [name, setName] = useState("");
   const [location, setLocation] = useState<PlaceResult | null>(null);
   const [category, setCategory] = useState<VenueCategory>("bar");
+  const [closeVotingInHours, setCloseVotingInHours] = useState(3);
   const [saveDetails, setSaveDetails] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
@@ -71,7 +80,12 @@ function CreatePage() {
       setSubmitting(true);
       setError(null);
       store.setSession(sessionId, "/");
-      await store.joinGroup(trimmedName, location.location, category);
+      await store.joinGroup(
+        trimmedName,
+        location.location,
+        category,
+        closeVotingInHours,
+      );
       if (saveDetails) {
         localStorage.setItem(
           "getout-user-details",
@@ -219,6 +233,23 @@ function CreatePage() {
               className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base shadow-sm focus:border-slate-400 focus:outline-none"
             >
               {CATEGORY_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="text-base font-semibold text-ink">
+              Close voting in?
+            </label>
+            <select
+              value={closeVotingInHours}
+              onChange={(event) => setCloseVotingInHours(Number(event.target.value))}
+              className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base shadow-sm focus:border-slate-400 focus:outline-none"
+            >
+              {CLOSE_VOTING_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
                 </option>

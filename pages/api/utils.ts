@@ -16,6 +16,7 @@ export const buildGroupResponse = (
   venues: group.venues,
   manualVenues: group.manualVenues,
   votes: group.votes,
+  votingClosesAt: group.votingClosesAt,
   venueCategory: group.venueCategory,
   lockedVenue: group.lockedVenue,
   currentUserId,

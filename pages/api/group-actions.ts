@@ -1,7 +1,6 @@
 import { NextApiRequest, NextApiResponse } from "next";
-import { GroupPayload, saveGroup } from "../../lib/groupStore";
+import { GroupPayload } from "../../lib/groupStore";
 import { User, Venue } from "../../lib/types";
-import { sendVenueLockedNotifications } from "../../lib/pushServer";
 import {
   recomputeSuggestionsForGroup,
   syncManualVenueMetricsForGroup,
@@ -15,6 +14,7 @@ import {
   SetManualVenuesRequest,
   UpdateUserRequest,
 } from "./types";
+import { lockVenueForGroup } from "./venue-lock";
 import { ALLOWED_CATEGORIES } from "./constants";
 import { buildAvatarUrl, buildGroupResponse, safeTrigger } from "./utils";
 
@@ -74,6 +74,26 @@ export const groupActions = (
     }
     if (!group.venueCategory && payload.venueCategory) {
       group.venueCategory = payload.venueCategory;
+    }
+
+    if (
+      group.users.length === 0 &&
+      group.sessionMembers.length === 0 &&
+      payload.closeVotingInHours !== undefined
+    ) {
+      const closeVotingInHours = Number(payload.closeVotingInHours);
+      if (
+        !Number.isInteger(closeVotingInHours) ||
+        closeVotingInHours < 1 ||
+        closeVotingInHours > 12
+      ) {
+        return res
+          .status(400)
+          .json({ message: "Voting close time must be between 1 and 12 hours." });
+      }
+      group.votingClosesAt = new Date(
+        Date.now() + closeVotingInHours * 60 * 60 * 1000,
+      ).toISOString();
     }
 
     const isOwner = group.sessionMembers.length === 0 && group.users.length === 0;
@@ -217,34 +237,12 @@ export const groupActions = (
       return res.status(404).json({ message: "Venue not found." });
     }
 
-    group.lockedVenue = {
-      id: venue.id,
-      name: venue.name,
-      address: venue.address,
-      lockedAt: new Date().toISOString(),
-    };
-    await saveGroup(payload.sessionId, group);
-    await safeTrigger(channel, "group-updated", {
-      reason: "venue-finalized",
-      venueId: venue.id,
-    });
-    await safeTrigger(channel, "venue-locked", {
-      venueId: venue.id,
-    });
-    const { staleUserIds } = await sendVenueLockedNotifications({
-      group,
+    await lockVenueForGroup({
       sessionId: payload.sessionId,
+      group,
+      venue,
       organizerId: actingMember.userId,
-      venueId: venue.id,
     });
-    if (staleUserIds.length > 0) {
-      staleUserIds.forEach((userId) => {
-        if (group.pushSubscriptions) {
-          delete group.pushSubscriptions[userId];
-        }
-      });
-      await saveGroup(payload.sessionId, group);
-    }
     return res.status(200).json(buildGroupResponse(group));
   },
 });

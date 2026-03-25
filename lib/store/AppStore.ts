@@ -18,6 +18,7 @@ type GroupPayload = {
   venues: Venue[];
   manualVenues?: Venue[];
   votes?: VotesByVenue;
+  votingClosesAt?: string | null;
   venueCategory?: VenueCategory | null;
   lockedVenue?: LockedVenue | null;
   currentUserId?: string;
@@ -30,6 +31,7 @@ type SuggestionsPayload = {
   etaMatrix: EtaMatrix;
   totalsByVenue: TotalsByVenue;
   votes?: VotesByVenue;
+  votingClosesAt?: string | null;
   warning?: string;
 };
 
@@ -60,6 +62,7 @@ export class AppStore {
   suggestedVenues: Venue[] = [];
   totalsByVenue: TotalsByVenue = {};
   votes: VotesByVenue = {};
+  votingClosesAt: string | null = null;
   venueCategory: VenueCategory | null = null;
   lockedVenue: LockedVenue | null = null;
   selectedVenueId: string | null = null;
@@ -143,6 +146,7 @@ export class AppStore {
   setSession(sessionId: string, pathname = "/") {
     this.sessionId = sessionId;
     this.venueCategory = null;
+    this.votingClosesAt = null;
     this.lockedVenue = null;
     this.currentUserId = null;
     this.isOwner = false;
@@ -184,6 +188,7 @@ export class AppStore {
         this.users = data.users || [];
         this.manualVenues = data.manualVenues || [];
         this.reconcileVotes(data.votes || {});
+        this.votingClosesAt = data.votingClosesAt || null;
         this.venueCategory = data.venueCategory || null;
         this.lockedVenue = data.lockedVenue || null;
         this.currentUserId = data.currentUserId || null;
@@ -232,6 +237,7 @@ export class AppStore {
         this.totalsByVenue = data.totalsByVenue || {};
         this.etaMatrix = data.etaMatrix || {};
         this.reconcileVotes(data.votes || {});
+        this.votingClosesAt = data.votingClosesAt || null;
         this.suggestionWarning = data.warning || null;
         this.isLoadingSuggestions = false;
         const hasSelected =
@@ -439,6 +445,7 @@ export class AppStore {
     name: string,
     location: LatLng,
     venueCategory?: VenueCategory,
+    closeVotingInHours?: number,
   ) {
     if (!this.sessionId || !this.browserId) {
       throw new Error("Missing session. Open this page from a group link.");
@@ -453,6 +460,7 @@ export class AppStore {
         name: name.trim(),
         location,
         venueCategory,
+        closeVotingInHours,
       }),
     });
     if (!response.ok) {
@@ -464,6 +472,7 @@ export class AppStore {
       this.users = data.users || [];
       this.manualVenues = data.manualVenues || [];
       this.reconcileVotes(data.votes || {});
+      this.votingClosesAt = data.votingClosesAt || null;
       this.venueCategory = data.venueCategory || null;
       this.lockedVenue = data.lockedVenue || null;
       this.currentUserId = data.currentUserId || null;
