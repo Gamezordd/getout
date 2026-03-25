@@ -77,6 +77,30 @@ const dedupeVenues = (venues: Venue[]) => {
   });
 };
 
+const getAreaFromAddressComponents = (components?: Array<{
+  longText?: string;
+  shortText?: string;
+  types?: string[];
+}>): string | undefined => {
+  if (!Array.isArray(components)) return undefined;
+
+  const preferredOrder = [
+    "sublocality_level_1",
+    "sublocality",
+    "neighborhood",
+    "administrative_area_level_2",
+    "administrative_area_level_1",
+  ];
+
+  for (const type of preferredOrder) {
+    const match = components.find((component) => component.types?.includes(type));
+    const value = match?.longText || match?.shortText;
+    if (value) return value;
+  }
+
+  return undefined;
+};
+
 const cloneEtaMatrix = (etaMatrix: EtaMatrix): EtaMatrix => {
   const next: EtaMatrix = {};
   Object.entries(etaMatrix || {}).forEach(([venueId, userMap]) => {
@@ -159,7 +183,7 @@ const fetchTopPlaces = async (
           "Content-Type": "application/json",
           "X-Goog-Api-Key": apiKey,
           "X-Goog-FieldMask":
-            "places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount",
+            "places.id,places.displayName,places.formattedAddress,places.addressComponents,places.location,places.rating,places.userRatingCount",
         },
         body: JSON.stringify({
           includedTypes: [venueCategory],
@@ -191,6 +215,7 @@ const fetchTopPlaces = async (
           id: place.id,
           name: place.displayName?.text || "Unknown place",
           address: place.formattedAddress,
+          area: getAreaFromAddressComponents(place.addressComponents),
           location: { lat: location.latitude, lng: location.longitude },
           rating: place.rating || 0,
           userRatingCount: place.userRatingCount || 0,

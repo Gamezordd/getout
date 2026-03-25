@@ -26,11 +26,14 @@ const DrawerContent = observer(function DrawerContent({
     manualVenues,
     currentUserId,
     selectedVenue,
+    mostEfficientVenueId,
     etaMatrix,
     votes,
     showSuggestedVenues,
     updateUserLocation,
     setSelectedVenue,
+    applyVote,
+    vote,
   } = useAppStore();
   const isLoading = isLoadingGroup || isLoadingSuggestions;
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
@@ -204,7 +207,15 @@ const DrawerContent = observer(function DrawerContent({
                 votes={votes}
                 users={users}
                 showSuggestedVenues={showSuggestedVenues}
+                currentUserId={currentUserId}
+                selectedVenueId={null}
+                mostEfficientVenueId={mostEfficientVenueId}
                 onSelect={setSelectedVenue}
+                onVote={(venueId) => {
+                  if (!currentUserId) return;
+                  applyVote(currentUserId, venueId);
+                  vote(venueId);
+                }}
               />
             )}
             {hasCurrentUserLocation &&
@@ -331,4 +342,3 @@ const DrawerContent = observer(function DrawerContent({
 });
 
 export default DrawerContent;
-

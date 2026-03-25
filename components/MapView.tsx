@@ -7,10 +7,12 @@ const DEFAULT_CENTER = { lng: -73.9857, lat: 40.7484 };
 
 type Props = {
   fitAllTrigger?: number;
+  resizeTrigger?: number;
 };
 
 const MapView = observer(function MapView({
   fitAllTrigger = 0,
+  resizeTrigger = 0,
 }: Props) {
   const {
     users,
@@ -119,6 +121,17 @@ const MapView = observer(function MapView({
       offset: [0, -offsetY],
     });
   }, [selectedVenueId]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const timeout = window.setTimeout(() => {
+      map.resize();
+    }, 0);
+
+    return () => window.clearTimeout(timeout);
+  }, [resizeTrigger]);
 
   return <div ref={containerRef} className="h-full w-full" />;
 });

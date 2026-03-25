@@ -5,6 +5,7 @@ export type PlaceResult = {
   id: string;
   name: string;
   address?: string;
+  area?: string;
   location: LatLng;
 };
 

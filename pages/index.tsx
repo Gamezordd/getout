@@ -1,18 +1,19 @@
 import { observer } from "mobx-react-lite";
 import { toast } from "sonner";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import BottomDrawer, { BottomDrawerHandle } from "../components/BottomDrawer";
 import { useAppStore } from "../lib/store/AppStoreProvider";
 import FinalizeDialog from "../components/FinalizeDialog";
 import { Header } from "../components/Header";
-import DrawerContent from "../components/DrawerContent";
 import LockedVenueDialog from "../components/LockedVenueDialog";
 import InviteDialog from "../components/InviteDialog";
 import usePusher from "../hooks/usePusher";
 import useRedirections from "../hooks/useRedirections";
 import useForegroundResume from "../hooks/useForegroundResume";
-import PickButton from "../components/PickButton";
-import { MapContainer } from "../components/MapContainer";
+import PlaceList from "../components/PlaceList";
+import ActivityStrip from "../components/ActivityStrip";
+import SessionSummary from "../components/SessionSummary";
+import MapStrip from "../components/MapStrip";
+import Loader from "../components/Loader";
 import { registerPushSubscription } from "../lib/pushClient";
 
 function HomePage() {
@@ -20,8 +21,6 @@ function HomePage() {
   const [showFinalizeDialog, setShowFinalizeDialog] = useState(false);
   const [showInviteDialog, setShowInviteDialog] = useState(false);
   const [inviteDialogTitle, setInviteDialogTitle] = useState("You're the first one here!");
-
-  const bottomSheetRef = useRef<BottomDrawerHandle>(null);
   const pushInitRef = useRef(false);
 
   const handleJoinEvent = useCallback(
@@ -46,7 +45,6 @@ function HomePage() {
 
   usePusher(handleJoinEvent, handleVoteEvent);
 
-  const {selectedVenue} = store;
   useRedirections();
   useForegroundResume(async () => {
     if (!store.sessionId) return;
@@ -54,21 +52,6 @@ function HomePage() {
     if (store.users.length === 0) return;
     await store.fetchSuggestions();
   });
-
-  const handleEditUser = useCallback(
-    (userId: string) => {
-      if (userId !== store.currentUserId) return;
-      bottomSheetRef.current?.snapTo("max");
-    },
-    [store.currentUserId],
-  );
-
-  useEffect(() => {
-    if (store.selectedVenue) {
-      bottomSheetRef.current?.snapTo("mid");
-    }
-  }, [store.selectedVenue]);
-
 
   useEffect(() => {
     store.loadGroup();
@@ -93,48 +76,88 @@ function HomePage() {
     return () => clearTimeout(timeout);
   }, [store, store.sessionId, store.users.length, store.manualVenues.length]);
 
-
-  const showVoteFooter =
-    !store.lockedVenue && store.hasCurrentUserLocation && store.selectedVenue;
+  const handleVote = useCallback(
+    (venueId: string) => {
+      if (!store.currentUserId) return;
+      if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+        navigator.vibrate(12);
+      }
+      store.setSelectedVenue(venueId);
+      store.applyVote(store.currentUserId, venueId);
+      store.vote(venueId);
+    },
+    [store],
+  );
 
   const errorBanner = useMemo(
     () => store.mapError || store.groupError || store.suggestionWarning,
     [store.groupError, store.mapError, store.suggestionWarning],
   );
 
-  if (!store.currentUser) {
+  if (!store.currentUser && !store.isLoadingGroup) {
     return null;
   }
 
   return (
-    <div className="relative flex flex-col h-full overflow-clip bg-mist">
+    <div className="min-h-full bg-[#0a0a0d] text-[#f0f0f5]">
       <Header
         onInviteClick={() => {
           setInviteDialogTitle("Leave no one behind!");
           setShowInviteDialog(true);
         }}
       />
-      <MapContainer onFinalizeClick={() => setShowFinalizeDialog(true)} />
+      <ActivityStrip />
 
       {errorBanner && (
-        <div className="pointer-events-none absolute inset-x-4 top-16 z-20 rounded-2xl bg-amber-50 px-4 py-3 text-xs text-amber-800">
+        <div className="mx-auto mt-3 max-w-[430px] rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-xs text-amber-100">
           {errorBanner}
         </div>
       )}
-      {!store.lockedVenue && (
-        <BottomDrawer
-          ref={bottomSheetRef}
-          bottomOffset={selectedVenue ? 280 : 0}
-          allowScroll={!selectedVenue}
-          render={(isExpanded) => (
-            <DrawerContent
-              isExpanded={isExpanded}
-              onEditUser={handleEditUser}
+
+      <main className="mx-auto flex w-full max-w-[430px] flex-1 flex-col px-4 pb-12 pt-4">
+        <SessionSummary onFinalizeClick={() => setShowFinalizeDialog(true)} />
+        {!store.lockedVenue && <MapStrip />}
+        <section className="mt-4 space-y-4">
+          {(store.isLoadingGroup || (store.isLoadingSuggestions && store.venues.length === 0)) && (
+            <Loader
+              variant="dark"
+              title={store.isLoadingGroup ? "Loading group..." : "Syncing..."}
+              description={
+                store.isLoadingGroup
+                  ? "Fetching members, votes, and venues."
+                  : "Pulling the latest votes and venue data."
+              }
             />
           )}
-        />
-      )}
-      {showVoteFooter && <PickButton />}
+
+          {!store.isLoadingGroup && store.isLoadingSuggestions && store.venues.length > 0 && (
+            <Loader
+              variant="dark"
+              title="Syncing..."
+              description="Refreshing votes and venue rankings without replacing your current view."
+              className="rounded-[20px] px-4 py-4"
+            />
+          )}
+
+          {store.venues.length > 0 && (
+            <PlaceList
+              suggestedVenues={store.suggestedVenues}
+              manualVenues={store.manualVenues}
+              totalsByVenue={store.totalsByVenue}
+              etaMatrix={store.etaMatrix}
+              votes={store.votes}
+              users={store.users}
+              showSuggestedVenues={store.showSuggestedVenues}
+              currentUserId={store.currentUserId}
+              selectedVenueId={store.selectedVenueId}
+              mostEfficientVenueId={store.mostEfficientVenueId}
+              onSelect={store.setSelectedVenue}
+              onVote={handleVote}
+            />
+          )}
+        </section>
+      </main>
+
       <FinalizeDialog
         showFinalizeDialog={showFinalizeDialog}
         setShowFinalizeDialog={setShowFinalizeDialog}

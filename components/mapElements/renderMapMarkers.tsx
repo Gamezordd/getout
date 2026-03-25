@@ -55,7 +55,6 @@ export default function renderMapMarkers(
   });
 
   useEffect(() => {
-    console.log("Updating map markers");
     const map = mapRef.current;
     const mapboxgl = mapboxRef.current;
     if (!map || !mapboxgl) return;
@@ -132,4 +131,3 @@ export default function renderMapMarkers(
     setSelectedVenue,
   ]);
 }
-

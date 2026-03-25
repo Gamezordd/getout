@@ -16,6 +16,7 @@ export type Venue = {
   name: string;
   location: LatLng;
   address?: string;
+  area?: string;
   rating?: number;
   userRatingCount?: number;
   addedByUserId?: string;

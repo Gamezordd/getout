@@ -272,6 +272,7 @@ export class AppStore {
     id: string;
     name: string;
     address?: string;
+    area?: string;
     location: LatLng;
   }) {
     if (!this.sessionId) return;
@@ -287,6 +288,7 @@ export class AppStore {
             id: place.id,
             name: place.name,
             address: place.address,
+            area: place.area,
             location: place.location,
             addedByUserId: this.currentUserId || undefined,
           },

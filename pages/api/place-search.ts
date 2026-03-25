@@ -5,7 +5,34 @@ type PlaceResult = {
   id: string;
   name: string;
   address?: string;
+  area?: string;
   location: LatLng;
+};
+
+const getAreaFromAddressComponents = (components?: Array<{
+  longText?: string;
+  shortText?: string;
+  types?: string[];
+}>): string | undefined => {
+  if (!Array.isArray(components)) return undefined;
+
+  const preferredOrder = [
+    "sublocality_level_1",
+    "sublocality",
+    "neighborhood",
+    "administrative_area_level_2",
+    "administrative_area_level_1",
+  ];
+
+  console.log("Address components:", components); 
+
+  for (const type of preferredOrder) {
+    const match = components.find((component) => component.types?.includes(type));
+    const value = match?.longText || match?.shortText;
+    if (value) return value;
+  }
+
+  return undefined;
 };
 
 type SearchResponse = {
@@ -33,7 +60,7 @@ const searchTextPlaces = async (
         "Content-Type": "application/json",
         "X-Goog-Api-Key": apiKey,
         "X-Goog-FieldMask":
-          "places.id,places.displayName,places.formattedAddress,places.location",
+          "places.id,places.displayName,places.formattedAddress,places.addressComponents,places.location",
       },
       body: JSON.stringify({
         textQuery: query,
@@ -59,6 +86,7 @@ const searchTextPlaces = async (
         name:
           place.displayName?.text || place.formattedAddress || "Unknown place",
         address: place.formattedAddress || undefined,
+        area: getAreaFromAddressComponents(place.addressComponents),
         location: {
           lat: location.latitude,
           lng: location.longitude,
@@ -101,6 +129,15 @@ const geocodeAddress = async (
       id: result.place_id,
       name: (result.formatted_address || "Unknown place").split(",")[0],
       address: result.formatted_address || undefined,
+      area: Array.isArray(result.address_components)
+        ? getAreaFromAddressComponents(
+            result.address_components.map((component: any) => ({
+              longText: component.long_name,
+              shortText: component.short_name,
+              types: component.types,
+            })),
+          )
+        : undefined,
       location: {
         lat: result.geometry?.location?.lat,
         lng: result.geometry?.location?.lng,
