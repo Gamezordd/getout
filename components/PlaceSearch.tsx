@@ -20,6 +20,7 @@ type Props = {
   selectedPlace?: PlaceResult | null;
   clearOnSelect?: boolean;
   resultFilter?: (place: PlaceResult) => boolean;
+  variant?: "light" | "dark";
 };
 
 export default function PlaceSearch({
@@ -30,12 +31,14 @@ export default function PlaceSearch({
   selectedPlace,
   clearOnSelect = false,
   resultFilter,
+  variant = "light",
 }: Props) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<PlaceResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const selectedDisplay = selectedPlace ? selectedPlace.name : "";
+  const isDark = variant === "dark";
 
   useEffect(() => {
     if (!selectedPlace) return;
@@ -101,21 +104,21 @@ export default function PlaceSearch({
   return (
     <div className="space-y-2">
       {label ? (
-        <label className="text-base font-semibold text-ink">{label}</label>
+        <label className={isDark ? "text-base font-semibold text-white/80" : "text-base font-semibold text-ink"}>{label}</label>
       ) : null}
       <div className="relative">
         <input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder={placeholder}
-          className={`w-full rounded-xl border bg-white text-base text-ink px-4 py-3 shadow-sm focus:border-slate-400 focus:outline-none ${
+          className={`w-full rounded-2xl border px-4 py-3 text-base focus:outline-none ${isDark ? "border-white/10 bg-[#141418] text-white placeholder:text-[#64647a] focus:border-white/25" : "bg-white text-ink shadow-sm focus:border-slate-400"} ${
             selectedPlace && query.trim() === selectedDisplay
-              ? "border-emerald-300 pr-10"
-              : "border-slate-200"
+              ? `${isDark ? "border-[#00e5a033] pr-10" : "border-emerald-300 pr-10"}`
+              : `${isDark ? "border-white/10" : "border-slate-200"}`
           }`}
         />
         {selectedPlace && query.trim() === selectedDisplay && (
-          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-emerald-500">
+          <span className={`pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 ${isDark ? "text-[#00e5a0]" : "text-emerald-500"}`}>
             <svg
               viewBox="0 0 20 20"
               fill="currentColor"
@@ -132,10 +135,10 @@ export default function PlaceSearch({
         )}
       </div>
       {selectedPlace && query.trim() === selectedDisplay && selectedPlace.address ? (
-        <p className="text-xs text-slate-500">{selectedPlace.address}</p>
+        <p className={isDark ? "text-xs text-[#64647a]" : "text-xs text-slate-500"}>{selectedPlace.address}</p>
       ) : null}
-      {loading && <p className="text-base text-slate-500">Searching…</p>}
-      {error && <p className="text-base text-red-600">{error}</p>}
+      {loading && <p className={isDark ? "text-sm text-[#64647a]" : "text-base text-slate-500"}>Searching…</p>}
+      {error && <p className={isDark ? "text-sm text-rose-300" : "text-base text-red-600"}>{error}</p>}
       {!selectedPlace || query.trim() !== selectedDisplay ? (
         <div className="space-y-2">
           {results.map((place) => (
@@ -147,10 +150,10 @@ export default function PlaceSearch({
               setQuery(clearOnSelect ? "" : place.name);
               setResults([]);
             }}
-              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-left text-base shadow-sm hover:border-slate-300"
+              className={`w-full rounded-2xl border px-4 py-3 text-left text-base ${isDark ? "border-white/10 bg-[#1c1c22] hover:border-white/20" : "border-slate-200 bg-white shadow-sm hover:border-slate-300"}`}
             >
-              <p className="font-semibold text-ink">{place.name}</p>
-              <p className="text-base text-slate-500">{place.address}</p>
+              <p className={isDark ? "font-semibold text-white" : "font-semibold text-ink"}>{place.name}</p>
+              <p className={isDark ? "text-sm text-[#64647a]" : "text-base text-slate-500"}>{place.address}</p>
             </button>
           ))}
         </div>

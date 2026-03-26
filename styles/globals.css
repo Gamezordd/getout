@@ -40,3 +40,43 @@ button {
 .font-display {
   font-family: "Syne", sans-serif;
 }
+
+@keyframes getoutTicker {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes getoutScanLine {
+  0% {
+    top: 0%;
+    opacity: 0;
+  }
+
+  5% {
+    opacity: 0.5;
+  }
+
+  95% {
+    opacity: 0.5;
+  }
+
+  100% {
+    top: 60%;
+    opacity: 0;
+  }
+}
+
+@keyframes getoutCollageFloat {
+  from {
+    transform: scale(1.02);
+  }
+
+  to {
+    transform: scale(1.12);
+  }
+}

@@ -1,26 +1,10 @@
 import { observer } from "mobx-react-lite";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
-import PlaceSearch, { PlaceResult } from "../components/PlaceSearch";
-import TranslucentSelect from "../components/TranslucentSelect";
+import { CreateGroupForm, EntryShell } from "../components/entry/EntryFlow";
+import { PlaceResult } from "../components/PlaceSearch";
 import { useAppStore } from "../lib/store/AppStoreProvider";
 import type { VenueCategory } from "../lib/types";
-
-const CATEGORY_OPTIONS: Array<{ value: VenueCategory; label: string }> = [
-  { value: "bar", label: "Bars" },
-  { value: "restaurant", label: "Restaurants" },
-  { value: "cafe", label: "Cafes" },
-  { value: "night_club", label: "Night clubs" },
-  { value: "brewery", label: "Breweries" },
-];
-
-const CLOSE_VOTING_OPTIONS = Array.from({ length: 12 }, (_, index) => {
-  const hours = index + 1;
-  return {
-    value: hours,
-    label: `${hours} ${hours === 1 ? "hour" : "hours"}`,
-  };
-});
 
 function CreatePage() {
   const store = useAppStore();
@@ -47,10 +31,7 @@ function CreatePage() {
     const stored = localStorage.getItem("getout-user-details");
     if (!stored) return;
     try {
-      const payload = JSON.parse(stored) as {
-        name?: string;
-        place?: PlaceResult;
-      };
+      const payload = JSON.parse(stored) as { name?: string; place?: PlaceResult };
       if (payload?.name) setName(payload.name);
       if (payload?.place) setLocation(payload.place);
     } catch {
@@ -81,12 +62,7 @@ function CreatePage() {
       setSubmitting(true);
       setError(null);
       store.setSession(sessionId, "/");
-      await store.joinGroup(
-        trimmedName,
-        location.location,
-        category,
-        closeVotingInHours,
-      );
+      await store.joinGroup(trimmedName, location.location, category, closeVotingInHours);
       if (saveDetails) {
         localStorage.setItem(
           "getout-user-details",
@@ -143,131 +119,37 @@ function CreatePage() {
   };
 
   return (
-    <main className="min-h-screen bg-mist px-4 pb-8 pt-6">
-      <div className="mx-auto max-w-md rounded-3xl bg-white p-5 shadow-sm">
-        <div className="flex items-center justify-between">
-          <h1 className="text-base font-bold text-ink">GetOut</h1>
-        </div>
-        <p className="mt-2 text-base font-semibold text-slate-500">
-          Lets pick today's spot. Fast.
-        </p>
-
-        <div className="mt-4 space-y-4">
-          <div>
-            <label className="text-base font-semibold text-ink">
-              Your name
-            </label>
-            <div className="relative mt-2">
-              <input
-                value={name}
-                onChange={(event) => {
-                  setName(event.target.value);
-                  setError(null);
-                }}
-                placeholder="Type your name"
-                className={`w-full rounded-xl border bg-white px-4 py-3 text-base shadow-sm focus:border-slate-400 focus:outline-none ${
-                  isNameValid ? "border-emerald-300 pr-10" : "border-slate-200"
-                }`}
-              />
-              {isNameValid && (
-                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-emerald-500">
-                  <svg
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                    aria-hidden="true"
-                    className="h-4 w-4"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M16.704 5.29a1 1 0 0 1 0 1.415l-7.5 7.5a1 1 0 0 1-1.415 0l-3-3a1 1 0 1 1 1.415-1.415l2.293 2.293 6.793-6.793a1 1 0 0 1 1.414 0z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                </span>
-              )}
-            </div>
-            {nameTooShort && (
-              <p className="mt-2 text-sm text-red-600">
-                Name must be at least 3 characters.
-              </p>
-            )}
-            {nameTaken && (
-              <p className="mt-2 text-sm text-red-600">
-                That name is already taken in this group.
-              </p>
-            )}
-          </div>
-
-          <div className="flex items-center justify-between">
-            <label className="text-base font-semibold text-ink">
-              Your location
-            </label>
-            <button
-              type="button"
-              onClick={handleDetectLocation}
-              disabled={locating}
-              className="text-xs font-semibold text-blue-500 hover:text-blue-600 disabled:opacity-60"
-            >
-              {locating ? "Detecting..." : "Detect location"}
-            </button>
-          </div>
-          <PlaceSearch
-            label=""
-            placeholder="Search for your neighborhood"
-            selectedPlace={location}
-            onSelect={(place) => {
-              setLocation(place);
-              setLocationError(null);
-              setError(null);
-            }}
-          />
-
-          <TranslucentSelect
-            label="Looking for"
-            value={category}
-            onChange={(event) =>
-              setCategory(event.target.value as VenueCategory)
-            }
-            options={CATEGORY_OPTIONS}
-            variant="light"
-          />
-
-          <TranslucentSelect
-            label="Close voting in?"
-            value={closeVotingInHours}
-            onChange={(event) =>
-              setCloseVotingInHours(Number(event.target.value))
-            }
-            options={CLOSE_VOTING_OPTIONS}
-            variant="light"
-          />
-
-          {locationError && (
-            <p className="text-base text-red-600">{locationError}</p>
-          )}
-          {error && <p className="text-base text-red-600">{error}</p>}
-
-          <label className="flex items-center gap-3 text-xs text-slate-500">
-            <input
-              type="checkbox"
-              checked={saveDetails}
-              onChange={(event) => setSaveDetails(event.target.checked)}
-              className="h-4 w-4 rounded border-slate-300 text-ink"
-            />
-            Save my details for next time
-          </label>
-
-          <button
-            type="button"
-            onClick={handleCreate}
-            disabled={submitting}
-            className="w-full rounded-full bg-ink px-5 py-3 text-base font-semibold text-white disabled:opacity-60"
-          >
-            {submitting ? "Suii..." : "Start Picking"}
-          </button>
-        </div>
-      </div>
-    </main>
+    <EntryShell>
+      <CreateGroupForm
+        name={name}
+        setName={(value) => {
+          setName(value);
+          setError(null);
+        }}
+        location={location}
+        setLocation={(place) => {
+          setLocation(place);
+          setLocationError(null);
+          setError(null);
+        }}
+        category={category}
+        setCategory={setCategory}
+        closeVotingInHours={closeVotingInHours}
+        setCloseVotingInHours={setCloseVotingInHours}
+        saveDetails={saveDetails}
+        setSaveDetails={setSaveDetails}
+        error={error}
+        locationError={locationError}
+        submitting={submitting}
+        locating={locating}
+        nameTooShort={nameTooShort}
+        nameTaken={nameTaken}
+        isNameValid={isNameValid}
+        onDetectLocation={handleDetectLocation}
+        onSubmit={handleCreate}
+        onBack={() => router.push("/landing")}
+      />
+    </EntryShell>
   );
 }
 
