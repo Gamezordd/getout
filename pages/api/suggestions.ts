@@ -90,7 +90,6 @@ const getAreaFromAddressComponents = (components?: Array<{
   if (!Array.isArray(components)) return undefined;
 
   const preferredOrder = [
-    "locality",
     "sublocality_level_1",
     "sublocality",
     "neighborhood",
