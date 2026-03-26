@@ -1,5 +1,5 @@
 import { observer } from "mobx-react-lite";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAppStore } from "../lib/store/AppStoreProvider";
 
 const AVATAR_TONES = [
@@ -37,10 +37,7 @@ const ActivityStrip = observer(function ActivityStrip() {
   const [nowMs, setNowMs] = useState(() => Date.now());
   const deadlineSyncKeyRef = useRef<string | null>(null);
 
-  const totalVotes = useMemo(
-    () => Object.values(store.votes || {}).reduce((sum, ids) => sum + ids.length, 0),
-    [store.votes],
-  );
+  const totalVotes = store.totalVisibleVoteCount;
 
   const statusCopy =
     store.manualVenues.length > 0
@@ -48,7 +45,7 @@ const ActivityStrip = observer(function ActivityStrip() {
           store.manualVenues.length === 1 ? "spot" : "spots"
         } added`
       : totalVotes > 0
-        ? `${totalVotes} ${totalVotes === 1 ? "vote" : "votes"} cast`
+        ? `${store.totalVisibleVoteCountLabel} ${totalVotes === 1 ? "vote" : "votes"} cast`
         : "Waiting for the first vote";
 
   const deadlineMs = store.votingClosesAt ? Date.parse(store.votingClosesAt) : null;
@@ -99,12 +96,12 @@ const ActivityStrip = observer(function ActivityStrip() {
       <div className="mx-auto flex max-w-[430px] items-center gap-3">
         <div className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-[#ff3b5c] animate-pulse" />
         <p className="min-w-0 flex flex-1 text-xs text-[#8b8b9c] gap-1">
-          <div className="items-center gap-1 flex min-h-0">
+          <span className="flex min-h-0 items-center gap-1">
             <span className="font-medium text-[#f0f0f5]">
               {store.users.length} {store.users.length === 1 ? "person" : "people"}
             </span>{" "}
             deciding now · {statusCopy}
-          </div>
+          </span>
           {countdownLabel && (
             <>
               {" · "}

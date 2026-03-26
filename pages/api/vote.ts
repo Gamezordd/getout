@@ -1,6 +1,7 @@
 ﻿import type { NextApiRequest, NextApiResponse } from "next";
 import type { VotesByVenue } from "../../lib/types";
 import { getGroup, saveGroup } from "../../lib/groupStore";
+import { mergeVenues } from "../../lib/mergeVenues";
 import { pusher } from "../../lib/pusherServer";
 import { sendVoteNotifications } from "../../lib/pushServer";
 import { ensureVotingDeadlineState } from "./venue-lock";
@@ -45,6 +46,18 @@ export default async function handler(
       .status(400)
       .json({ message: "Voting is closed. Venue already finalized." });
   }
+
+  const visibleVenueIds = new Set(
+    mergeVenues(
+      group.suggestions?.suggestedVenues || [],
+      group.manualVenues || [],
+      true,
+    ).mergedVenues.map((venue) => venue.id),
+  );
+  if (!visibleVenueIds.has(payload.venueId)) {
+    return res.status(400).json({ message: "Selected venue is no longer available." });
+  }
+
   const votes: VotesByVenue = group.votes || {};
 
   // Remove existing vote from any venue.

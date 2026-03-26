@@ -1,5 +1,4 @@
 import { observer } from "mobx-react-lite";
-import { useMemo } from "react";
 import { useAppStore } from "../lib/store/AppStoreProvider";
 
 type Props = {
@@ -17,10 +16,7 @@ const CATEGORY_LABELS = {
 const SessionSummary = observer(function SessionSummary({ onFinalizeClick }: Props) {
   const store = useAppStore();
 
-  const totalVotes = useMemo(
-    () => Object.values(store.votes || {}).reduce((sum, ids) => sum + ids.length, 0),
-    [store.votes],
-  );
+  const totalVotes = store.totalVisibleVoteCount;
 
   const canFinalize =
     store.isCurrentUserOrganizer &&
@@ -32,8 +28,8 @@ const SessionSummary = observer(function SessionSummary({ onFinalizeClick }: Pro
     : "Planning session";
 
   const summaryText = store.isLoadingSuggestions
-    ? `${totalVotes}/${store.users.length || 0} voted · Syncing...`
-    : `${totalVotes}/${store.users.length || 0} voted`;
+    ? `${store.totalVisibleVoteCountLabel}/${store.users.length || 0} voted · Syncing...`
+    : `${store.totalVisibleVoteCountLabel}/${store.users.length || 0} voted`;
 
   return (
     <section className="rounded-[24px] border border-white/10 bg-[#141418] px-4 py-4 shadow-[0_20px_50px_rgba(0,0,0,0.25)]">

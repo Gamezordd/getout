@@ -1,22 +1,15 @@
 import { GroupPayload, saveGroup } from "../../lib/groupStore";
+import { mergeVenues } from "../../lib/mergeVenues";
 import { sendVenueLockedNotifications } from "../../lib/pushServer";
 import type { Venue } from "../../lib/types";
 import { safeTrigger } from "./utils";
 
-const dedupeVenues = (venues: Venue[]) => {
-  const seen = new Set<string>();
-  return venues.filter((venue) => {
-    if (seen.has(venue.id)) return false;
-    seen.add(venue.id);
-    return true;
-  });
-};
-
 const getRankedVenuesForLock = (group: GroupPayload) =>
-  dedupeVenues([
-    ...(group.suggestions?.suggestedVenues || []),
-    ...(group.manualVenues || []),
-  ]);
+  mergeVenues(
+    group.suggestions?.suggestedVenues || [],
+    group.manualVenues || [],
+    true,
+  ).mergedVenues;
 
 export const getAutoLockVenue = (group: GroupPayload): Venue | null => {
   const rankedVenues = getRankedVenuesForLock(group);

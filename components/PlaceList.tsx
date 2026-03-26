@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { mergeVenues } from "../lib/mergeVenues";
 import VenueCard from "./VenueCard";
 import type { EtaMatrix, TotalsByVenue, User, Venue, VotesByVenue } from "../lib/types";
 
@@ -39,22 +40,10 @@ export default function PlaceList({
   onSelect,
   onVote,
 }: Props) {
-  const suggestedIndex = useMemo(() => {
-    const index = new Map<string, number>();
-    suggestedVenues.forEach((venue, idx) => index.set(venue.id, idx + 1));
-    return index;
-  }, [suggestedVenues]);
-
-  const rankedVenues = useMemo(() => {
-    const visibleSuggested = showSuggestedVenues ? suggestedVenues : [];
-    const list = [...visibleSuggested, ...manualVenues];
-    return list
-      .map((venue) => ({
-        venue,
-        total: totalsByVenue?.[venue.id],
-      }))
-      .map((entry) => entry.venue);
-  }, [manualVenues, showSuggestedVenues, suggestedVenues, totalsByVenue]);
+  const { mergedVenues: rankedVenues, suggestedRankById } = useMemo(
+    () => mergeVenues(suggestedVenues, manualVenues, showSuggestedVenues),
+    [manualVenues, showSuggestedVenues, suggestedVenues],
+  );
 
   const userById = useMemo(
     () => new Map(users.map((user) => [user.id, user])),
@@ -87,9 +76,7 @@ export default function PlaceList({
   const voterIdsByVenue = useMemo(() => new Map(Object.entries(votes || {})), [votes]);
 
   const medalNoteByVenue = useMemo(() => {
-    const visibleSuggested = showSuggestedVenues ? suggestedVenues : [];
-    const visibleVenues = [...visibleSuggested, ...manualVenues];
-    const ranked = visibleVenues
+    const ranked = rankedVenues
       .map((venue) => ({
         venueId: venue.id,
         total: totalsByVenue?.[venue.id],
@@ -114,7 +101,7 @@ export default function PlaceList({
       noteByVenue.set(entry.venueId, "Worth considering");
     });
     return noteByVenue;
-  }, [manualVenues, showSuggestedVenues, suggestedVenues, totalsByVenue]);
+  }, [rankedVenues, totalsByVenue]);
 
   const addedByNameByVenue = useMemo(() => {
     const map = new Map<string, string>();
@@ -139,8 +126,8 @@ export default function PlaceList({
   return (
     <div className="flex flex-col gap-4">
       {rankedVenues.map((venue) => {
-        const badge = suggestedIndex.get(venue.id)
-          ? { text: String(suggestedIndex.get(venue.id)), tone: "ranked" as const }
+        const badge = suggestedRankById.get(venue.id)
+          ? { text: String(suggestedRankById.get(venue.id)), tone: "ranked" as const }
           : { text: "M", tone: "manual" as const };
 
         const voterIds = voterIdsByVenue.get(venue.id) || [];

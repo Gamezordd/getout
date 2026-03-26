@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { observer } from "mobx-react-lite";
+import { mergeVenues } from "../lib/mergeVenues";
 import { useAppStore } from "../lib/store/AppStoreProvider";
 import renderMapMarkers from "./mapElements/renderMapMarkers";
 
@@ -18,8 +19,9 @@ const MapView = observer(function MapView({
 }: Props) {
   const {
     users,
-    topVenues: suggestedVenues,
+    suggestedVenues,
     manualVenues,
+    venues,
     showSuggestedVenues,
     selectedVenueId,
     setSelectedVenue: onSelectVenue,
@@ -91,19 +93,20 @@ const MapView = observer(function MapView({
     const mapboxgl = mapboxRef.current;
     if (!map || !mapboxgl) return;
 
+    const visibleVenues = showSuggestedVenues
+      ? venues
+      : mergeVenues(suggestedVenues, manualVenues, false).mergedVenues;
+
     const points = [
       ...users.map((user) => user.location),
-      ...(showSuggestedVenues
-        ? suggestedVenues.map((venue) => venue.location)
-        : []),
-      ...manualVenues.map((venue) => venue.location),
+      ...visibleVenues.map((venue) => venue.location),
     ];
     if (points.length === 0) return;
 
     const bounds = new mapboxgl.LngLatBounds();
     points.forEach((point) => bounds.extend([point.lng, point.lat]));
     map.fitBounds(bounds, { padding: 80, maxZoom: 14, duration: 700 });
-  }, [fitAllTrigger, users, suggestedVenues, manualVenues, showSuggestedVenues]);
+  }, [fitAllTrigger, users, venues, suggestedVenues, manualVenues, showSuggestedVenues]);
 
   useEffect(() => {
     const map = mapRef.current;

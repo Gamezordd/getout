@@ -13,7 +13,7 @@ const GroupSettingsDialog = observer(function GroupSettingsDialog({
 }: Props) {
   const store = useAppStore();
   const venueById = new Map<string, { name: string }>();
-  [...store.venues, ...store.manualVenues].forEach((venue) => {
+  [...store.manualVenues, ...store.suggestedVenues, ...store.venues].forEach((venue) => {
     venueById.set(venue.id, { name: venue.name });
   });
 

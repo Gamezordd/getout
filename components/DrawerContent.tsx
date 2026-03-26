@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { observer } from "mobx-react-lite";
 import { formatCompactCount } from "../lib/formatCount";
+import { mergeVenues } from "../lib/mergeVenues";
 import { useAppStore } from "../lib/store/AppStoreProvider";
 import Dialog from "./Dialog";
 import PlaceSearch, { PlaceResult } from "./PlaceSearch";
@@ -59,16 +60,13 @@ const DrawerContent = observer(function DrawerContent({
     setEditingUserId(null);
   };
 
-  const suggestedIndex = useMemo(() => {
-    const index = new Map<string, number>();
-    suggestedVenues.forEach((venue, idx) => index.set(venue.id, idx + 1));
-    return index;
-  }, [suggestedVenues]);
+  const { mergedVenues, suggestedRankById } = useMemo(
+    () => mergeVenues(suggestedVenues, manualVenues, showSuggestedVenues),
+    [manualVenues, showSuggestedVenues, suggestedVenues],
+  );
   const medalNote = useMemo(() => {
     if (!selectedVenue) return null;
-    const visibleSuggested = showSuggestedVenues ? suggestedVenues : [];
-    const visibleVenues = [...visibleSuggested, ...manualVenues];
-    const ranked = visibleVenues
+    const ranked = mergedVenues
       .map((venue) => ({
         venueId: venue.id,
         total: totalsByVenue?.[venue.id],
@@ -85,10 +83,8 @@ const DrawerContent = observer(function DrawerContent({
     if (index === 1) return "🥈 Second best based on ratings and travel time";
     return "🥉 Third best based on ratings and travel time";
   }, [
-    manualVenues,
+    mergedVenues,
     selectedVenue,
-    showSuggestedVenues,
-    suggestedVenues,
     totalsByVenue,
   ]);
 
@@ -160,9 +156,9 @@ const DrawerContent = observer(function DrawerContent({
           {selectedVenue ? (
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center flex-grow gap-2">
-                {suggestedIndex.get(selectedVenue.id) ? (
+                {suggestedRankById.get(selectedVenue.id) ? (
                   <div className="flex h-7 w-8 items-center justify-center rounded-full bg-ink text-xs font-bold text-white">
-                    {suggestedIndex.get(selectedVenue.id)}
+                    {suggestedRankById.get(selectedVenue.id)}
                   </div>
                 ) : (
                   <div className="flex h-7 w-7 items-center justify-center rounded-full bg-sun text-[9px] font-semibold text-ink">

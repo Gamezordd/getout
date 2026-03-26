@@ -10,6 +10,8 @@ import type {
   VotesByVenue,
 } from "../types";
 import { shareLinkText } from "../constants";
+import { formatCompactCount } from "../formatCount";
+import { mergeVenues } from "../mergeVenues";
 
 const BROWSER_ID_KEY = "getout-id";
 
@@ -93,11 +95,25 @@ export class AppStore {
   }
 
   get uniqueVoterCount() {
+    const visibleVenueIds = new Set(this.venues.map((venue) => venue.id));
     const unique = new Set<string>();
-    Object.values(this.votes || {}).forEach((voterIds) => {
+    Object.entries(this.votes || {}).forEach(([venueId, voterIds]) => {
+      if (!visibleVenueIds.has(venueId)) return;
       voterIds.forEach((id) => unique.add(id));
     });
     return unique.size;
+  }
+
+  get totalVisibleVoteCount() {
+    const visibleVenueIds = new Set(this.venues.map((venue) => venue.id));
+    return Object.entries(this.votes || {}).reduce((sum, [venueId, voterIds]) => {
+      if (!visibleVenueIds.has(venueId)) return sum;
+      return sum + voterIds.length;
+    }, 0);
+  }
+
+  get totalVisibleVoteCountLabel() {
+    return formatCompactCount(this.totalVisibleVoteCount);
   }
 
   get hasFinalizeQuorum() {
@@ -125,7 +141,7 @@ export class AppStore {
   }
 
   get topVenues() {
-    return this.suggestedVenues;
+    return this.venues;
   }
 
   get mostEfficientVenueId() {
@@ -184,9 +200,15 @@ export class AppStore {
         throw new Error(payload.message || "Unable to load group.");
       }
       const data = (await response.json()) as GroupPayload;
+      const mergedVenueState = mergeVenues(
+        this.suggestedVenues,
+        data.manualVenues || [],
+        this.showSuggestedVenues,
+      );
       runInAction(() => {
         this.users = data.users || [];
         this.manualVenues = data.manualVenues || [];
+        this.venues = mergedVenueState.mergedVenues;
         this.reconcileVotes(data.votes || {});
         this.votingClosesAt = data.votingClosesAt || null;
         this.venueCategory = data.venueCategory || null;
@@ -231,8 +253,13 @@ export class AppStore {
         throw new Error(payload.message || "Unable to fetch suggestions.");
       }
       const data = (await response.json()) as SuggestionsPayload;
+      const mergedVenueState = mergeVenues(
+        data.suggestedVenues || [],
+        this.manualVenues,
+        this.showSuggestedVenues,
+      );
       runInAction(() => {
-        this.venues = data.venues || [];
+        this.venues = mergedVenueState.mergedVenues;
         this.suggestedVenues = data.suggestedVenues || [];
         this.totalsByVenue = data.totalsByVenue || {};
         this.etaMatrix = data.etaMatrix || {};
@@ -508,6 +535,11 @@ export class AppStore {
 
   toggleSuggestedVenues() {
     this.showSuggestedVenues = !this.showSuggestedVenues;
+    this.venues = mergeVenues(
+      this.suggestedVenues,
+      this.manualVenues,
+      this.showSuggestedVenues,
+    ).mergedVenues;
   }
 
   setMapError(message: string | null) {

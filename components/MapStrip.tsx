@@ -58,7 +58,7 @@ const MapStrip = observer(function MapStrip() {
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#141418] via-transparent to-[#141418]" />
         )}
         <div className="pointer-events-none absolute bottom-3 right-3 rounded-full border border-white/10 bg-black/50 px-2.5 py-1 text-[11px] font-medium text-white/80 backdrop-blur">
-          {store.showSuggestedVenues ? "Suggested + manual" : "Manual only"}
+          {store.showSuggestedVenues ? "Merged venues" : "Manual only"}
         </div>
       </div>
     </section>
