@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { formatCompactCount } from "../lib/formatCount";
 import type { User, Venue } from "../lib/types";
+import ImageLightbox from "./ImageLightbox";
 
 type VoteSummary = {
   count: number;
@@ -74,10 +75,24 @@ export default function VenueCard({
   const photos = Array.isArray(venue.photos) ? venue.photos.slice(0, 5) : [];
   const firstPhoto = photos[0] || null;
   const [activePhoto, setActivePhoto] = useState<string | null>(firstPhoto);
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+  const [lightboxDirection, setLightboxDirection] = useState(0);
 
   useEffect(() => {
     setActivePhoto(firstPhoto);
   }, [venue.id, firstPhoto]);
+
+  useEffect(() => {
+    if (!activePhoto) {
+      setLightboxIndex(0);
+      return;
+    }
+    const nextIndex = photos.findIndex((photo) => photo === activePhoto);
+    if (nextIndex >= 0) {
+      setLightboxIndex(nextIndex);
+    }
+  }, [activePhoto, photos]);
 
   const sortedUsers = users
     .map((user) => ({
@@ -106,34 +121,56 @@ export default function VenueCard({
   )}`;
   const showPhotoHero = Boolean(activePhoto);
 
+  const openLightbox = () => {
+    const nextIndex = activePhoto
+      ? Math.max(photos.findIndex((photo) => photo === activePhoto), 0)
+      : 0;
+    setLightboxDirection(0);
+    setLightboxIndex(nextIndex);
+    setIsLightboxOpen(true);
+  };
+
+  const navigateLightbox = (direction: number) => {
+    setLightboxIndex((current) => {
+      const nextIndex = Math.min(Math.max(current + direction, 0), photos.length - 1);
+      if (nextIndex === current) return current;
+      setLightboxDirection(direction);
+      setActivePhoto(photos[nextIndex] || activePhoto);
+      return nextIndex;
+    });
+  };
+
   return (
-    <article
-      className={`overflow-hidden rounded-[24px] border bg-[#141418] shadow-[0_18px_40px_rgba(0,0,0,0.22)] transition ${
-        isSelected
-          ? "border-[#00e5a0]/60"
-          : isWinner
-            ? "border-[#00e5a0]/25"
-            : "border-white/10"
-      }`}
-    >
+    <>
+      <article
+        className={`overflow-hidden rounded-[24px] border bg-[#141418] shadow-[0_18px_40px_rgba(0,0,0,0.22)] transition ${
+          isSelected
+            ? "border-[#00e5a0]/60"
+            : isWinner
+              ? "border-[#00e5a0]/25"
+              : "border-white/10"
+        }`}
+      >
       {showPhotoHero && (
         <div
           role="button"
           tabIndex={0}
-          onClick={onSelect}
+          onClick={openLightbox}
           onKeyDown={(event) => {
             if (event.key === "Enter" || event.key === " ") {
               event.preventDefault();
-              onSelect();
+              openLightbox();
             }
           }}
-          className="relative h-[200px] overflow-hidden bg-[#1a1a22]"
+          style={{width: 'calc(100% - 1px)'}}
+          className="relative h-[212px] rounded-[24px] overflow-hidden bg-[#1a1a22]"
         >
           <img
             src={activePhoto || undefined}
             alt={venue.name}
             loading="lazy"
             className="h-full w-full object-cover"
+            
           />
           <div className="absolute inset-0 bg-gradient-to-t from-[rgba(10,10,14,0.92)] via-[rgba(10,10,14,0.3)] to-transparent" />
           <div className="absolute left-4 top-4">
@@ -355,6 +392,17 @@ export default function VenueCard({
           </button>
         </div>
       </div>
-    </article>
+      </article>
+
+      <ImageLightbox
+        photos={photos}
+        currentIndex={lightboxIndex}
+        direction={lightboxDirection}
+        isOpen={isLightboxOpen}
+        title={venue.name}
+        onClose={() => setIsLightboxOpen(false)}
+        onNavigate={navigateLightbox}
+      />
+    </>
   );
 }
