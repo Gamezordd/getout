@@ -301,7 +301,7 @@ export default function VenueCard({
       <div className="mx-4 rounded-[18px] bg-[#1c1c22] px-4 py-3">
         <div className="mb-3 flex items-center justify-between">
           <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[#727287]">
-            Travel times
+            🚗 Travel times
           </p>
           <p className="font-display text-base font-bold text-[#f0f0f5]">
             {getTravelRange(etaByUser)}
@@ -388,7 +388,7 @@ export default function VenueCard({
                 : "bg-[#00e5a0] text-black"
             }`}
           >
-            {hasCurrentUserVote ? "Picked" : "Vote"}
+            {hasCurrentUserVote ? "Picked" : "👉 Pick"}
           </button>
         </div>
       </div>

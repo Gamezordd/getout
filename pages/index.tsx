@@ -14,6 +14,7 @@ import ActivityStrip from "../components/ActivityStrip";
 import SessionSummary from "../components/SessionSummary";
 import MapStrip from "../components/MapStrip";
 import Loader from "../components/Loader";
+import VotingCountdown from "../components/VotingCountdown";
 import { registerPushSubscription } from "../lib/pushClient";
 
 function HomePage() {
@@ -131,6 +132,7 @@ function HomePage() {
       )}
 
       <main className="mx-auto flex w-full max-w-[430px] flex-1 flex-col px-4 pb-28 pt-4">
+        <VotingCountdown />
         <SessionSummary />
         {!store.lockedVenue && <MapStrip />}
         <section className="mt-4 space-y-4">
@@ -196,7 +198,7 @@ function HomePage() {
                 </p>
               </div>
               <span className="ml-3 shrink-0 rounded-full bg-[#00e5a0] px-3 py-2 text-xs font-bold text-black">
-                Lock
+                Finalize Now 🎯
               </span>
             </button>
           </div>
