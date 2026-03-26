@@ -1,10 +1,6 @@
 import { observer } from "mobx-react-lite";
 import { useAppStore } from "../lib/store/AppStoreProvider";
 
-type Props = {
-  onFinalizeClick: () => void;
-};
-
 const CATEGORY_LABELS = {
   bar: "Bars",
   restaurant: "Restaurants",
@@ -37,13 +33,8 @@ const getTitleTimeLabel = (votingClosesAt: string | null) => {
   return decisionTime.getHours() >= 17 ? "tonight" : "today";
 };
 
-const SessionSummary = observer(function SessionSummary({ onFinalizeClick }: Props) {
+const SessionSummary = observer(function SessionSummary() {
   const store = useAppStore();
-
-  const canFinalize =
-    store.isCurrentUserOrganizer &&
-    store.hasFinalizeQuorum &&
-    !store.lockedVenue;
 
   const categoryEmoji = store.venueCategory
     ? CATEGORY_EMOJIS[store.venueCategory][
@@ -72,18 +63,6 @@ const SessionSummary = observer(function SessionSummary({ onFinalizeClick }: Pro
           <span className="text-[#00e5a0]">{summaryText}</span>
         </div>
       </div>
-
-      {canFinalize && (
-        <div className="mt-4 flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={onFinalizeClick}
-            className="inline-flex items-center gap-2 rounded-full bg-[#00e5a0] px-3 py-2 text-xs font-bold text-black"
-          >
-            Finalize venue
-          </button>
-        </div>
-      )}
     </section>
   );
 });

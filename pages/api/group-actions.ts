@@ -222,15 +222,6 @@ export const groupActions = (
         .status(403)
         .json({ message: "Only organizer can finalize a venue." });
     }
-    const votedVenueIds = Object.keys(group.votes || {}).filter(
-      (venueId) => (group.votes[venueId] || []).length > 0,
-    );
-    if (!votedVenueIds.includes(payload.venueId)) {
-      return res
-        .status(400)
-        .json({ message: "Selected venue does not have votes." });
-    }
-
     const allVenues = [...group.manualVenues, ...group.venues];
     const venue = allVenues.find((item) => item.id === payload.venueId);
     if (!venue) {

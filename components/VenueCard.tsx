@@ -127,7 +127,7 @@ export default function VenueCard({
               onSelect();
             }
           }}
-          className="relative h-[208px] overflow-hidden bg-[#1a1a22]"
+          className="relative h-[200px] overflow-hidden bg-[#1a1a22]"
         >
           <img
             src={activePhoto || undefined}

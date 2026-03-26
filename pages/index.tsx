@@ -104,6 +104,12 @@ function HomePage() {
     }
   }, [store]);
 
+  const showFinalizeCta =
+    store.isCurrentUserOrganizer &&
+    store.hasFinalizeQuorum &&
+    !store.lockedVenue &&
+    Boolean(store.selectedVenue);
+
   if (!store.currentUser && !store.isLoadingGroup) {
     return null;
   }
@@ -124,8 +130,8 @@ function HomePage() {
         </div>
       )}
 
-      <main className="mx-auto flex w-full max-w-[430px] flex-1 flex-col px-4 pb-12 pt-4">
-        <SessionSummary onFinalizeClick={() => setShowFinalizeDialog(true)} />
+      <main className="mx-auto flex w-full max-w-[430px] flex-1 flex-col px-4 pb-28 pt-4">
+        <SessionSummary />
         {!store.lockedVenue && <MapStrip />}
         <section className="mt-4 space-y-4">
           {(store.isLoadingGroup || (store.isLoadingSuggestions && store.venues.length === 0)) && (
@@ -169,6 +175,33 @@ function HomePage() {
           )}
         </section>
       </main>
+
+      {showFinalizeCta && (
+        <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30">
+          <div
+            className="mx-auto w-full max-w-[430px] px-4 pt-3"
+            style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)" }}
+          >
+            <button
+              type="button"
+              onClick={() => setShowFinalizeDialog(true)}
+              className="pointer-events-auto flex w-full items-center justify-between rounded-[22px] border border-[#00e5a0]/20 bg-[#111316]/95 px-5 py-4 text-left shadow-[0_-10px_30px_rgba(0,0,0,0.28)] backdrop-blur"
+            >
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#00e5a0]/80">
+                  Finalize venue
+                </p>
+                <p className="mt-1 truncate font-display text-base font-bold tracking-[-0.02em] text-[#f0f0f5]">
+                  {store.selectedVenue?.name}
+                </p>
+              </div>
+              <span className="ml-3 shrink-0 rounded-full bg-[#00e5a0] px-3 py-2 text-xs font-bold text-black">
+                Lock
+              </span>
+            </button>
+          </div>
+        </div>
+      )}
 
       <FinalizeDialog
         showFinalizeDialog={showFinalizeDialog}
