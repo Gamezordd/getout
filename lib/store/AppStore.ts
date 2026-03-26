@@ -303,6 +303,8 @@ export class AppStore {
     name: string;
     address?: string;
     area?: string;
+    priceLabel?: string;
+    closingTimeLabel?: string;
     photos?: string[];
     location: LatLng;
   }) {
@@ -320,6 +322,8 @@ export class AppStore {
             name: place.name,
             address: place.address,
             area: place.area,
+            priceLabel: place.priceLabel,
+            closingTimeLabel: place.closingTimeLabel,
             photos: place.photos,
             location: place.location,
             addedByUserId: this.currentUserId || undefined,

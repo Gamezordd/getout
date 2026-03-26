@@ -6,6 +6,8 @@ export type PlaceResult = {
   name: string;
   address?: string;
   area?: string;
+  priceLabel?: string;
+  closingTimeLabel?: string;
   photos?: string[];
   location: LatLng;
 };

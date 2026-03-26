@@ -1,11 +1,17 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import type { LatLng } from "../../lib/types";
+import {
+  getClosingTimeLabel,
+  getPriceLabel,
+} from "../../lib/placeVenueMetadata";
 
 type PlaceResult = {
   id: string;
   name: string;
   address?: string;
   area?: string;
+  priceLabel?: string;
+  closingTimeLabel?: string;
   photos?: string[];
   location: LatLng;
 };
@@ -98,7 +104,7 @@ const searchTextPlaces = async (
         "Content-Type": "application/json",
         "X-Goog-Api-Key": apiKey,
         "X-Goog-FieldMask":
-          "places.id,places.displayName,places.formattedAddress,places.addressComponents,places.location,places.photos",
+          "places.id,places.displayName,places.formattedAddress,places.addressComponents,places.location,places.photos,places.priceLevel,places.currentOpeningHours",
       },
       body: JSON.stringify({
         textQuery: query,
@@ -125,6 +131,8 @@ const searchTextPlaces = async (
           place.displayName?.text || place.formattedAddress || "Unknown place",
         address: place.formattedAddress || undefined,
         area: getAreaFromAddressComponents(place.addressComponents),
+        priceLabel: getPriceLabel(place.priceLevel),
+        closingTimeLabel: getClosingTimeLabel(place.currentOpeningHours),
         photos: await resolvePhotoUrls(apiKey, place.photos),
         location: {
           lat: location.latitude,

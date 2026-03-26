@@ -7,6 +7,10 @@ import type {
   VenueCategory,
 } from "../../lib/types";
 import {
+  getClosingTimeLabel,
+  getPriceLabel,
+} from "../../lib/placeVenueMetadata";
+import {
   GroupPayload,
   SuggestionsSnapshot,
   createEmptySuggestionsSnapshot,
@@ -220,7 +224,7 @@ const fetchTopPlaces = async (
           "Content-Type": "application/json",
           "X-Goog-Api-Key": apiKey,
           "X-Goog-FieldMask":
-            "places.id,places.displayName,places.formattedAddress,places.addressComponents,places.location,places.photos,places.rating,places.userRatingCount",
+            "places.id,places.displayName,places.formattedAddress,places.addressComponents,places.location,places.photos,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours",
         },
         body: JSON.stringify({
           includedTypes: [venueCategory],
@@ -253,6 +257,8 @@ const fetchTopPlaces = async (
           name: place.displayName?.text || "Unknown place",
           address: place.formattedAddress,
           area: getAreaFromAddressComponents(place.addressComponents),
+          priceLabel: getPriceLabel(place.priceLevel),
+          closingTimeLabel: getClosingTimeLabel(place.currentOpeningHours),
           photos: await resolvePhotoUrls(apiKey, place.photos),
           location: { lat: location.latitude, lng: location.longitude },
           rating: place.rating || 0,
