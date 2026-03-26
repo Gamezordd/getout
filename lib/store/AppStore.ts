@@ -76,7 +76,6 @@ export class AppStore {
   mapError: string | null = null;
   isLoadingGroup = false;
   isLoadingSuggestions = false;
-  showSuggestedVenues = true;
 
   constructor() {
     makeAutoObservable(this, {}, { autoBind: true });
@@ -203,7 +202,6 @@ export class AppStore {
       const mergedVenueState = mergeVenues(
         this.suggestedVenues,
         data.manualVenues || [],
-        this.showSuggestedVenues,
       );
       runInAction(() => {
         this.users = data.users || [];
@@ -256,7 +254,6 @@ export class AppStore {
       const mergedVenueState = mergeVenues(
         data.suggestedVenues || [],
         this.manualVenues,
-        this.showSuggestedVenues,
       );
       runInAction(() => {
         this.venues = mergedVenueState.mergedVenues;
@@ -283,8 +280,8 @@ export class AppStore {
           ranked.sort((a, b) => a.total - b.total);
           this.selectedVenueId =
             ranked[0]?.id ||
-            this.suggestedVenues[0]?.id ||
             this.venues[0]?.id ||
+            this.suggestedVenues[0]?.id ||
             null;
         }
       });
@@ -531,15 +528,6 @@ export class AppStore {
 
   setSelectedVenue(venueId: string | null) {
     this.selectedVenueId = venueId;
-  }
-
-  toggleSuggestedVenues() {
-    this.showSuggestedVenues = !this.showSuggestedVenues;
-    this.venues = mergeVenues(
-      this.suggestedVenues,
-      this.manualVenues,
-      this.showSuggestedVenues,
-    ).mergedVenues;
   }
 
   setMapError(message: string | null) {

@@ -10,7 +10,6 @@ export default function renderMapMarkers(
   venueCoordsRef: React.MutableRefObject<
     Record<string, { lng: number; lat: number }>
   >,
-  showSuggestedVenues: boolean,
   markerClickRef: React.MutableRefObject<boolean>,
 ) {
   const {
@@ -31,7 +30,6 @@ export default function renderMapMarkers(
   const { mergedVenues: visibleVenues, suggestedRankById } = mergeVenues(
     suggestedVenues,
     manualVenues,
-    showSuggestedVenues,
   );
 
   const totals = visibleVenues
@@ -106,7 +104,6 @@ export default function renderMapMarkers(
     users,
     suggestedVenues,
     manualVenues,
-    showSuggestedVenues,
     votes,
     highlightedVenueId,
     selectedVenueId,

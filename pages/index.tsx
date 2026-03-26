@@ -94,6 +94,16 @@ function HomePage() {
     [store.groupError, store.mapError, store.suggestionWarning],
   );
 
+  const handleRefreshSuggestions = useCallback(() => {
+    if (store.isLoadingSuggestions) return;
+    const shouldRefresh = window.confirm(
+      "This will replace the current suggestions and clear all votes.",
+    );
+    if (shouldRefresh) {
+      store.refreshSuggestions();
+    }
+  }, [store]);
+
   if (!store.currentUser && !store.isLoadingGroup) {
     return null;
   }
@@ -147,12 +157,14 @@ function HomePage() {
               etaMatrix={store.etaMatrix}
               votes={store.votes}
               users={store.users}
-              showSuggestedVenues={store.showSuggestedVenues}
               currentUserId={store.currentUserId}
               selectedVenueId={store.selectedVenueId}
               mostEfficientVenueId={store.mostEfficientVenueId}
               onSelect={store.setSelectedVenue}
               onVote={handleVote}
+              showRefreshAction={store.isCurrentUserOrganizer}
+              isRefreshing={store.isLoadingSuggestions}
+              onRefresh={handleRefreshSuggestions}
             />
           )}
         </section>

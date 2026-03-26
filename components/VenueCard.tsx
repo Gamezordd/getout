@@ -42,16 +42,16 @@ const getInitials = (name: string) =>
     .map((part) => part[0]?.toUpperCase() || "")
     .join("") || "?";
 
+const BASE_TRAVEL_RANGE_MINUTES = 40;
+
 const getTravelRange = (etas?: Record<string, number>) => {
   if (!etas) return "--";
   const values = Object.values(etas).filter(
     (value): value is number => typeof value === "number",
   );
   if (values.length === 0) return "--";
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  if (Math.round(min) === Math.round(max)) return `${Math.round(min)} min`;
-  return `${Math.round(min)} - ${Math.round(max)} min`;
+  const max = Math.max(...values, BASE_TRAVEL_RANGE_MINUTES);
+  return `0 - ${Math.round(max)} min`;
 };
 
 export default function VenueCard({
@@ -93,7 +93,11 @@ export default function VenueCard({
       return a.eta - b.eta;
     });
 
-  const maxEta = Math.max(...sortedUsers.map((entry) => entry.eta || 0), 1);
+  const maxEta = Math.max(
+    ...sortedUsers.map((entry) => entry.eta || 0),
+    BASE_TRAVEL_RANGE_MINUTES,
+    1,
+  );
   const voteCount = voteSummary?.count || 0;
   const voteFill = totalUsers > 0 ? Math.min(100, (voteCount / totalUsers) * 100) : 0;
   const areaLabel = venue.area || null;

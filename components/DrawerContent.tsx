@@ -31,7 +31,6 @@ const DrawerContent = observer(function DrawerContent({
     mostEfficientVenueId,
     etaMatrix,
     votes,
-    showSuggestedVenues,
     updateUserLocation,
     setSelectedVenue,
     applyVote,
@@ -61,8 +60,8 @@ const DrawerContent = observer(function DrawerContent({
   };
 
   const { mergedVenues, suggestedRankById } = useMemo(
-    () => mergeVenues(suggestedVenues, manualVenues, showSuggestedVenues),
-    [manualVenues, showSuggestedVenues, suggestedVenues],
+    () => mergeVenues(suggestedVenues, manualVenues),
+    [manualVenues, suggestedVenues],
   );
   const medalNote = useMemo(() => {
     if (!selectedVenue) return null;
@@ -203,7 +202,6 @@ const DrawerContent = observer(function DrawerContent({
                 etaMatrix={etaMatrix}
                 votes={votes}
                 users={users}
-                showSuggestedVenues={showSuggestedVenues}
                 currentUserId={currentUserId}
                 selectedVenueId={null}
                 mostEfficientVenueId={mostEfficientVenueId}
