@@ -257,7 +257,7 @@ function HomePage() {
         {showPreciseLocationBanner && (
           <div className="mt-4 rounded-[20px] border border-[#00e5a0]/20 bg-[#0f1714] px-4 py-3 text-sm text-[#d7f7ea]">
             <p className="font-medium text-[#f0f0f5]">
-              Allow precise location to get suggestions closer to you and show your travel time.
+              Allow precise location to get suggestions closer to you and unlock your travel time.
             </p>
             <div className="mt-3 flex items-center gap-2">
               <button

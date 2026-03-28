@@ -101,18 +101,29 @@ export const groupActions = (
     let resolvedLocation = payload.location;
     let resolvedLocationLabel = payload.locationLabel || null;
     let resolvedLocationSource = payload.locationSource || "precise";
+    let shouldRecomputeSuggestions = false;
 
     if (!resolvedLocation) {
-      const approximate = await resolveApproximateLocation(req);
-      resolvedLocation = approximate.location;
-      resolvedLocationLabel = approximate.locationLabel || null;
+      if (!group.defaultApproximateLocation) {
+        const approximate = await resolveApproximateLocation(req);
+        group.defaultApproximateLocation = approximate.location;
+        group.defaultApproximateLocationLabel = approximate.locationLabel || null;
+      }
+      resolvedLocation = group.defaultApproximateLocation;
+      resolvedLocationLabel =
+        payload.locationLabel || group.defaultApproximateLocationLabel || null;
       resolvedLocationSource = "ip";
+      shouldRecomputeSuggestions = isOwner;
     } else if (!resolvedLocationLabel) {
       const apiKey = process.env.GOOGLE_MAPS_API_KEY;
       if (apiKey) {
         const geocoded = await reverseGeocodeLocation(resolvedLocation, apiKey);
         resolvedLocationLabel = geocoded.locationLabel || null;
       }
+    }
+
+    if (!resolvedLocation) {
+      return res.status(500).json({ message: "Unable to determine join location." });
     }
 
     const userId = `u-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
@@ -132,9 +143,11 @@ export const groupActions = (
       userId: user.id,
       isOwner,
     });
-    await recomputeSuggestionsForGroup(payload.sessionId, group, {
-      rotateSuggestions: false,
-    });
+    if (shouldRecomputeSuggestions) {
+      await recomputeSuggestionsForGroup(payload.sessionId, group, {
+        rotateSuggestions: false,
+      });
+    }
     await safeTrigger(channel, "group-updated", { reason: "join", userId: user.id });
     return res.status(200).json(buildGroupResponse(group, user.id, isOwner));
   },

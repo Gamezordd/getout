@@ -1,5 +1,6 @@
 import type {
   EtaMatrix,
+  LatLng,
   LockedVenue,
   TotalsByVenue,
   User,
@@ -29,6 +30,8 @@ type GroupPayload = {
   manualVenues: Venue[];
   votes: VotesByVenue;
   votingClosesAt: string | null;
+  defaultApproximateLocation: LatLng | null;
+  defaultApproximateLocationLabel?: string | null;
   pushSubscriptions?: Record<string, PushSubscriptionJSON>;
   sessionMembers: SessionMember[];
   suggestions: SuggestionsSnapshot;
@@ -51,6 +54,8 @@ const createEmptyGroup = (): GroupPayload => ({
   manualVenues: [],
   votes: {},
   votingClosesAt: null,
+  defaultApproximateLocation: null,
+  defaultApproximateLocationLabel: null,
   pushSubscriptions: {},
   sessionMembers: [],
   suggestions: createEmptySuggestionsSnapshot(),
@@ -68,6 +73,16 @@ const getGroup = async (sessionId: string): Promise<GroupPayload> => {
     if (!Array.isArray(hydrated.venues)) hydrated.venues = [];
     if (!hydrated.votes) hydrated.votes = {};
     if (typeof hydrated.votingClosesAt !== "string") hydrated.votingClosesAt = null;
+    if (
+      !hydrated.defaultApproximateLocation ||
+      typeof hydrated.defaultApproximateLocation.lat !== "number" ||
+      typeof hydrated.defaultApproximateLocation.lng !== "number"
+    ) {
+      hydrated.defaultApproximateLocation = null;
+    }
+    if (typeof hydrated.defaultApproximateLocationLabel !== "string") {
+      hydrated.defaultApproximateLocationLabel = null;
+    }
     if (!hydrated.pushSubscriptions) hydrated.pushSubscriptions = {};
     if (!Array.isArray(hydrated.sessionMembers)) hydrated.sessionMembers = [];
 
