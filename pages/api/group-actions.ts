@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from "next";
-import { GroupPayload } from "../../lib/groupStore";
+import { GroupPayload, saveGroup } from "../../lib/groupStore";
 import { User, Venue } from "../../lib/types";
 import {
   recomputeSuggestionsForGroup,
@@ -147,6 +147,8 @@ export const groupActions = (
       await recomputeSuggestionsForGroup(payload.sessionId, group, {
         rotateSuggestions: false,
       });
+    } else {
+      await saveGroup(payload.sessionId, group);
     }
     await safeTrigger(channel, "group-updated", { reason: "join", userId: user.id });
     return res.status(200).json(buildGroupResponse(group, user.id, isOwner));

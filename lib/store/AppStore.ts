@@ -167,13 +167,16 @@ export class AppStore {
   }
 
   setSession(sessionId: string, pathname = "/") {
+    const isSameSession = this.sessionId === sessionId;
     this.sessionId = sessionId;
-    this.venueCategory = null;
-    this.votingClosesAt = null;
-    this.lockedVenue = null;
-    this.currentUserId = null;
-    this.isOwner = false;
-    this.identityResolved = false;
+    if (!isSameSession) {
+      this.venueCategory = null;
+      this.votingClosesAt = null;
+      this.lockedVenue = null;
+      this.currentUserId = null;
+      this.isOwner = false;
+      this.identityResolved = false;
+    }
     if (typeof window !== "undefined") {
       this.shareUrl = `${window.location.origin}${pathname}?sessionId=${sessionId}`;
       const storedBrowserId = localStorage.getItem(BROWSER_ID_KEY);
