@@ -78,13 +78,14 @@ export const resolveApproximateLocation = async (
   req: NextApiRequest,
 ): Promise<ApproximateLocation> => {
   const ip = getRequestIp(req);
+  console.log("ip: ", ip);
   const endpoint = ip
     ? `https://ipapi.co/${encodeURIComponent(ip)}/json/`
     : "https://ipapi.co/json/";
-
-  const response = await fetch(endpoint, {
-    headers: { Accept: "application/json" },
-  });
+    const response = await fetch(endpoint, {
+      headers: { Accept: "application/json" },
+    });
+    console.log("response: ", response);
 
   if (!response.ok) {
     throw new Error("Unable to determine approximate location.");

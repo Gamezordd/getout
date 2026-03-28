@@ -16,6 +16,7 @@ import MapStrip from "../components/MapStrip";
 import Loader from "../components/Loader";
 import VotingCountdown from "../components/VotingCountdown";
 import { registerPushSubscription } from "../lib/pushClient";
+import { formatCompactCount } from "../lib/formatCount";
 import Dialog from "../components/Dialog";
 import { getUserActivityLabel } from "../lib/userDisplay";
 
@@ -218,10 +219,17 @@ function HomePage() {
   const showFinalizeCta =
     store.isCurrentUserOrganizer &&
     store.hasFinalizeQuorum &&
-    !store.lockedVenue &&
-    Boolean(store.selectedVenue);
+    !store.lockedVenue;
   const showPreciseLocationBanner =
     store.currentUserNeedsPreciseLocation && !dismissedPreciseBanner;
+  const leadingVenue = useMemo(
+    () =>
+      store.venues.find((venue) => (store.votes?.[venue.id]?.length || 0) > 0) || null,
+    [store.venues, store.votes],
+  );
+  const leadingVoteCount = leadingVenue
+    ? store.votes?.[leadingVenue.id]?.length || 0
+    : 0;
 
   if (!store.currentUser && !store.isLoadingGroup) {
     return null;
@@ -313,7 +321,7 @@ function HomePage() {
         </section>
       </main>
 
-      {showFinalizeCta && (
+      {showFinalizeCta && leadingVenue && (
         <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30">
           <div
             className="mx-auto w-full max-w-[430px] px-4 pt-3"
@@ -326,14 +334,17 @@ function HomePage() {
             >
               <div className="min-w-0">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#00e5a0]/80">
-                  Finalize venue
+                  Leading venue
                 </p>
                 <p className="mt-1 truncate font-display text-base font-bold tracking-[-0.02em] text-[#f0f0f5]">
-                  {store.selectedVenue?.name}
+                  {leadingVenue.name}
+                </p>
+                <p className="mt-1 text-xs text-[#8b8b9c]">
+                  {formatCompactCount(leadingVoteCount)} {leadingVoteCount === 1 ? "vote" : "votes"}
                 </p>
               </div>
               <span className="ml-3 shrink-0 rounded-full bg-[#00e5a0] px-3 py-2 text-xs font-bold text-black">
-                Finalize Now 🎯
+                Finalize now 🎯
               </span>
             </button>
           </div>
