@@ -83,12 +83,12 @@ export const resolveApproximateLocation = async (
     ? `https://ipwho.is/${encodeURIComponent(ip)}`
     : "https://ipwho.is/";
   const response = await fetch(endpoint, {
-    headers: { Accept: "application/json" },
+    headers: { Accept: "application/json", "User-Agent": "GetOut/1.0", },
   });
 
-  console.log(response);
-
+  
   if (!response.ok) {
+    console.log(await response.text());
     throw new Error("Unable to determine approximate location.");
   }
 
