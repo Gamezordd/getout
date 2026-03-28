@@ -78,35 +78,31 @@ export const resolveApproximateLocation = async (
   req: NextApiRequest,
 ): Promise<ApproximateLocation> => {
   const ip = getRequestIp(req);
-    console.log(ip);
   const endpoint = ip
-    ? `https://ipwho.is/${encodeURIComponent(ip)}`
-    : "https://ipwho.is/";
+    ? `http://ip-api.com/json/${encodeURIComponent(ip)}`
+    : "http://ip-api.com/json/";
   const response = await fetch(endpoint, {
-    headers: { Accept: "application/json", "User-Agent": "GetOut/1.0", },
+    headers: { Accept: "application/json" },
   });
-
-  
   if (!response.ok) {
-    console.log(await response.text());
     throw new Error("Unable to determine approximate location.");
   }
 
   const data = await response.json();
-  if (data?.success === false) {
+  if (data?.status !== "success") {
     throw new Error("Unable to determine approximate location.");
   }
 
-  const lat = Number(data?.latitude);
-  const lng = Number(data?.longitude);
+  const lat = Number(data?.lat);
+  const lng = Number(data?.lon);
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
     throw new Error("Unable to determine approximate location.");
   }
 
   const locationLabel =
     (typeof data?.city === "string" && data.city.trim()) ||
-    (typeof data?.region === "string" && data.region.trim()) ||
-    (typeof data?.country_name === "string" && data.country_name.trim()) ||
+    (typeof data?.regionName === "string" && data.regionName.trim()) ||
+    (typeof data?.country === "string" && data.country.trim()) ||
     null;
 
   return {
