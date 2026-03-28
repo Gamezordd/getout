@@ -15,10 +15,17 @@ import { mergeVenues } from "../mergeVenues";
 
 const BROWSER_ID_KEY = "getout-id";
 
+type SessionMember = {
+  browserId: string;
+  userId: string;
+  isOwner: boolean;
+};
+
 type GroupPayload = {
   users: User[];
   venues: Venue[];
   manualVenues?: Venue[];
+  sessionMembers?: SessionMember[];
   votes?: VotesByVenue;
   votingClosesAt?: string | null;
   venueCategory?: VenueCategory | null;
@@ -59,6 +66,7 @@ export class AppStore {
   identityResolved = false;
   shareUrl: string | null = null;
   users: User[] = [];
+  sessionMembers: SessionMember[] = [];
   manualVenues: Venue[] = [];
   venues: Venue[] = [];
   suggestedVenues: Venue[] = [];
@@ -147,6 +155,29 @@ export class AppStore {
     this.votes = { ...(votes || {}) };
   }
 
+  buildAvatarUrl(name?: string | null, fallbackSeed?: string) {
+    const seed = encodeURIComponent(name?.trim() || fallbackSeed?.trim() || "guest");
+    return `https://api.dicebear.com/7.x/thumbs/svg?seed=${seed}`;
+  }
+
+  reconcileUserNames(namesByBrowserId: Record<string, string | null>) {
+    const userIdByBrowserId = new Map(
+      this.sessionMembers.map((member) => [member.browserId, member.userId]),
+    );
+    this.users = this.users.map((user) => {
+      const matchingEntry = Object.entries(namesByBrowserId).find(
+        ([browserId]) => userIdByBrowserId.get(browserId) === user.id,
+      );
+      if (!matchingEntry) return user;
+      const [, nextName] = matchingEntry;
+      return {
+        ...user,
+        name: nextName,
+        avatarUrl: this.buildAvatarUrl(nextName, user.locationLabel || user.id),
+      };
+    });
+  }
+
   get topVenues() {
     return this.venues;
   }
@@ -216,6 +247,7 @@ export class AppStore {
       );
       runInAction(() => {
         this.users = data.users || [];
+        this.sessionMembers = data.sessionMembers || [];
         this.manualVenues = data.manualVenues || [];
         this.venues = mergedVenueState.mergedVenues;
         this.reconcileVotes(data.votes || {});
@@ -524,6 +556,7 @@ export class AppStore {
     const data = (await response.json()) as GroupPayload;
     runInAction(() => {
       this.users = data.users || [];
+      this.sessionMembers = data.sessionMembers || [];
       this.manualVenues = data.manualVenues || [];
       this.reconcileVotes(data.votes || {});
       this.votingClosesAt = data.votingClosesAt || null;

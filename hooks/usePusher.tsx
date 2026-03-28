@@ -15,6 +15,10 @@ type VoteUpdatedPayload = {
   venueId?: string;
 };
 
+type NamesUpdatedPayload = {
+  namesByBrowserId?: Record<string, string | null>;
+};
+
 export default function usePusher(
   onJoin?: (userId: string) => void,
   onVote?: (voterId: string, venueId?: string) => void,
@@ -53,11 +57,16 @@ export default function usePusher(
         onVote?.(data.voterId, data.venueId);
       }
     });
+    channel.bind("names-update", (data?: NamesUpdatedPayload) => {
+      if (!data?.namesByBrowserId) return;
+      store.reconcileUserNames(data.namesByBrowserId);
+    });
 
     return () => {
       channel.unbind("group-updated", refresh);
       channel.unbind("venue-locked");
       channel.unbind("votes-update");
+      channel.unbind("names-update");
       channel.unbind("pusher:subscription_succeeded");
       channel.unbind("pusher:subscription_error");
       client.unsubscribe(`private-group-${store.sessionId}`);

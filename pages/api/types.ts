@@ -108,6 +108,11 @@ export type GroupResponse = {
   users: User[];
   venues: Venue[];
   manualVenues: Venue[];
+  sessionMembers: Array<{
+    browserId: string;
+    userId: string;
+    isOwner: boolean;
+  }>;
   votes: VotesByVenue;
   votingClosesAt?: string | null;
   venueCategory: VenueCategory | null;

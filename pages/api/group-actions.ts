@@ -256,6 +256,15 @@ export const groupActions = (
       return res.status(200).json(buildGroupResponse(group));
     }
 
+    await saveGroup(payload.sessionId, group);
+    await safeTrigger(channel, "names-update", {
+      namesByBrowserId: Object.fromEntries(
+        group.sessionMembers.map((member) => [
+          member.browserId,
+          group.users.find((user) => user.id === member.userId)?.name || null,
+        ]),
+      ),
+    });
     await safeTrigger(channel, "group-updated", { reason: "update-user" });
     return res.status(200).json(buildGroupResponse(group));
   },
