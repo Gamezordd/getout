@@ -12,11 +12,12 @@ type GroupUpdatedPayload = {
 type VoteUpdatedPayload = {
   votes?: VotesByVenue;
   voterId?: string;
+  venueId?: string;
 };
 
 export default function usePusher(
   onJoin?: (userId: string) => void,
-  onVote?: (voterId: string) => void,
+  onVote?: (voterId: string, venueId?: string) => void,
 ) {
   const store = useAppStore();
   const channelRef = useRef<Channel | null>(null);
@@ -49,7 +50,7 @@ export default function usePusher(
       if (!data?.votes) return;
       store.reconcileVotes(data.votes);
       if (data.voterId) {
-        onVote?.(data.voterId);
+        onVote?.(data.voterId, data.venueId);
       }
     });
 

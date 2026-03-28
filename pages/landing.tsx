@@ -1,91 +1,36 @@
 import { observer } from "mobx-react-lite";
 import { useRouter } from "next/router";
-import { useEffect, useState } from "react";
-import { CreateGroupForm, EntryShell, LandingHero } from "../components/entry/EntryFlow";
-import { PlaceResult } from "../components/PlaceSearch";
+import { useState } from "react";
+import { EntryShell, LandingHero } from "../components/entry/EntryFlow";
+import { CATEGORY_OPTIONS } from "../lib/entryFlow";
 import { useAppStore } from "../lib/store/AppStoreProvider";
 import type { VenueCategory } from "../lib/types";
+
+const CLOSE_VOTING_BADGES = [
+  { value: 1, label: "1h" },
+  { value: 3, label: "3h" },
+  { value: 6, label: "6h" },
+];
 
 function LandingPage() {
   const store = useAppStore();
   const router = useRouter();
-  const [step, setStep] = useState<"intro" | "create">("intro");
-  const [name, setName] = useState("");
-  const [location, setLocation] = useState<PlaceResult | null>(null);
   const [category, setCategory] = useState<VenueCategory>("bar");
   const [closeVotingInHours, setCloseVotingInHours] = useState(3);
-  const [saveDetails, setSaveDetails] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [locationError, setLocationError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [locating, setLocating] = useState(false);
-  const trimmedName = name.trim();
-  const normalizedName = trimmedName.toLowerCase();
-  const nameTooShort = trimmedName.length > 0 && trimmedName.length < 3;
-  const nameTaken = store.users.some(
-    (user) => user.name.trim().toLowerCase() === normalizedName,
-  );
-  const isNameValid = trimmedName.length >= 3 && !nameTaken;
-
-  useEffect(() => {
-    if (!router.isReady) return;
-    setStep(router.query.step === "create" ? "create" : "intro");
-  }, [router.isReady, router.query.step]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const stored = localStorage.getItem("getout-user-details");
-    if (!stored) return;
-    try {
-      const payload = JSON.parse(stored) as {
-        name?: string;
-        place?: PlaceResult;
-      };
-      if (payload?.name) setName(payload.name);
-      if (payload?.place) setLocation(payload.place);
-    } catch {
-      // ignore malformed storage
-    }
-  }, []);
 
   const handleCreate = async () => {
-    if (!trimmedName) {
-      setError("Add your name to continue.");
-      return;
-    }
-    if (trimmedName.length < 3) {
-      setError("Name must be at least 3 characters.");
-      return;
-    }
-    if (nameTaken) {
-      setError("That name is already taken in this group.");
-      return;
-    }
-    if (!location) {
-      setLocationError("Pick your planning location.");
-      return;
-    }
-
     const sessionId = store.ensureSessionId(null);
     try {
       setSubmitting(true);
       setError(null);
       store.setSession(sessionId, "/");
-      await store.joinGroup(
-        trimmedName,
-        location.location,
-        category,
+      await store.joinGroup({
+        venueCategory: category,
         closeVotingInHours,
-      );
-      if (saveDetails) {
-        localStorage.setItem(
-          "getout-user-details",
-          JSON.stringify({ name: trimmedName, place: location }),
-        );
-      } else {
-        localStorage.removeItem("getout-user-details");
-      }
-      router.push({ pathname: "/", query: { sessionId } });
+      });
+      router.replace({ pathname: "/", query: { sessionId } });
     } catch (err: any) {
       setError(err.message || "Unable to create group.");
     } finally {
@@ -93,80 +38,69 @@ function LandingPage() {
     }
   };
 
-  const handleDetectLocation = async () => {
-    if (!("geolocation" in navigator)) {
-      setLocationError("Location services are not supported.");
-      return;
-    }
-    setLocating(true);
-    setLocationError(null);
-    setError(null);
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        try {
-          const params = new URLSearchParams({
-            lat: String(position.coords.latitude),
-            lng: String(position.coords.longitude),
-          });
-          const response = await fetch(`/api/reverse-geocode?${params}`);
-          if (!response.ok) {
-            const payload = await response.json().catch(() => ({}));
-            throw new Error(payload.message || "Unable to detect address.");
-          }
-          const data = (await response.json()) as { result?: PlaceResult };
-          if (!data.result) {
-            throw new Error("Unable to detect address.");
-          }
-          setLocation(data.result);
-        } catch (err: any) {
-          setLocationError(err.message || "Unable to detect address.");
-        } finally {
-          setLocating(false);
-        }
-      },
-      () => {
-        setLocationError("Location permission denied.");
-        setLocating(false);
-      },
-      { enableHighAccuracy: true, timeout: 10000 },
-    );
-  };
-
   return (
     <EntryShell>
-      {step === "intro" ? (
-        <LandingHero onCreate={() => setStep("create")} />
-      ) : (
-        <CreateGroupForm
-          name={name}
-          setName={(value) => {
-            setName(value);
-            setError(null);
-          }}
-          location={location}
-          setLocation={(place) => {
-            setLocation(place);
-            setLocationError(null);
-            setError(null);
-          }}
-          category={category}
-          setCategory={setCategory}
-          closeVotingInHours={closeVotingInHours}
-          setCloseVotingInHours={setCloseVotingInHours}
-          saveDetails={saveDetails}
-          setSaveDetails={setSaveDetails}
-          error={error}
-          locationError={locationError}
-          submitting={submitting}
-          locating={locating}
-          nameTooShort={nameTooShort}
-          nameTaken={nameTaken}
-          isNameValid={isNameValid}
-          onDetectLocation={handleDetectLocation}
-          onSubmit={handleCreate}
-          onBack={() => setStep("intro")}
-        />
-      )}
+      <LandingHero
+        onCreate={handleCreate}
+        controls={
+          <div className="mt-6 space-y-3 rounded-[24px] border border-white/10 bg-[#141418]/90 p-4 backdrop-blur-sm">
+            <div>
+              <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8b8b9c]">
+                Looking for
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {CATEGORY_OPTIONS.map((option) => {
+                  const isSelected = option.value === category;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => setCategory(option.value)}
+                      className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                        isSelected
+                          ? "bg-[#00e5a0] text-black"
+                          : "border border-white/10 bg-[#1c1c22] text-[#d7d7e0]"
+                      }`}
+                    >
+                      <span className="mr-1.5">{option.emoji}</span>
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div>
+              <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8b8b9c]">
+                Close voting in?
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {CLOSE_VOTING_BADGES.map((option) => {
+                  const isSelected = option.value === closeVotingInHours;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => setCloseVotingInHours(option.value)}
+                      className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                        isSelected
+                          ? "bg-[#00e5a0] text-black"
+                          : "border border-white/10 bg-[#1c1c22] text-[#d7d7e0]"
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            {error ? <p className="text-sm text-rose-300">{error}</p> : null}
+            <p className="text-xs text-[#64647a]">
+              We&apos;ll start with an approximate location, then ask for precise access inside the group.
+            </p>
+          </div>
+        }
+        createButtonLabel={submitting ? "Creating group..." : "Create group"}
+      />
     </EntryShell>
   );
 }

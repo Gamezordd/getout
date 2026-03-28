@@ -91,7 +91,15 @@ export function EntryHeader({ title, subtitle, onBack }: HeaderProps) {
   );
 }
 
-export function LandingHero({ onCreate }: { onCreate: () => void }) {
+export function LandingHero({
+  onCreate,
+  controls,
+  createButtonLabel = "Create a group",
+}: {
+  onCreate: () => void;
+  controls?: ReactNode;
+  createButtonLabel?: string;
+}) {
   return (
     <div className="flex min-h-[calc(100svh-4rem)] flex-col">
       <div className="flex items-center justify-between pt-8">
@@ -172,6 +180,7 @@ export function LandingHero({ onCreate }: { onCreate: () => void }) {
         </div>
 
         <div className="mt-7 space-y-3">
+          {controls}
           <button
             type="button"
             onClick={onCreate}
@@ -180,7 +189,7 @@ export function LandingHero({ onCreate }: { onCreate: () => void }) {
             <svg viewBox="0 0 16 16" fill="none" aria-hidden="true" className="h-4 w-4">
               <path d="M8 1v14M1 8h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
             </svg>
-            Create a group
+            {createButtonLabel}
           </button>
           <div className="text-center text-[13px] text-[#64647a]">
             Have a link? <span className="font-medium text-[#00e5a0]">Open it to join →</span>

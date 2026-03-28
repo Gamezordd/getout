@@ -89,6 +89,14 @@ export class AppStore {
     return Boolean(this.currentUser?.location);
   }
 
+  get currentUserNeedsPreciseLocation() {
+    return this.currentUser?.locationSource === "ip";
+  }
+
+  get currentUserIsAnonymous() {
+    return !this.currentUser?.name?.trim();
+  }
+
   get isCurrentUserOrganizer() {
     return Boolean(this.currentUser?.isOrganizer);
   }
@@ -368,7 +376,14 @@ export class AppStore {
     }
   }
 
-  async updateUserLocation(userId: string, location: LatLng) {
+  async updateUserLocation(
+    userId: string,
+    location: LatLng,
+    options?: {
+      locationLabel?: string | null;
+      locationSource?: "ip" | "precise";
+    },
+  ) {
     if (!this.sessionId) return;
     try {
       this.groupError = null;
@@ -380,6 +395,8 @@ export class AppStore {
           sessionId: this.sessionId,
           userId,
           location,
+          locationLabel: options?.locationLabel,
+          locationSource: options?.locationSource,
         }),
       });
       if (!response.ok) {
@@ -423,7 +440,7 @@ export class AppStore {
   async vote(venueId: string) {
     if (!this.sessionId || !this.currentUserId) {
       this.groupError = "Join the group to vote.";
-      return;
+      return false;
     }
     try {
       this.groupError = null;
@@ -444,10 +461,12 @@ export class AppStore {
       runInAction(() => {
         this.reconcileVotes(data.votes || {});
       });
+      return true;
     } catch (err: any) {
       runInAction(() => {
         this.groupError = err.message || "Unable to cast vote.";
       });
+      return false;
     }
   }
 
@@ -469,12 +488,14 @@ export class AppStore {
     this.reconcileVotes(votes);
   }
 
-  async joinGroup(
-    name: string,
-    location: LatLng,
-    venueCategory?: VenueCategory,
-    closeVotingInHours?: number,
-  ) {
+  async joinGroup(options?: {
+    name?: string;
+    location?: LatLng;
+    locationLabel?: string;
+    locationSource?: "ip" | "precise";
+    venueCategory?: VenueCategory;
+    closeVotingInHours?: number;
+  }) {
     if (!this.sessionId || !this.browserId) {
       throw new Error("Missing session. Open this page from a group link.");
     }
@@ -485,10 +506,12 @@ export class AppStore {
         action: "join",
         sessionId: this.sessionId,
         browserId: this.browserId,
-        name: name.trim(),
-        location,
-        venueCategory,
-        closeVotingInHours,
+        name: options?.name?.trim(),
+        location: options?.location,
+        locationLabel: options?.locationLabel,
+        locationSource: options?.locationSource,
+        venueCategory: options?.venueCategory,
+        closeVotingInHours: options?.closeVotingInHours,
       }),
     });
     if (!response.ok) {
@@ -532,6 +555,27 @@ export class AppStore {
 
   setSelectedVenue(venueId: string | null) {
     this.selectedVenueId = venueId;
+  }
+
+  async updateCurrentUserName(name: string) {
+    if (!this.sessionId || !this.currentUserId) {
+      throw new Error("Missing current user.");
+    }
+    const response = await fetch("/api/group", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "updateUser",
+        sessionId: this.sessionId,
+        userId: this.currentUserId,
+        name,
+      }),
+    });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(payload.message || "Unable to update name.");
+    }
+    await this.loadGroup();
   }
 
   setMapError(message: string | null) {

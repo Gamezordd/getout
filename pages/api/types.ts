@@ -45,8 +45,10 @@ export type JoinRequest = {
   action: "join";
   sessionId: string;
   browserId: string;
-  name: string;
-  location: LatLng;
+  name?: string;
+  location?: LatLng;
+  locationLabel?: string;
+  locationSource?: "ip" | "precise";
   venueCategory?: VenueCategory;
   closeVotingInHours?: number;
 };
@@ -73,7 +75,10 @@ export type UpdateUserRequest = {
   action: "updateUser";
   sessionId: string;
   userId: string;
-  location: LatLng;
+  location?: LatLng;
+  locationLabel?: string;
+  locationSource?: "ip" | "precise";
+  name?: string;
 };
 
 export type RemoveUserRequest = {

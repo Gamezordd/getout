@@ -17,6 +17,10 @@ import {
 import { lockVenueForGroup } from "./venue-lock";
 import { ALLOWED_CATEGORIES } from "./constants";
 import { buildAvatarUrl, buildGroupResponse, safeTrigger } from "./utils";
+import {
+  resolveApproximateLocation,
+  reverseGeocodeLocation,
+} from "./location-utils";
 
 export const groupActions = (
   req: NextApiRequest,
@@ -37,25 +41,22 @@ export const groupActions = (
           buildGroupResponse(group, existingMember.userId, existingMember.isOwner),
         );
     }
-    if (!payload.name || !payload.location) {
-      return res
-        .status(400)
-        .json({ message: "Name and location are required." });
-    }
-    const trimmedName = payload.name.trim();
-    if (trimmedName.length < 3) {
+    const trimmedName = payload.name?.trim() || "";
+    if (trimmedName.length > 0 && trimmedName.length < 3) {
       return res
         .status(400)
         .json({ message: "Name must be at least 3 characters." });
     }
-    const normalized = trimmedName.toLowerCase();
-    const nameTaken = group.users.some(
-      (user) => user.name.trim().toLowerCase() === normalized,
-    );
-    if (nameTaken) {
-      return res
-        .status(400)
-        .json({ message: "That name is already taken in this group." });
+    if (trimmedName) {
+      const normalized = trimmedName.toLowerCase();
+      const nameTaken = group.users.some(
+        (user) => (user.name || "").trim().toLowerCase() === normalized,
+      );
+      if (nameTaken) {
+        return res
+          .status(400)
+          .json({ message: "That name is already taken in this group." });
+      }
     }
     if (
       payload.venueCategory &&
@@ -97,12 +98,32 @@ export const groupActions = (
     }
 
     const isOwner = group.sessionMembers.length === 0 && group.users.length === 0;
+    let resolvedLocation = payload.location;
+    let resolvedLocationLabel = payload.locationLabel || null;
+    let resolvedLocationSource = payload.locationSource || "precise";
+
+    if (!resolvedLocation) {
+      const approximate = await resolveApproximateLocation(req);
+      resolvedLocation = approximate.location;
+      resolvedLocationLabel = approximate.locationLabel || null;
+      resolvedLocationSource = "ip";
+    } else if (!resolvedLocationLabel) {
+      const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+      if (apiKey) {
+        const geocoded = await reverseGeocodeLocation(resolvedLocation, apiKey);
+        resolvedLocationLabel = geocoded.locationLabel || null;
+      }
+    }
+
+    const userId = `u-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
     const user: User = {
-      id: `u-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
-      name: trimmedName,
-      avatarUrl: buildAvatarUrl(trimmedName),
-      location: payload.location,
+      id: userId,
+      name: trimmedName || null,
+      avatarUrl: buildAvatarUrl(trimmedName, resolvedLocationLabel || userId),
+      location: resolvedLocation,
       isOrganizer: isOwner,
+      locationLabel: resolvedLocationLabel,
+      locationSource: resolvedLocationSource,
     };
 
     group.users.push(user);
@@ -159,10 +180,67 @@ export const groupActions = (
     if (index === -1) {
       return res.status(404).json({ message: "User not found." });
     }
-    group.users[index] = { ...group.users[index], location: payload.location };
-    await recomputeSuggestionsForGroup(payload.sessionId, group, {
-      rotateSuggestions: false,
-    });
+    const existingUser = group.users[index];
+    const nextUser: User = { ...existingUser };
+
+    if (payload.name !== undefined) {
+      const trimmedName = payload.name.trim();
+      if (trimmedName.length > 0 && trimmedName.length < 3) {
+        return res
+          .status(400)
+          .json({ message: "Name must be at least 3 characters." });
+      }
+      if (trimmedName) {
+        const normalized = trimmedName.toLowerCase();
+        const nameTaken = group.users.some(
+          (user) =>
+            user.id !== payload.userId &&
+            (user.name || "").trim().toLowerCase() === normalized,
+        );
+        if (nameTaken) {
+          return res
+            .status(400)
+            .json({ message: "That name is already taken in this group." });
+        }
+      }
+      nextUser.name = trimmedName || null;
+      nextUser.avatarUrl = buildAvatarUrl(
+        nextUser.name,
+        nextUser.locationLabel || nextUser.id,
+      );
+    }
+
+    if (payload.location) {
+      nextUser.location = payload.location;
+    }
+    if (payload.locationLabel !== undefined) {
+      nextUser.locationLabel = payload.locationLabel || null;
+    }
+    if (payload.locationSource) {
+      nextUser.locationSource = payload.locationSource;
+    }
+
+    group.users[index] = nextUser;
+
+    if (payload.location) {
+      if (!nextUser.locationLabel && nextUser.locationSource === "precise") {
+        const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+        if (apiKey) {
+          const geocoded = await reverseGeocodeLocation(nextUser.location, apiKey);
+          group.users[index] = {
+            ...group.users[index],
+            locationLabel: geocoded.locationLabel || nextUser.locationLabel || null,
+          };
+        }
+      }
+
+      await recomputeSuggestionsForGroup(payload.sessionId, group, {
+        rotateSuggestions: false,
+      });
+      await safeTrigger(channel, "group-updated", { reason: "update-user" });
+      return res.status(200).json(buildGroupResponse(group));
+    }
+
     await safeTrigger(channel, "group-updated", { reason: "update-user" });
     return res.status(200).json(buildGroupResponse(group));
   },
