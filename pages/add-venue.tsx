@@ -33,7 +33,27 @@ function AddVenuePage() {
   }, [sessionId, store]);
 
   useEffect(() => {
+    if (!router.isReady || !store.sessionId || store.isLoadingGroup) return;
+    if (!store.lockedVenue) return;
+
+    router.replace(
+      { pathname: "/final", query: { sessionId: store.sessionId } },
+      undefined,
+      {
+        shallow: true,
+      },
+    );
+  }, [
+    router,
+    router.isReady,
+    store.isLoadingGroup,
+    store.lockedVenue,
+    store.sessionId,
+  ]);
+
+  useEffect(() => {
     if (!router.isReady || !store.sessionId || !store.identityResolved) return;
+    if (store.lockedVenue) return;
     if (store.currentUserId) return;
     router.replace(
       { pathname: "/join", query: { sessionId: store.sessionId } },
@@ -47,6 +67,7 @@ function AddVenuePage() {
     router.isReady,
     store.currentUserId,
     store.identityResolved,
+    store.lockedVenue,
     store.sessionId,
   ]);
 
