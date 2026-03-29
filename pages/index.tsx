@@ -1,6 +1,7 @@
 import { observer } from "mobx-react-lite";
 import { toast } from "sonner";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useAuth } from "../lib/auth/AuthProvider";
 import { useAppStore } from "../lib/store/AppStoreProvider";
 import FinalizeDialog from "../components/FinalizeDialog";
 import { Header } from "../components/Header";
@@ -22,6 +23,7 @@ import { getUserActivityLabel } from "../lib/userDisplay";
 
 function HomePage() {
   const store = useAppStore();
+  const { authenticatedUser, isNative } = useAuth();
   const [showFinalizeDialog, setShowFinalizeDialog] = useState(false);
   const [showInviteDialog, setShowInviteDialog] = useState(false);
   const [inviteDialogTitle, setInviteDialogTitle] = useState("You're the first one here!");
@@ -119,11 +121,16 @@ function HomePage() {
       store.setSelectedVenue(venueId);
       store.applyVote(store.currentUserId, venueId);
       const success = await store.vote(venueId);
-      if (success && store.currentUserIsAnonymous && !dismissedNamePrompt) {
+      if (
+        success &&
+        store.currentUserIsAnonymous &&
+        !dismissedNamePrompt &&
+        !(isNative && authenticatedUser)
+      ) {
         setShowNamePrompt(true);
       }
     },
-    [dismissedNamePrompt, store],
+    [authenticatedUser, dismissedNamePrompt, isNative, store],
   );
 
   const handleAllowPreciseLocation = useCallback(async () => {

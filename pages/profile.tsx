@@ -1,0 +1,95 @@
+import { useRouter } from "next/router";
+import { useEffect, useState } from "react";
+import { observer } from "mobx-react-lite";
+import { EntryHeader, EntryShell } from "../components/entry/EntryFlow";
+import { useAuth } from "../lib/auth/AuthProvider";
+
+function ProfilePage() {
+  const router = useRouter();
+  const { authenticatedUser, authStatus, isNative, signOut, updateDisplayName } =
+    useAuth();
+  const [displayName, setDisplayName] = useState(
+    authenticatedUser?.displayName || "",
+  );
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setDisplayName(authenticatedUser?.displayName || "");
+  }, [authenticatedUser?.displayName]);
+
+  if (!isNative) {
+    return null;
+  }
+
+  return (
+    <EntryShell>
+      <EntryHeader
+        title="Profile"
+        subtitle="Your mobile sign-in identity"
+        onBack={() => router.back()}
+      />
+      <div className="space-y-4 rounded-[24px] border border-white/10 bg-[#141418]/90 p-5 backdrop-blur-sm">
+        {authStatus === "signed_in" && authenticatedUser ? (
+          <>
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8b8b9c]">
+                Email
+              </p>
+              <p className="mt-2 text-sm text-white">{authenticatedUser.email}</p>
+            </div>
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8b8b9c]">
+                Display name
+              </p>
+              <input
+                value={displayName}
+                onChange={(event) => {
+                  setDisplayName(event.target.value);
+                  setError(null);
+                }}
+                className="mt-2 w-full rounded-2xl border border-white/10 bg-[#0a0a0d] px-4 py-3 text-sm text-white outline-none"
+              />
+            </div>
+            {error ? <p className="text-sm text-rose-300">{error}</p> : null}
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  setSaving(true);
+                  setError(null);
+                  await updateDisplayName(displayName);
+                } catch (err: any) {
+                  setError(err.message || "Unable to save profile.");
+                } finally {
+                  setSaving(false);
+                }
+              }}
+              disabled={saving}
+              className="w-full rounded-2xl bg-[#00e5a0] px-4 py-3 text-sm font-bold text-black disabled:opacity-60"
+            >
+              {saving ? "Saving..." : "Save display name"}
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                await signOut();
+                router.replace("/landing");
+              }}
+              className="w-full rounded-2xl border border-white/10 px-4 py-3 text-sm font-semibold text-white"
+            >
+              Sign out
+            </button>
+          </>
+        ) : (
+          <p className="text-sm text-[#8b8b9c]">
+            Sign in with Google from the mobile landing page to create your
+            profile.
+          </p>
+        )}
+      </div>
+    </EntryShell>
+  );
+}
+
+export default observer(ProfilePage);

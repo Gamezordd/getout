@@ -1,7 +1,9 @@
 import { observer } from "mobx-react-lite";
 import { useRouter } from "next/router";
 import { useState } from "react";
+import MobileAuthCard from "../components/MobileAuthCard";
 import { EntryShell, LandingHero } from "../components/entry/EntryFlow";
+import { useAuth } from "../lib/auth/AuthProvider";
 import { CATEGORY_OPTIONS } from "../lib/entryFlow";
 import { useAppStore } from "../lib/store/AppStoreProvider";
 import type { VenueCategory } from "../lib/types";
@@ -14,6 +16,7 @@ const CLOSE_VOTING_BADGES = [
 
 function LandingPage() {
   const store = useAppStore();
+  const { authStatus, authenticatedUser, isNative } = useAuth();
   const router = useRouter();
   const [category, setCategory] = useState<VenueCategory>("bar");
   const [closeVotingInHours, setCloseVotingInHours] = useState(3);
@@ -21,12 +24,17 @@ function LandingPage() {
   const [submitting, setSubmitting] = useState(false);
 
   const handleCreate = async () => {
+    if (isNative && authStatus !== "signed_in") {
+      setError("Sign in with Google to create a group in the mobile app.");
+      return;
+    }
     const sessionId = store.ensureSessionId(null);
     try {
       setSubmitting(true);
       setError(null);
       store.setSession(sessionId, "/");
       await store.joinGroup({
+        name: isNative ? authenticatedUser?.displayName : undefined,
         venueCategory: category,
         closeVotingInHours,
       });
@@ -44,6 +52,9 @@ function LandingPage() {
         onCreate={handleCreate}
         controls={
           <div className="mt-6 space-y-3 rounded-[24px] border border-white/10 bg-[#141418]/90 p-4 backdrop-blur-sm">
+            {isNative ? (
+              <MobileAuthCard className="border-none bg-transparent p-0" />
+            ) : null}
             <div>
               <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8b8b9c]">
                 Looking for
@@ -95,11 +106,19 @@ function LandingPage() {
             </div>
             {error ? <p className="text-sm text-rose-300">{error}</p> : null}
             <p className="text-xs text-[#64647a]">
-              We&apos;ll start with an approximate location, then ask for precise access inside the group.
+              {isNative
+                ? "Your Google profile name will be used automatically for mobile-created groups."
+                : "We&apos;ll start with an approximate location, then ask for precise access inside the group."}
             </p>
           </div>
         }
-        createButtonLabel={submitting ? "Creating group..." : "Create group"}
+        createButtonLabel={
+          isNative && authStatus !== "signed_in"
+            ? "Sign in to create"
+            : submitting
+              ? "Creating group..."
+              : "Create group"
+        }
       />
     </EntryShell>
   );

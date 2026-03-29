@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import { GroupPayload, saveGroup } from "../../lib/groupStore";
 import { User, Venue } from "../../lib/types";
+import { getAuthenticatedUser } from "../../lib/serverAuth";
 import {
   recomputeSuggestionsForGroup,
   syncManualVenueMetricsForGroup,
@@ -41,7 +42,10 @@ export const groupActions = (
           buildGroupResponse(group, existingMember.userId, existingMember.isOwner),
         );
     }
-    const trimmedName = payload.name?.trim() || "";
+    const authenticatedUser = await getAuthenticatedUser(req);
+
+    const trimmedName =
+      payload.name?.trim() || authenticatedUser?.displayName?.trim() || "";
     if (trimmedName.length > 0 && trimmedName.length < 3) {
       return res
         .status(400)
@@ -130,7 +134,9 @@ export const groupActions = (
     const user: User = {
       id: userId,
       name: trimmedName || null,
-      avatarUrl: buildAvatarUrl(trimmedName, resolvedLocationLabel || userId),
+      avatarUrl:
+        authenticatedUser?.avatarUrl ||
+        buildAvatarUrl(trimmedName, resolvedLocationLabel || userId),
       location: resolvedLocation,
       isOrganizer: isOwner,
       locationLabel: resolvedLocationLabel,

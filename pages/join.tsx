@@ -1,11 +1,14 @@
 import { observer } from "mobx-react-lite";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
+import MobileAuthCard from "../components/MobileAuthCard";
 import { EntryHeader, EntryShell } from "../components/entry/EntryFlow";
+import { useAuth } from "../lib/auth/AuthProvider";
 import { useAppStore } from "../lib/store/AppStoreProvider";
 
 function JoinPage() {
   const store = useAppStore();
+  const { authStatus, authenticatedUser, isNative } = useAuth();
   const router = useRouter();
   const sessionId =
     typeof router.query.sessionId === "string" ? router.query.sessionId : "";
@@ -23,13 +26,16 @@ function JoinPage() {
 
   useEffect(() => {
     if (!router.isReady || !sessionId || !store.browserId) return;
+    if (isNative && authStatus !== "signed_in") return;
 
     let cancelled = false;
     const run = async () => {
       try {
         setSubmitting(true);
         setError(null);
-        await store.joinGroup();
+        await store.joinGroup({
+          name: isNative ? authenticatedUser?.displayName : undefined,
+        });
         if (!cancelled) {
           router.replace({ pathname: "/", query: { sessionId } });
         }
@@ -48,7 +54,32 @@ function JoinPage() {
     return () => {
       cancelled = true;
     };
-  }, [router, router.isReady, sessionId, store, store.browserId]);
+  }, [
+    authStatus,
+    authenticatedUser?.displayName,
+    isNative,
+    router,
+    router.isReady,
+    sessionId,
+    store,
+    store.browserId,
+  ]);
+
+  if (isNative && authStatus !== "signed_in") {
+    return (
+      <EntryShell>
+        <EntryHeader
+          title="Sign in to join"
+          subtitle="Mobile users join groups with their Google profile."
+          onBack={() => router.push("/landing")}
+        />
+        <MobileAuthCard
+          title="Continue with Google to join"
+          subtitle="Once you sign in, we&apos;ll use your saved profile name when you enter this group."
+        />
+      </EntryShell>
+    );
+  }
 
   return (
     <EntryShell>

@@ -6,11 +6,19 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "cap:sync": "cap sync android",
+    "cap:android": "cap open android"
   },
   "dependencies": {
+    "@capacitor/android": "^8.3.0",
+    "@capacitor/cli": "^8.3.0",
+    "@capacitor/core": "^8.3.0",
+    "@neondatabase/serverless": "^1.0.2",
     "@upstash/redis": "^1.34.2",
+    "cookie": "^1.1.1",
     "framer-motion": "^12.34.0",
+    "google-auth-library": "^10.6.2",
     "mapbox-gl": "^3.6.0",
     "mobx": "^6.15.0",
     "mobx-react-lite": "^4.1.1",

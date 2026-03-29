@@ -46,6 +46,7 @@ export type JoinRequest = {
   sessionId: string;
   browserId: string;
   name?: string;
+  useAuthenticatedProfile?: boolean;
   location?: LatLng;
   locationLabel?: string;
   locationSource?: "ip" | "precise";

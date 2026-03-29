@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { observer } from "mobx-react-lite";
 import { useRouter } from "next/router";
 import useInstallPrompt from "../hooks/useInstallPrompt";
+import { useAuth } from "../lib/auth/AuthProvider";
 import { useAppStore } from "../lib/store/AppStoreProvider";
 
 type HeaderProps = {
@@ -10,6 +11,7 @@ type HeaderProps = {
 
 export const Header = observer(function Header({ onInviteClick }: HeaderProps) {
   const store = useAppStore();
+  const { authenticatedUser, isNative } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const router = useRouter();
@@ -168,6 +170,26 @@ export const Header = observer(function Header({ onInviteClick }: HeaderProps) {
                   </svg>
                   Edit location
                 </button>
+                {isNative && authenticatedUser ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      router.push("/profile");
+                    }}
+                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-[#f0f0f5] hover:bg-white/5"
+                  >
+                    <svg
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                      aria-hidden="true"
+                      className="h-4 w-4 text-[#8b8b9c]"
+                    >
+                      <path d="M10 2a4 4 0 100 8 4 4 0 000-8ZM4 16a6 6 0 1112 0H4Z" />
+                    </svg>
+                    Profile
+                  </button>
+                ) : null}
               </div>
             )}
           </div>

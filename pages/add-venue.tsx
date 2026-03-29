@@ -2,6 +2,7 @@ import { observer } from "mobx-react-lite";
 import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
 import PlaceSearch, { PlaceResult } from "../components/PlaceSearch";
+import { isGoogleMapsShareUrl } from "../lib/nativeShare";
 import { useAppStore } from "../lib/store/AppStoreProvider";
 
 function AddVenuePage() {
@@ -9,9 +10,15 @@ function AddVenuePage() {
   const router = useRouter();
   const sessionId =
     typeof router.query.sessionId === "string" ? router.query.sessionId : "";
+  const sharedMapsUrl =
+    typeof router.query.sharedMapsUrl === "string"
+      ? router.query.sharedMapsUrl
+      : "";
   const [venues, setVenues] = useState<PlaceResult[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [isResolvingSharedLink, setIsResolvingSharedLink] = useState(false);
+  const [resolvedSharedUrl, setResolvedSharedUrl] = useState<string | null>(null);
 
   const organizerLocation = useMemo(() => {
     const organizer = store.users.find((user) => user.isOrganizer);
@@ -21,11 +28,13 @@ function AddVenuePage() {
   useEffect(() => {
     if (!router.isReady) return;
     if (!sessionId) {
-      router.replace({ pathname: "/create" }, undefined, { shallow: true });
+      if (!sharedMapsUrl) {
+        router.replace({ pathname: "/create" }, undefined, { shallow: true });
+      }
       return;
     }
     store.setSession(sessionId, "/");
-  }, [router, router.isReady, sessionId, store]);
+  }, [router, router.isReady, sessionId, sharedMapsUrl, store]);
 
   useEffect(() => {
     if (!sessionId) return;
@@ -49,6 +58,71 @@ function AddVenuePage() {
     store.identityResolved,
     store.sessionId,
   ]);
+
+  useEffect(() => {
+    if (!router.isReady || !sharedMapsUrl || resolvedSharedUrl === sharedMapsUrl) {
+      return;
+    }
+    if (!isGoogleMapsShareUrl(sharedMapsUrl)) {
+      setError("Only Google Maps links can be imported right now.");
+      setResolvedSharedUrl(sharedMapsUrl);
+      return;
+    }
+
+    let cancelled = false;
+
+    const resolveSharedPlace = async () => {
+      try {
+        setIsResolvingSharedLink(true);
+        setError(null);
+        const response = await fetch(
+          `/api/resolve-shared-place?url=${encodeURIComponent(sharedMapsUrl)}`,
+        );
+        if (!response.ok) {
+          const payload = await response.json().catch(() => ({}));
+          throw new Error(payload.message || "Unable to import Google Maps link.");
+        }
+
+        const data = (await response.json()) as { result?: PlaceResult };
+        const resolvedPlace = data.result;
+        if (!resolvedPlace || cancelled) return;
+
+        setVenues((current) => {
+          if (current.some((item) => item.id === resolvedPlace.id)) {
+            return current;
+          }
+          return [...current, resolvedPlace];
+        });
+        setResolvedSharedUrl(sharedMapsUrl);
+
+        const nextQuery =
+          sessionId && sessionId.length > 0 ? { sessionId } : {};
+        void router.replace(
+          {
+            pathname: "/add-venue",
+            query: nextQuery,
+          },
+          undefined,
+          { shallow: true },
+        );
+      } catch (err: any) {
+        if (!cancelled) {
+          setError(err.message || "Unable to import Google Maps link.");
+          setResolvedSharedUrl(sharedMapsUrl);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsResolvingSharedLink(false);
+        }
+      }
+    };
+
+    void resolveSharedPlace();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [resolvedSharedUrl, router, router.isReady, sessionId, sharedMapsUrl]);
 
   const handleAddVenue = async () => {
     if (!store.sessionId) {
@@ -107,6 +181,17 @@ function AddVenuePage() {
         </div>
 
         <div className="mt-4 space-y-4">
+          {sharedMapsUrl ? (
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+              <p className="text-sm font-semibold text-ink">
+                Importing shared Google Maps link
+              </p>
+              <p className="mt-1 break-all text-sm text-slate-500">
+                {sharedMapsUrl}
+              </p>
+            </div>
+          ) : null}
+
           <PlaceSearch
             label="Venue"
             placeholder="Search for a specific bar"
@@ -130,6 +215,9 @@ function AddVenuePage() {
               setError(null);
             }}
           />
+          {isResolvingSharedLink ? (
+            <p className="text-base text-slate-500">Importing shared venue...</p>
+          ) : null}
 
           {venues.length > 0 && (
             <div className="space-y-2 rounded-2xl border border-slate-200 bg-slate-50 p-3 max-h-[45vh] overflow-y-auto">
