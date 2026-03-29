@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import { GroupPayload, saveGroup } from "../../lib/groupStore";
 import { User, Venue } from "../../lib/types";
+import { acceptInviteForSession } from "../../lib/inviteStore";
 import { getAuthenticatedUser } from "../../lib/serverAuth";
 import {
   recomputeSuggestionsForGroup,
@@ -138,6 +139,7 @@ export const groupActions = (
         authenticatedUser?.avatarUrl ||
         buildAvatarUrl(trimmedName, resolvedLocationLabel || userId),
       location: resolvedLocation,
+      authenticatedUserId: authenticatedUser?.id,
       isOrganizer: isOwner,
       locationLabel: resolvedLocationLabel,
       locationSource: resolvedLocationSource,
@@ -155,6 +157,12 @@ export const groupActions = (
       });
     } else {
       await saveGroup(payload.sessionId, group);
+    }
+    if (authenticatedUser) {
+      await acceptInviteForSession({
+        sessionId: payload.sessionId,
+        recipientUserId: authenticatedUser.id,
+      });
     }
     await safeTrigger(channel, "group-updated", { reason: "join", userId: user.id });
     return res.status(200).json(buildGroupResponse(group, user.id, isOwner));

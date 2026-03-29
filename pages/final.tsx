@@ -229,7 +229,7 @@ function FinalPage() {
                     key={user.id}
                     className={`-ml-2 flex h-8 w-8 items-center justify-center rounded-full border-2 border-[#0a0a0d] bg-gradient-to-br text-[10px] font-bold first:ml-0 ${background}`}
                   >
-                    {getInitials(user.name)}
+                    {getInitials(user.name || "Guest")}
                   </div>
                 );
               })}
@@ -371,7 +371,7 @@ function FinalPage() {
                           : AVATAR_BACKGROUNDS[index % AVATAR_BACKGROUNDS.length]
                       }`}
                     >
-                      {getInitials(user.name)}
+                      {getInitials(user.name || "Guest")}
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">

@@ -6,6 +6,10 @@ import { Toaster } from "sonner";
 import { AuthProvider } from "../lib/auth/AuthProvider";
 import { initInstallPrompt } from "../lib/installPrompt";
 import {
+  addNativeNotificationActionListener,
+  isNativeNotificationsSupported,
+} from "../lib/nativeNotifications";
+import {
   getLastSessionId,
   isGoogleMapsShareUrl,
   registerNativeShareListener,
@@ -64,38 +68,76 @@ export default function App({ Component, pageProps }: AppProps) {
     };
   }, [router]);
 
+  useEffect(() => {
+    if (!isNativeNotificationsSupported()) return;
+
+    let listener:
+      | {
+          remove: () => Promise<void>;
+        }
+      | undefined;
+
+    const handleRoute = (route?: string | null) => {
+      if (!route) return;
+      void router.push(route);
+    };
+
+    const init = async () => {
+      listener = await addNativeNotificationActionListener((payload) => {
+        handleRoute(payload.route);
+      }).catch(() => undefined);
+    };
+
+    void init();
+
+    return () => {
+      void listener?.remove();
+    };
+  }, [router]);
+
   return (
     <AuthProvider>
       <AppStoreProvider>
         <Head>
-          <title>GetOut</title>
+          <title>GetOut — Pick a place in 2 minutes</title>
+
           <meta
             name="description"
-            content="Find the best spot for everyone. Fast, simple, and free."
+            content="Stop the WhatsApp chaos. Vote with friends and lock a place in minutes."
           />
+
           <meta name="theme-color" content="#111827" />
+
           <meta name="mobile-web-app-capable" content="yes" />
           <meta name="apple-mobile-web-app-capable" content="yes" />
-          <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+          <meta
+            name="apple-mobile-web-app-status-bar-style"
+            content="default"
+          />
           <meta name="apple-mobile-web-app-title" content="GetOut" />
+
           <link rel="manifest" href="/manifest.webmanifest" />
           <link rel="icon" href="/icons/getout_icon.png" />
           <link rel="apple-touch-icon" href="/icons/getout_icon_md.png" />
-          <meta property="og:title" content="GetOut" />
+
+          {/* Open Graph (WhatsApp, Facebook, etc.) */}
+          <meta property="og:title" content="Pick a place in 2 minutes" />
           <meta
             property="og:description"
-            content="Find the best spot for everyone. Fast, simple, and free."
+            content="No more group chat chaos. Vote and lock a place instantly."
           />
           <meta property="og:type" content="website" />
           {siteUrl && <meta property="og:url" content={siteUrl} />}
           <meta property="og:image" content={ogImage} />
           <meta property="og:image:width" content="512" />
           <meta property="og:image:height" content="512" />
-          <meta name="twitter:card" content="summary" />
-          <meta name="twitter:title" content="GetOut" />
+
+          {/* Twitter */}
+          <meta name="twitter:card" content="summary_large_image" />
+          <meta name="twitter:title" content="Pick a place in 2 minutes" />
           <meta
             name="twitter:description"
-            content="Find the best spot for everyone. Fast, simple, and free."
+            content="Stop the back and forth. Decide with your group instantly."
           />
           <meta name="twitter:image" content={ogImage} />
         </Head>

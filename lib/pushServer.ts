@@ -1,4 +1,11 @@
+import { cert, getApp, getApps, initializeApp } from "firebase-admin/app";
+import { getMessaging, type Messaging } from "firebase-admin/messaging";
 import webpush from "web-push";
+import {
+  getUserNotificationEndpoints,
+  revokeUserNotificationEndpointByEndpoint,
+  revokeUserNotificationEndpointByToken,
+} from "./inviteStore";
 import type { GroupPayload } from "./groupStore";
 
 type SendResult = {
@@ -6,6 +13,7 @@ type SendResult = {
 };
 
 let isConfigured = false;
+let firebaseMessaging: Messaging | null | undefined;
 
 const configureWebPush = () => {
   if (isConfigured) return true;
@@ -55,6 +63,47 @@ const buildVenueLockedPayload = (params: {
   const url = `/?sessionId=${encodeURIComponent(sessionId)}`;
 
   return { title, body, url };
+};
+
+const getFirebaseServiceAccount = () => {
+  const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+  if (!raw) {
+    return null;
+  }
+
+  const parsed = JSON.parse(raw) as {
+    project_id: string;
+    client_email: string;
+    private_key: string;
+  };
+
+  return {
+    projectId: parsed.project_id,
+    clientEmail: parsed.client_email,
+    privateKey: parsed.private_key.replace(/\\n/g, "\n"),
+  };
+};
+
+const getFirebaseMessagingClient = () => {
+  if (firebaseMessaging !== undefined) {
+    return firebaseMessaging;
+  }
+
+  const serviceAccount = getFirebaseServiceAccount();
+  if (!serviceAccount) {
+    firebaseMessaging = null;
+    return firebaseMessaging;
+  }
+
+  const app =
+    getApps().length > 0
+      ? getApp()
+      : initializeApp({
+          credential: cert(serviceAccount),
+        });
+
+  firebaseMessaging = getMessaging(app);
+  return firebaseMessaging;
 };
 
 export const sendVoteNotifications = async (params: {
@@ -125,4 +174,79 @@ export const sendVenueLockedNotifications = async (params: {
   );
 
   return { staleUserIds };
+};
+
+export const sendInviteNotification = async (params: {
+  inviteId: string;
+  recipientUserId: string;
+  inviterDisplayName: string;
+  sessionId: string;
+}) => {
+  const endpoints = await getUserNotificationEndpoints(params.recipientUserId);
+  if (endpoints.length === 0) {
+    return { delivered: 0 };
+  }
+
+  const title = "Group invite";
+  const body = `${params.inviterDisplayName} invited you to contribute to a group.`;
+  const route = `/join?sessionId=${encodeURIComponent(params.sessionId)}`;
+  const payload = JSON.stringify({
+    title,
+    body,
+    url: route,
+    inviteId: params.inviteId,
+  });
+  const webPushConfigured = configureWebPush();
+  const messaging = getFirebaseMessagingClient();
+
+  let delivered = 0;
+  await Promise.all(
+    endpoints.map(async (endpoint) => {
+      if (endpoint.provider === "fcm") {
+        if (!messaging || !endpoint.token) return;
+        try {
+          await messaging.send({
+            token: endpoint.token,
+            android: {
+              priority: "high",
+            },
+            data: {
+              type: "group_invite",
+              title,
+              body,
+              inviteId: params.inviteId,
+              sessionId: params.sessionId,
+              route,
+            },
+          });
+          delivered += 1;
+        } catch (error: any) {
+          const code = error?.code;
+          if (
+            code === "messaging/registration-token-not-registered" ||
+            code === "messaging/invalid-registration-token"
+          ) {
+            await revokeUserNotificationEndpointByToken(endpoint.token);
+          }
+        }
+        return;
+      }
+
+      if (!webPushConfigured || !endpoint.subscription || !endpoint.endpoint) return;
+      try {
+        await webpush.sendNotification(
+          endpoint.subscription as webpush.PushSubscription,
+          payload,
+        );
+        delivered += 1;
+      } catch (error: any) {
+        const statusCode = error?.statusCode;
+        if (statusCode === 404 || statusCode === 410) {
+          await revokeUserNotificationEndpointByEndpoint(endpoint.endpoint);
+        }
+      }
+    }),
+  );
+
+  return { delivered };
 };

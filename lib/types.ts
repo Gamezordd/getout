@@ -8,6 +8,7 @@ export type User = {
   name?: string | null;
   avatarUrl: string;
   location: LatLng;
+  authenticatedUserId?: string;
   isOrganizer?: boolean;
   locationLabel?: string | null;
   locationSource?: "ip" | "precise";

@@ -30,3 +30,10 @@ The Android manifest is configured as a share target for `text/plain`. When a us
 - Set `DATABASE_URL` and `GOOGLE_AUTH_SERVER_CLIENT_ID` in your environment.
 - For Android builds, also provide `GOOGLE_AUTH_SERVER_CLIENT_ID` to Gradle or add `google.auth.serverClientId=...` to `android/local.properties`.
 - Web keeps the existing anonymous/open flow; only the native app shows Google sign-in.
+
+## Android FCM invite notifications
+
+- Invite notifications now use FCM for authenticated Android app users and keep Web Push for browser users.
+- Add `android/app/google-services.json` from your Firebase project before running Android builds.
+- Set `FIREBASE_SERVICE_ACCOUNT_JSON` on the server so the Next.js API can send FCM messages.
+- Android notification taps deep-link into `/join?sessionId=...` inside the Capacitor app.

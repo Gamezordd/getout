@@ -1,4 +1,5 @@
 import { Capacitor, registerPlugin } from "@capacitor/core";
+export { addNativeTokenRefreshListener } from "./nativeNotifications";
 
 type GoogleAuthResult = {
   idToken: string;

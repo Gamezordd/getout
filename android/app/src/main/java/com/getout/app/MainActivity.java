@@ -12,13 +12,17 @@ public class MainActivity extends BridgeActivity {
     protected void onCreate(android.os.Bundle savedInstanceState) {
         registerPlugin(ShareIntentPlugin.class);
         registerPlugin(GoogleAuthPlugin.class);
+        registerPlugin(NativeNotificationsPlugin.class);
         super.onCreate(savedInstanceState);
+        handleShareIntent(getIntent());
+        handleNotificationIntent(getIntent());
     }
 
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         handleShareIntent(intent);
+        handleNotificationIntent(intent);
     }
 
     private void handleShareIntent(Intent intent) {
@@ -46,5 +50,9 @@ public class MainActivity extends BridgeActivity {
         if (plugin instanceof ShareIntentPlugin) {
             ((ShareIntentPlugin) plugin).emitPendingShare(sharedText);
         }
+    }
+
+    private void handleNotificationIntent(Intent intent) {
+        NativeNotificationsPlugin.handleNotificationIntent(intent);
     }
 }

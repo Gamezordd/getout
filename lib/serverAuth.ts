@@ -22,7 +22,7 @@ type GoogleClaims = {
   picture?: string | null;
 };
 
-const getSql = () => {
+export const getSql = () => {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
     throw new Error("Missing DATABASE_URL.");
@@ -43,7 +43,7 @@ const getGoogleClient = () => {
 
 let schemaReady: Promise<void> | null = null;
 
-const ensureSchema = async () => {
+export const ensureAuthSchema = async () => {
   if (!schemaReady) {
     schemaReady = (async () => {
       const sql = getSql();
@@ -129,7 +129,7 @@ export const verifyGoogleIdToken = async (idToken: string) => {
 };
 
 export const upsertGoogleUser = async (claims: GoogleClaims) => {
-  await ensureSchema();
+  await ensureAuthSchema();
   const sql = getSql();
   const rows = (await sql`
     INSERT INTO users (id, google_sub, email, display_name, avatar_url, updated_at)
@@ -156,7 +156,7 @@ export const createUserSession = async (
   req: NextApiRequest,
   res: NextApiResponse,
 ) => {
-  await ensureSchema();
+  await ensureAuthSchema();
   const sql = getSql();
   const sessionId = randomBytes(32).toString("base64url");
   const expiresAt = new Date(Date.now() + SESSION_DURATION_MS);
@@ -174,7 +174,7 @@ export const createUserSession = async (
 };
 
 export const getAuthenticatedUser = async (req: NextApiRequest) => {
-  await ensureSchema();
+  await ensureAuthSchema();
   const sessionId = getSessionIdFromRequest(req);
   if (!sessionId) return null;
   const sql = getSql();
@@ -199,7 +199,7 @@ export const requireAuthenticatedUser = async (req: NextApiRequest) => {
 };
 
 export const revokeSession = async (req: NextApiRequest, res: NextApiResponse) => {
-  await ensureSchema();
+  await ensureAuthSchema();
   const sessionId = getSessionIdFromRequest(req);
   if (sessionId) {
     const sql = getSql();
@@ -217,7 +217,7 @@ export const updateAuthenticatedDisplayName = async (
   userId: string,
   displayName: string,
 ) => {
-  await ensureSchema();
+  await ensureAuthSchema();
   const trimmedName = displayName.trim();
   if (trimmedName.length < 3) {
     throw new Error("Name must be at least 3 characters.");
@@ -234,4 +234,16 @@ export const updateAuthenticatedDisplayName = async (
     throw new Error("User not found.");
   }
   return mapUser(rows[0]);
+};
+
+export const getUserById = async (userId: string) => {
+  await ensureAuthSchema();
+  const sql = getSql();
+  const rows = (await sql`
+    SELECT id, email, display_name, avatar_url
+    FROM users
+    WHERE id = ${userId}
+    LIMIT 1
+  `) as UserRow[];
+  return rows[0] ? mapUser(rows[0]) : null;
 };

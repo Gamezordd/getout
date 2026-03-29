@@ -7,3 +7,32 @@ export type AuthenticatedUser = {
 };
 
 export type AuthStatus = "unknown" | "signed_out" | "signing_in" | "signed_in";
+
+export type InviteStatus = "pending" | "accepted" | "dismissed" | "expired";
+
+export type NotificationProvider = "fcm" | "webpush";
+
+export type NotificationEndpoint = {
+  id: string;
+  userId: string;
+  provider: NotificationProvider;
+  platform?: string | null;
+  token?: string | null;
+  endpoint?: string | null;
+  subscription?: PushSubscriptionJSON | null;
+  appVersion?: string | null;
+  revokedAt?: string | null;
+};
+
+export type InviteListItem = {
+  id: string;
+  sessionId: string;
+  inviter: {
+    id: string;
+    displayName: string;
+    avatarUrl?: string | null;
+  };
+  createdAt: string;
+  joinUrl: string;
+  status: InviteStatus;
+};

@@ -17,6 +17,7 @@
     "@neondatabase/serverless": "^1.0.2",
     "@upstash/redis": "^1.34.2",
     "cookie": "^1.1.1",
+    "firebase-admin": "^13.5.0",
     "framer-motion": "^12.34.0",
     "google-auth-library": "^10.6.2",
     "mapbox-gl": "^3.6.0",

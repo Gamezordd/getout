@@ -8,10 +8,15 @@ import {
 } from "react";
 import type { AuthenticatedUser, AuthStatus } from "../authTypes";
 import {
+  registerUserPushSubscription,
+  unregisterUserPushSubscription,
+} from "../pushClient";
+import {
   isNativePlatform,
   signInWithNativeGoogle,
   signOutOfNativeGoogle,
 } from "../nativeGoogleAuth";
+import { addNativeTokenRefreshListener } from "../nativeNotifications";
 
 type AuthContextValue = {
   authStatus: AuthStatus;
@@ -71,6 +76,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAuthenticatedUser(null);
   }, []);
 
+  useEffect(() => {
+    if (!authenticatedUser) return;
+    registerUserPushSubscription().catch(() => undefined);
+  }, [authenticatedUser?.id]);
+
+  useEffect(() => {
+    if (!isNative || !authenticatedUser) return;
+
+    let handle:
+      | {
+          remove: () => Promise<void>;
+        }
+      | undefined;
+
+    const init = async () => {
+      handle = await addNativeTokenRefreshListener(async ({ token }) => {
+        if (!token) return;
+        await fetch("/api/push/register-user", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            provider: "fcm",
+            platform: "android",
+            token,
+          }),
+        }).catch(() => undefined);
+      }).catch(() => undefined);
+    };
+
+    void init();
+
+    return () => {
+      void handle?.remove();
+    };
+  }, [authenticatedUser?.id, isNative]);
+
   const signIn = async () => {
     setAuthStatus("signing_in");
     const nativeResult = await signInWithNativeGoogle();
@@ -96,6 +137,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
+    await unregisterUserPushSubscription().catch(() => undefined);
     await fetch("/api/auth/logout", {
       method: "POST",
       headers: {
