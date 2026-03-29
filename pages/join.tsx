@@ -77,6 +77,25 @@ function JoinPage() {
   }, [sessionId, store]);
 
   useEffect(() => {
+    if (!router.isReady || !store.sessionId || store.isLoadingGroup) return;
+    if (!store.lockedVenue) return;
+
+    router.replace(
+      { pathname: "/final", query: { sessionId: store.sessionId } },
+      undefined,
+      {
+        shallow: true,
+      },
+    );
+  }, [
+    router,
+    router.isReady,
+    store.isLoadingGroup,
+    store.lockedVenue,
+    store.sessionId,
+  ]);
+
+  useEffect(() => {
     if (!location) return;
     if (isLocationTooFar) {
       setLocationError(LOCATION_DISTANCE_ERROR);

@@ -26,7 +26,29 @@ export default function useRedirections() {
   }, [router.isReady, router.pathname, router.query.sessionId, store]);
 
   useEffect(() => {
+    if (!router.isReady || !store.sessionId || store.isLoadingGroup) return;
+    if (!store.lockedVenue) return;
+    if (router.pathname === "/final") return;
+
+    router.replace(
+      { pathname: "/final", query: { sessionId: store.sessionId } },
+      undefined,
+      {
+        shallow: true,
+      },
+    );
+  }, [
+    router,
+    router.isReady,
+    router.pathname,
+    store.isLoadingGroup,
+    store.lockedVenue,
+    store.sessionId,
+  ]);
+
+  useEffect(() => {
     if (!router.isReady || !store.sessionId || !store.identityResolved) return;
+    if (store.lockedVenue) return;
     if (store.currentUserId) return;
 
     router.replace(
@@ -41,6 +63,7 @@ export default function useRedirections() {
     router.isReady,
     store.currentUserId,
     store.identityResolved,
+    store.lockedVenue,
     store.sessionId,
   ]);
 
