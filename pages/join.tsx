@@ -37,7 +37,16 @@ function JoinPage() {
           name: isNative ? authenticatedUser?.displayName : undefined,
         });
         if (!cancelled) {
-          router.replace({ pathname: "/", query: { sessionId } });
+          if(!store.lockedVenue){
+            return router.replace({ pathname: "/", query: { sessionId } });
+          }
+          return router.replace(
+            { pathname: "/final", query: { sessionId: store.sessionId } },
+            undefined,
+            {
+              shallow: true,
+            },
+          );
         }
       } catch (err: any) {
         if (!cancelled) {

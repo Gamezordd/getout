@@ -5,7 +5,6 @@ import { useAuth } from "../lib/auth/AuthProvider";
 import { useAppStore } from "../lib/store/AppStoreProvider";
 import FinalizeDialog from "../components/FinalizeDialog";
 import { Header } from "../components/Header";
-import LockedVenueDialog from "../components/LockedVenueDialog";
 import InviteDialog from "../components/InviteDialog";
 import usePusher from "../hooks/usePusher";
 import useRedirections from "../hooks/useRedirections";
@@ -362,8 +361,6 @@ function HomePage() {
         showFinalizeDialog={showFinalizeDialog}
         setShowFinalizeDialog={setShowFinalizeDialog}
       />
-
-      <LockedVenueDialog />
       <InviteDialog
         isOpen={showInviteDialog}
         title={inviteDialogTitle}
