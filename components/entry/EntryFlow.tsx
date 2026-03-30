@@ -21,7 +21,7 @@ const tickerItems = [
   "🍸 Ravi's crew picked Pangeo · 3m ago",
   "🎉 5 friends heading to Church St Social",
   "📍 Sana just joined a group in Bengaluru",
-  "⚡ Decided in 4 minutes · no WhatsApp drama",
+  "⚡ Decided in 15 minutes · no WhatsApp drama",
 ];
 
 type EntryShellProps = {
@@ -193,7 +193,7 @@ export function LandingHero({
             ))}
           </div>
           <div className="text-xs text-[#64647a]">
-            <span className="font-semibold text-white">2,400+</span> groups decided this week
+            <span className="font-semibold text-white">10+</span> groups decided this week
           </div>
         </div>
 

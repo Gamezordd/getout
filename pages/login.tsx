@@ -158,7 +158,7 @@ export default function LoginPage() {
                 ))}
               </div>
               <div className="text-xs text-[#5a5a70]">
-                <span className="font-medium text-white/70">2,400+</span> groups this week
+                <span className="font-medium text-white/70">10+</span> groups this week
               </div>
             </div>
           </section>
