@@ -1,12 +1,15 @@
 import { useRouter } from "next/router";
 import { useAppStore } from "../lib/store/AppStoreProvider";
 import { useEffect } from "react";
+import { useAuth } from "../lib/auth/AuthProvider";
 
 export default function useRedirections() {
   const store = useAppStore();
   const router = useRouter();
+  const { authStatus, isNative, startupResolved } = useAuth();
   useEffect(() => {
     if (!router.isReady) return;
+    if (!startupResolved) return;
 
     const sessionId =
       typeof router.query.sessionId === "string"
@@ -14,16 +17,26 @@ export default function useRedirections() {
         : null;
 
     if (!sessionId) {
-      router.replace(
-        { pathname: "/landing" },
-        undefined,
-        { shallow: true },
-      );
+      if (isNative && authStatus === "signed_out") {
+        router.replace(
+          { pathname: "/login", query: { redirect: "/dashboard" } },
+          undefined,
+          { shallow: true },
+        );
+        return;
+      }
+      if (isNative && authStatus === "signed_in") {
+        router.replace({ pathname: "/dashboard" }, undefined, {
+          shallow: true,
+        });
+        return;
+      }
+      router.replace({ pathname: "/landing" }, undefined, { shallow: true });
       return;
     }
 
     store.setSession(sessionId, router.pathname);
-  }, [router.isReady, router.pathname, router.query.sessionId, store]);
+  }, [authStatus, isNative, router.isReady, router.pathname, router.query.sessionId, startupResolved, store]);
 
   useEffect(() => {
     if (!router.isReady || !store.sessionId || store.isLoadingGroup) return;
@@ -51,6 +64,23 @@ export default function useRedirections() {
     if (store.lockedVenue) return;
     if (store.currentUserId) return;
 
+    if (!startupResolved) return;
+    if (isNative && authStatus === "signed_out") {
+      router.replace(
+        {
+          pathname: "/login",
+          query: {
+            redirect: `/join?sessionId=${encodeURIComponent(store.sessionId)}`,
+          },
+        },
+        undefined,
+        {
+          shallow: true,
+        },
+      );
+      return;
+    }
+
     router.replace(
       { pathname: "/join", query: { sessionId: store.sessionId } },
       undefined,
@@ -65,6 +95,9 @@ export default function useRedirections() {
     store.identityResolved,
     store.lockedVenue,
     store.sessionId,
+    authStatus,
+    isNative,
+    startupResolved,
   ]);
 
   useEffect(() => {

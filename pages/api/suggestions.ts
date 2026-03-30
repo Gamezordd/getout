@@ -14,7 +14,7 @@ import {
   GroupPayload,
   SuggestionsSnapshot,
   createEmptySuggestionsSnapshot,
-  getGroup,
+  findGroup,
   saveGroup,
 } from "../../lib/groupStore";
 import { CacheEntry, DistanceMatrixRow, SuggestionsResponse } from "./types";
@@ -581,7 +581,10 @@ export default async function handler(
   const browserId =
     typeof req.query.browserId === "string" ? req.query.browserId : null;
 
-  const group = await getGroup(sessionId);
+  const group = await findGroup(sessionId);
+  if (!group) {
+    return res.status(404).json({ message: "Group not found." });
+  }
   await ensureVotingDeadlineState({ sessionId, group });
   if (group.users.length === 0) {
     return res.status(200).json({

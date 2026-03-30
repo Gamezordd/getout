@@ -49,5 +49,5 @@ export const getClosingTimeLabel = (
     return undefined;
   }
 
-  return `Closes ${TIME_FORMATTER.format(nextClose)}`;
+  return `${TIME_FORMATTER.format(nextClose)}`;
 };

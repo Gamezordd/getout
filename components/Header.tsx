@@ -2,14 +2,22 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { observer } from "mobx-react-lite";
 import { useRouter } from "next/router";
 import useInstallPrompt from "../hooks/useInstallPrompt";
+import { useAuth } from "../lib/auth/AuthProvider";
 import { useAppStore } from "../lib/store/AppStoreProvider";
 
 type HeaderProps = {
   onInviteClick: () => void;
+  showNativeBackButton?: boolean;
+  onBackClick?: () => void;
 };
 
-export const Header = observer(function Header({ onInviteClick }: HeaderProps) {
+export const Header = observer(function Header({
+  onInviteClick,
+  showNativeBackButton = false,
+  onBackClick,
+}: HeaderProps) {
   const store = useAppStore();
+  const { authenticatedUser, isNative } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const router = useRouter();
@@ -53,9 +61,23 @@ export const Header = observer(function Header({ onInviteClick }: HeaderProps) {
   return (
     <header className="sticky top-0 z-20 border-b border-white/10 bg-[#0a0a0d]/90 px-4 py-3 backdrop-blur-xl">
       <div className="mx-auto relative flex max-w-[430px] items-center justify-between gap-3">
-        <h1 className="font-display text-xl font-extrabold tracking-[-0.04em] text-[#f0f0f5]">
-          Get<span className="text-[#00e5a0]">Out</span>
-        </h1>
+        <div className="flex items-center gap-3">
+          {showNativeBackButton && isNative ? (
+            <button
+              type="button"
+              onClick={onBackClick}
+              className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-[#f0f0f5]"
+              aria-label="Back to dashboard"
+            >
+              <svg viewBox="0 0 16 16" fill="none" aria-hidden="true" className="h-4 w-4">
+                <path d="M10 3 5 8l5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+          ) : null}
+          <h1 className="font-display text-xl font-extrabold tracking-[-0.04em] text-[#f0f0f5]">
+            Get<span className="text-[#00e5a0]">Out</span>
+          </h1>
+        </div>
         <div className="flex items-center gap-2">
           {store.shareUrl && (
             <button
@@ -168,6 +190,26 @@ export const Header = observer(function Header({ onInviteClick }: HeaderProps) {
                   </svg>
                   Edit location
                 </button>
+                {isNative && authenticatedUser ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      router.push("/profile");
+                    }}
+                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-[#f0f0f5] hover:bg-white/5"
+                  >
+                    <svg
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                      aria-hidden="true"
+                      className="h-4 w-4 text-[#8b8b9c]"
+                    >
+                      <path d="M10 2a4 4 0 100 8 4 4 0 000-8ZM4 16a6 6 0 1112 0H4Z" />
+                    </svg>
+                    Profile
+                  </button>
+                ) : null}
               </div>
             )}
           </div>

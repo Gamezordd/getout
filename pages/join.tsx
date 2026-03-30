@@ -1,66 +1,25 @@
 import { observer } from "mobx-react-lite";
 import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
-import { EntryShell, JoinGroupForm } from "../components/entry/EntryFlow";
-import { PlaceResult } from "../components/PlaceSearch";
-import { getDistanceKm } from "../lib/distance";
+import { EntryHeader, EntryShell } from "../components/entry/EntryFlow";
+import { useAuth } from "../lib/auth/AuthProvider";
 import { useAppStore } from "../lib/store/AppStoreProvider";
-
-const MAX_JOIN_DISTANCE_KM = 80;
-const LOCATION_DISTANCE_ERROR =
-  "Provided location is too far from the group location.";
 
 function JoinPage() {
   const store = useAppStore();
+  const { authStatus, authenticatedUser, isNative } = useAuth();
   const router = useRouter();
   const sessionId =
     typeof router.query.sessionId === "string" ? router.query.sessionId : "";
-  const [name, setName] = useState("");
-  const [location, setLocation] = useState<PlaceResult | null>(null);
-  const [saveDetails, setSaveDetails] = useState(true);
+  const loginRedirect = useMemo(
+    () =>
+      sessionId
+        ? `/join?sessionId=${encodeURIComponent(sessionId)}`
+        : "/landing",
+    [sessionId],
+  );
   const [error, setError] = useState<string | null>(null);
-  const [locationError, setLocationError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [locating, setLocating] = useState(false);
-  const trimmedName = name.trim();
-  const normalizedName = trimmedName.toLowerCase();
-  const nameTooShort = trimmedName.length > 0 && trimmedName.length < 3;
-  const nameTaken = store.users.some(
-    (user) => user.name.trim().toLowerCase() === normalizedName,
-  );
-  const isNameValid = trimmedName.length >= 3 && !nameTaken;
-
-  const organizerLocation = useMemo(() => {
-    const organizer = store.users.find((user) => user.isOrganizer);
-    return organizer?.location;
-  }, [store.users]);
-  const organizer = useMemo(
-    () => store.users.find((user) => user.isOrganizer) || null,
-    [store.users],
-  );
-
-  const isLocationTooFar = useMemo(() => {
-    if (!location || !organizerLocation) return false;
-    return (
-      getDistanceKm(location.location, organizerLocation) > MAX_JOIN_DISTANCE_KM
-    );
-  }, [location, organizerLocation]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const stored = localStorage.getItem("getout-user-details");
-    if (!stored) return;
-    try {
-      const payload = JSON.parse(stored) as {
-        name?: string;
-        place?: PlaceResult;
-      };
-      if (payload?.name) setName(payload.name);
-      if (payload?.place) setLocation(payload.place);
-    } catch {
-      // ignore malformed storage
-    }
-  }, []);
 
   useEffect(() => {
     if (!router.isReady) return;
@@ -72,169 +31,84 @@ function JoinPage() {
   }, [router, router.isReady, sessionId, store]);
 
   useEffect(() => {
-    if (!sessionId) return;
-    store.loadGroup();
-  }, [sessionId, store]);
+    if (!router.isReady || !isNative || authStatus !== "signed_out") return;
+    void router.replace({
+      pathname: "/login",
+      query: { redirect: loginRedirect },
+    });
+  }, [authStatus, isNative, loginRedirect, router, router.isReady]);
 
   useEffect(() => {
-    if (!router.isReady || !store.sessionId || store.isLoadingGroup) return;
-    if (!store.lockedVenue) return;
+    if (!router.isReady || !sessionId || !store.browserId) return;
+    if (isNative && authStatus !== "signed_in") return;
 
-    router.replace(
-      { pathname: "/final", query: { sessionId: store.sessionId } },
-      undefined,
-      {
-        shallow: true,
-      },
-    );
+    let cancelled = false;
+    const run = async () => {
+      try {
+        setSubmitting(true);
+        setError(null);
+        await store.joinGroup({
+          name: isNative ? authenticatedUser?.displayName : undefined,
+        });
+        if (!cancelled) {
+          if(!store.lockedVenue){
+            return router.replace({ pathname: "/", query: { sessionId } });
+          }
+          return router.replace(
+            { pathname: "/final", query: { sessionId: store.sessionId } },
+            undefined,
+            {
+              shallow: true,
+            },
+          );
+        }
+      } catch (err: any) {
+        if (!cancelled) {
+          setError(err.message || "Unable to join group.");
+        }
+      } finally {
+        if (!cancelled) {
+          setSubmitting(false);
+        }
+      }
+    };
+
+    run();
+    return () => {
+      cancelled = true;
+    };
   }, [
+    authStatus,
+    authenticatedUser?.displayName,
+    isNative,
     router,
     router.isReady,
-    store.isLoadingGroup,
-    store.lockedVenue,
-    store.sessionId,
+    sessionId,
+    store,
+    store.browserId,
   ]);
 
-  useEffect(() => {
-    if (!location) return;
-    if (isLocationTooFar) {
-      setLocationError(LOCATION_DISTANCE_ERROR);
-      return;
-    }
-    setLocationError((current) =>
-      current === LOCATION_DISTANCE_ERROR ? null : current,
-    );
-  }, [isLocationTooFar, location]);
-
-  const handleJoin = async () => {
-    if (!store.sessionId) {
-      setError("Missing session. Open this page from a group link.");
-      return;
-    }
-    if (!trimmedName) {
-      setError("Add your name to join.");
-      return;
-    }
-    if (trimmedName.length < 3) {
-      setError("Name must be at least 3 characters.");
-      return;
-    }
-    if (nameTaken) {
-      setError("That name is already taken in this group.");
-      return;
-    }
-    if (!location) {
-      setLocationError("Pick a planning location to join.");
-      return;
-    }
-    if (isLocationTooFar) {
-      setLocationError(LOCATION_DISTANCE_ERROR);
-      return;
-    }
-    if (!store.venueCategory) {
-      await store.loadGroup();
-    }
-
-    try {
-      setSubmitting(true);
-      setError(null);
-      await store.joinGroup(trimmedName, location.location);
-      if (saveDetails) {
-        localStorage.setItem(
-          "getout-user-details",
-          JSON.stringify({ name: trimmedName, place: location }),
-        );
-      } else {
-        localStorage.removeItem("getout-user-details");
-      }
-      router.push({ pathname: "/", query: { sessionId: store.sessionId } });
-    } catch (err: any) {
-      setError(err.message || "Unable to join group.");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleDetectLocation = async () => {
-    if (!("geolocation" in navigator)) {
-      setLocationError("Location services are not supported.");
-      return;
-    }
-    setLocating(true);
-    setLocationError(null);
-    setError(null);
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        try {
-          const params = new URLSearchParams({
-            lat: String(position.coords.latitude),
-            lng: String(position.coords.longitude),
-          });
-          const response = await fetch(`/api/reverse-geocode?${params}`);
-          if (!response.ok) {
-            const payload = await response.json().catch(() => ({}));
-            throw new Error(payload.message || "Unable to detect address.");
-          }
-          const data = (await response.json()) as { result?: PlaceResult };
-          if (!data.result) {
-            throw new Error("Unable to detect address.");
-          }
-          setLocation(data.result);
-        } catch (err: any) {
-          setLocationError(err.message || "Unable to detect address.");
-        } finally {
-          setLocating(false);
-        }
-      },
-      () => {
-        setLocationError("Location permission denied.");
-        setLocating(false);
-      },
-      { enableHighAccuracy: true, timeout: 10000 },
-    );
-  };
+  if (isNative && authStatus !== "signed_in") {
+    return null;
+  }
 
   return (
     <EntryShell>
-      <JoinGroupForm
-        onBack={() =>
-          router.push({ pathname: "/", query: sessionId ? { sessionId } : {} })
-        }
-        name={name}
-        setName={(value) => {
-          setName(value);
-          setError(null);
-        }}
-        location={location}
-        setLocation={(place) => {
-          setLocation(place);
-          setLocationError(null);
-          setError(null);
-        }}
-        saveDetails={saveDetails}
-        setSaveDetails={setSaveDetails}
-        error={error}
-        locationError={locationError}
-        submitting={submitting || isLocationTooFar}
-        locating={locating}
-        nameTooShort={nameTooShort}
-        nameTaken={nameTaken}
-        isNameValid={isNameValid}
-        onDetectLocation={handleDetectLocation}
-        onSubmit={handleJoin}
-        peopleWaiting={store.users.length}
-        organizerName={organizer?.name || null}
-        organizerLocationBias={
-          organizerLocation
-            ? { lat: organizerLocation.lat, lng: organizerLocation.lng, radiusKm: 40 }
-            : undefined
-        }
-        resultFilter={(place) => {
-          if (!organizerLocation) return true;
-          return getDistanceKm(place.location, organizerLocation) <= MAX_JOIN_DISTANCE_KM;
-        }}
-        category={store.venueCategory}
+      <EntryHeader
+        title="Joining group"
+        subtitle="We’re placing you using your approximate location first."
+        onBack={() => router.push("/landing")}
       />
+      <div className="rounded-[24px] border border-white/10 bg-[#141418]/90 p-5 text-center backdrop-blur-sm">
+        <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-2 border-white/10 border-t-[#00e5a0]" />
+        <p className="font-display text-xl font-bold tracking-[-0.03em] text-white">
+          {submitting ? "Getting you in..." : "Almost there"}
+        </p>
+        <p className="mt-2 text-sm text-[#8b8b9c]">
+          We&apos;ll ask for precise location after you enter the group so suggestions get closer to you.
+        </p>
+        {error ? <p className="mt-4 text-sm text-rose-300">{error}</p> : null}
+      </div>
     </EntryShell>
   );
 }

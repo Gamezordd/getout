@@ -1,6 +1,9 @@
 import { NextApiRequest, NextApiResponse } from "next";
-import { GroupPayload } from "../../lib/groupStore";
+import { GroupPayload, saveGroup } from "../../lib/groupStore";
 import { User, Venue } from "../../lib/types";
+import { acceptInviteForSession } from "../../lib/inviteStore";
+import { touchRecentGroupMembership } from "../../lib/recentGroupStore";
+import { getAuthenticatedUser } from "../../lib/serverAuth";
 import {
   recomputeSuggestionsForGroup,
   syncManualVenueMetricsForGroup,
@@ -17,6 +20,10 @@ import {
 import { lockVenueForGroup } from "./venue-lock";
 import { ALLOWED_CATEGORIES } from "./constants";
 import { buildAvatarUrl, buildGroupResponse, safeTrigger } from "./utils";
+import {
+  resolveApproximateLocation,
+  reverseGeocodeLocation,
+} from "./location-utils";
 
 export const groupActions = (
   req: NextApiRequest,
@@ -30,32 +37,39 @@ export const groupActions = (
     const existingMember = group.sessionMembers.find(
       (member) => member.browserId === payload.browserId,
     );
+    const authenticatedUser = await getAuthenticatedUser(req);
+
     if (existingMember) {
+      if (authenticatedUser?.id) {
+        await touchRecentGroupMembership({
+          userId: authenticatedUser.id,
+          sessionId: payload.sessionId,
+        });
+      }
       return res
         .status(200)
         .json(
           buildGroupResponse(group, existingMember.userId, existingMember.isOwner),
         );
     }
-    if (!payload.name || !payload.location) {
-      return res
-        .status(400)
-        .json({ message: "Name and location are required." });
-    }
-    const trimmedName = payload.name.trim();
-    if (trimmedName.length < 3) {
+
+    const trimmedName =
+      payload.name?.trim() || authenticatedUser?.displayName?.trim() || "";
+    if (trimmedName.length > 0 && trimmedName.length < 3) {
       return res
         .status(400)
         .json({ message: "Name must be at least 3 characters." });
     }
-    const normalized = trimmedName.toLowerCase();
-    const nameTaken = group.users.some(
-      (user) => user.name.trim().toLowerCase() === normalized,
-    );
-    if (nameTaken) {
-      return res
-        .status(400)
-        .json({ message: "That name is already taken in this group." });
+    if (trimmedName) {
+      const normalized = trimmedName.toLowerCase();
+      const nameTaken = group.users.some(
+        (user) => (user.name || "").trim().toLowerCase() === normalized,
+      );
+      if (nameTaken) {
+        return res
+          .status(400)
+          .json({ message: "That name is already taken in this group." });
+      }
     }
     if (
       payload.venueCategory &&
@@ -97,12 +111,46 @@ export const groupActions = (
     }
 
     const isOwner = group.sessionMembers.length === 0 && group.users.length === 0;
+    let resolvedLocation = payload.location;
+    let resolvedLocationLabel = payload.locationLabel || null;
+    let resolvedLocationSource = payload.locationSource || "precise";
+    let shouldRecomputeSuggestions = false;
+
+    if (!resolvedLocation) {
+      if (!group.defaultApproximateLocation) {
+        const approximate = await resolveApproximateLocation(req);
+        group.defaultApproximateLocation = approximate.location;
+        group.defaultApproximateLocationLabel = approximate.locationLabel || null;
+      }
+      resolvedLocation = group.defaultApproximateLocation;
+      resolvedLocationLabel =
+        payload.locationLabel || group.defaultApproximateLocationLabel || null;
+      resolvedLocationSource = "ip";
+      shouldRecomputeSuggestions = isOwner;
+    } else if (!resolvedLocationLabel) {
+      const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+      if (apiKey) {
+        const geocoded = await reverseGeocodeLocation(resolvedLocation, apiKey);
+        resolvedLocationLabel = geocoded.locationLabel || null;
+      }
+    }
+
+    if (!resolvedLocation) {
+      return res.status(500).json({ message: "Unable to determine join location." });
+    }
+
+    const userId = `u-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
     const user: User = {
-      id: `u-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
-      name: trimmedName,
-      avatarUrl: buildAvatarUrl(trimmedName),
-      location: payload.location,
+      id: userId,
+      name: trimmedName || null,
+      avatarUrl:
+        authenticatedUser?.avatarUrl ||
+        buildAvatarUrl(trimmedName, resolvedLocationLabel || userId),
+      location: resolvedLocation,
+      authenticatedUserId: authenticatedUser?.id,
       isOrganizer: isOwner,
+      locationLabel: resolvedLocationLabel,
+      locationSource: resolvedLocationSource,
     };
 
     group.users.push(user);
@@ -111,9 +159,23 @@ export const groupActions = (
       userId: user.id,
       isOwner,
     });
-    await recomputeSuggestionsForGroup(payload.sessionId, group, {
-      rotateSuggestions: false,
-    });
+    if (shouldRecomputeSuggestions) {
+      await recomputeSuggestionsForGroup(payload.sessionId, group, {
+        rotateSuggestions: false,
+      });
+    } else {
+      await saveGroup(payload.sessionId, group);
+    }
+    if (authenticatedUser) {
+      await acceptInviteForSession({
+        sessionId: payload.sessionId,
+        recipientUserId: authenticatedUser.id,
+      });
+      await touchRecentGroupMembership({
+        userId: authenticatedUser.id,
+        sessionId: payload.sessionId,
+      });
+    }
     await safeTrigger(channel, "group-updated", { reason: "join", userId: user.id });
     return res.status(200).json(buildGroupResponse(group, user.id, isOwner));
   },
@@ -159,9 +221,75 @@ export const groupActions = (
     if (index === -1) {
       return res.status(404).json({ message: "User not found." });
     }
-    group.users[index] = { ...group.users[index], location: payload.location };
-    await recomputeSuggestionsForGroup(payload.sessionId, group, {
-      rotateSuggestions: false,
+    const existingUser = group.users[index];
+    const nextUser: User = { ...existingUser };
+
+    if (payload.name !== undefined) {
+      const trimmedName = payload.name.trim();
+      if (trimmedName.length > 0 && trimmedName.length < 3) {
+        return res
+          .status(400)
+          .json({ message: "Name must be at least 3 characters." });
+      }
+      if (trimmedName) {
+        const normalized = trimmedName.toLowerCase();
+        const nameTaken = group.users.some(
+          (user) =>
+            user.id !== payload.userId &&
+            (user.name || "").trim().toLowerCase() === normalized,
+        );
+        if (nameTaken) {
+          return res
+            .status(400)
+            .json({ message: "That name is already taken in this group." });
+        }
+      }
+      nextUser.name = trimmedName || null;
+      nextUser.avatarUrl = buildAvatarUrl(
+        nextUser.name,
+        nextUser.locationLabel || nextUser.id,
+      );
+    }
+
+    if (payload.location) {
+      nextUser.location = payload.location;
+    }
+    if (payload.locationLabel !== undefined) {
+      nextUser.locationLabel = payload.locationLabel || null;
+    }
+    if (payload.locationSource) {
+      nextUser.locationSource = payload.locationSource;
+    }
+
+    group.users[index] = nextUser;
+
+    if (payload.location) {
+      if (!nextUser.locationLabel && nextUser.locationSource === "precise") {
+        const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+        if (apiKey) {
+          const geocoded = await reverseGeocodeLocation(nextUser.location, apiKey);
+          group.users[index] = {
+            ...group.users[index],
+            locationLabel: geocoded.locationLabel || nextUser.locationLabel || null,
+          };
+        }
+      }
+
+      await recomputeSuggestionsForGroup(payload.sessionId, group, {
+        rotateSuggestions: false,
+      });
+      await safeTrigger(channel, "group-updated", { reason: "update-user" });
+      return res.status(200).json(buildGroupResponse(group));
+    }
+
+    await saveGroup(payload.sessionId, group);
+    await safeTrigger(channel, "names-update", {
+      namesByBrowserId: Object.fromEntries(
+        group.sessionMembers.map((member) => [
+          member.browserId,
+          group.users.find((user) => user.id === member.userId)?.name || null,
+        ]),
+      ),
     });
     await safeTrigger(channel, "group-updated", { reason: "update-user" });
     return res.status(200).json(buildGroupResponse(group));

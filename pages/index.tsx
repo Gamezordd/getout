@@ -1,6 +1,9 @@
 import { observer } from "mobx-react-lite";
+import { useRouter } from "next/router";
 import { toast } from "sonner";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import AuthResolvingScreen from "../components/AuthResolvingScreen";
+import { useAuth } from "../lib/auth/AuthProvider";
 import { useAppStore } from "../lib/store/AppStoreProvider";
 import FinalizeDialog from "../components/FinalizeDialog";
 import { Header } from "../components/Header";
@@ -15,19 +18,50 @@ import MapStrip from "../components/MapStrip";
 import Loader from "../components/Loader";
 import VotingCountdown from "../components/VotingCountdown";
 import { registerPushSubscription } from "../lib/pushClient";
+import { formatCompactCount } from "../lib/formatCount";
+import Dialog from "../components/Dialog";
+import { getUserActivityLabel } from "../lib/userDisplay";
+import { getPreciseLocation } from "../lib/preciseLocation";
 
 function HomePage() {
   const store = useAppStore();
+  const { authStatus, authenticatedUser, isNative, startupResolved } = useAuth();
+  const router = useRouter();
   const [showFinalizeDialog, setShowFinalizeDialog] = useState(false);
   const [showInviteDialog, setShowInviteDialog] = useState(false);
   const [inviteDialogTitle, setInviteDialogTitle] = useState("You're the first one here!");
+  const [showNamePrompt, setShowNamePrompt] = useState(false);
+  const [pendingName, setPendingName] = useState("");
+  const [nameError, setNameError] = useState<string | null>(null);
+  const [isSavingName, setIsSavingName] = useState(false);
+  const [dismissedPreciseBanner, setDismissedPreciseBanner] = useState(false);
+  const [dismissedNamePrompt, setDismissedNamePrompt] = useState(false);
   const pushInitRef = useRef(false);
+
+  const preciseBannerKey = store.sessionId
+    ? `getout-precise-location-dismissed:${store.sessionId}`
+    : null;
+  const namePromptKey = store.sessionId
+    ? `getout-name-prompt-dismissed:${store.sessionId}`
+    : null;
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !preciseBannerKey) return;
+    setDismissedPreciseBanner(
+      window.sessionStorage.getItem(preciseBannerKey) === "1",
+    );
+  }, [preciseBannerKey]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !namePromptKey) return;
+    setDismissedNamePrompt(window.sessionStorage.getItem(namePromptKey) === "1");
+  }, [namePromptKey]);
 
   const handleJoinEvent = useCallback(
     (userId: string) => {
       if (userId === store.currentUserId) return;
       const joinedUser = store.users.find((user) => user.id === userId);
-      toast.success(`${joinedUser?.name || "Someone"} has joined!`, {
+      toast.success(`${getUserActivityLabel(joinedUser)} has joined!`, {
         description: "Suggestions have been updated",
       });
     },
@@ -35,12 +69,17 @@ function HomePage() {
   );
 
   const handleVoteEvent = useCallback(
-    (voterId: string) => {
+    (voterId: string, venueId?: string) => {
       if (voterId === store.currentUserId) return;
       const voter = store.users.find((user) => user.id === voterId);
-      toast.info(`${voter?.name || "Someone"} has voted`,);
+      const venueName = venueId
+        ? store.venues.find((venue) => venue.id === venueId)?.name
+        : null;
+      toast.info(
+        `${getUserActivityLabel(voter)} has voted${venueName ? ` for ${venueName}` : ""}`,
+      );
     },
-    [store.currentUserId, store.users],
+    [store.currentUserId, store.users, store.venues],
   );
 
   usePusher(handleJoinEvent, handleVoteEvent);
@@ -77,17 +116,92 @@ function HomePage() {
   }, [store, store.sessionId, store.users.length, store.manualVenues.length]);
 
   const handleVote = useCallback(
-    (venueId: string) => {
+    async (venueId: string) => {
       if (!store.currentUserId) return;
       if (typeof navigator !== "undefined" && "vibrate" in navigator) {
         navigator.vibrate(12);
       }
       store.setSelectedVenue(venueId);
       store.applyVote(store.currentUserId, venueId);
-      store.vote(venueId);
+      const success = await store.vote(venueId);
+      if (
+        success &&
+        store.currentUserIsAnonymous &&
+        !dismissedNamePrompt &&
+        !(isNative && authenticatedUser)
+      ) {
+        setShowNamePrompt(true);
+      }
     },
-    [store],
+    [authenticatedUser, dismissedNamePrompt, isNative, store],
   );
+  const handleAllowPreciseLocation = useCallback(async () => {
+    const currentUserId = store.currentUserId;
+    if (!currentUserId) return;
+    const locationResult = await getPreciseLocation(isNative);
+    if (!locationResult.ok) {
+      store.setMapError(locationResult.message);
+      return;
+    }
+
+    try {
+      const params = new URLSearchParams({
+        lat: String(locationResult.location.lat),
+        lng: String(locationResult.location.lng),
+      });
+      const response = await fetch(`/api/reverse-geocode?${params}`);
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.message || "Unable to detect address.");
+      }
+      const data = (await response.json()) as { result?: { location: { lat: number; lng: number }; area?: string; name?: string } };
+      if (!data.result) {
+        throw new Error("Unable to detect address.");
+      }
+      await store.updateUserLocation(currentUserId, data.result.location, {
+        locationLabel: data.result.area || data.result.name || null,
+        locationSource: "precise",
+      });
+      await store.fetchSuggestions();
+    } catch (err: any) {
+      store.setMapError(err.message || "Unable to detect address.");
+    }
+  }, [isNative, store]);
+
+  const handleDenyPreciseLocation = useCallback(() => {
+    if (typeof window !== "undefined" && preciseBannerKey) {
+      window.sessionStorage.setItem(preciseBannerKey, "1");
+    }
+    setDismissedPreciseBanner(true);
+  }, [preciseBannerKey]);
+
+  const handleSaveName = useCallback(async () => {
+    const trimmed = pendingName.trim();
+    if (trimmed.length < 3) {
+      setNameError("Name must be at least 3 characters.");
+      return;
+    }
+    try {
+      setIsSavingName(true);
+      setNameError(null);
+      await store.updateCurrentUserName(trimmed);
+      setShowNamePrompt(false);
+      setPendingName("");
+    } catch (err: any) {
+      setNameError(err.message || "Unable to save name.");
+    } finally {
+      setIsSavingName(false);
+    }
+  }, [pendingName, store]);
+
+  const handleSkipName = useCallback(() => {
+    if (typeof window !== "undefined" && namePromptKey) {
+      window.sessionStorage.setItem(namePromptKey, "1");
+    }
+    setDismissedNamePrompt(true);
+    setShowNamePrompt(false);
+    setNameError(null);
+  }, [namePromptKey]);
 
   const errorBanner = useMemo(
     () => store.mapError || store.groupError || store.suggestionWarning,
@@ -107,8 +221,21 @@ function HomePage() {
   const showFinalizeCta =
     store.isCurrentUserOrganizer &&
     store.hasFinalizeQuorum &&
-    !store.lockedVenue &&
-    Boolean(store.selectedVenue);
+    !store.lockedVenue;
+  const showPreciseLocationBanner =
+    store.currentUserNeedsPreciseLocation && !dismissedPreciseBanner;
+  const leadingVenue = useMemo(
+    () =>
+      store.venues.find((venue) => (store.votes?.[venue.id]?.length || 0) > 0) || null,
+    [store.venues, store.votes],
+  );
+  const leadingVoteCount = leadingVenue
+    ? store.votes?.[leadingVenue.id]?.length || 0
+    : 0;
+
+  if (!startupResolved) {
+    return <AuthResolvingScreen />;
+  }
 
   if (!store.currentUser && !store.isLoadingGroup) {
     return null;
@@ -117,6 +244,10 @@ function HomePage() {
   return (
     <div className="min-h-full bg-[#0a0a0d] text-[#f0f0f5]">
       <Header
+        showNativeBackButton={isNative}
+        onBackClick={() => {
+          void router.replace("/dashboard");
+        }}
         onInviteClick={() => {
           setInviteDialogTitle("Leave no one behind!");
           setShowInviteDialog(true);
@@ -133,6 +264,29 @@ function HomePage() {
       <main className="mx-auto flex w-full max-w-[430px] flex-1 flex-col px-4 pb-28 pt-4">
         <VotingCountdown />
         <SessionSummary />
+        {showPreciseLocationBanner && (
+          <div className="mt-4 rounded-[20px] border border-[#00e5a0]/20 bg-[#0f1714] px-4 py-3 text-sm text-[#d7f7ea]">
+            <p className="font-medium text-[#f0f0f5]">
+              Allow precise location to get suggestions closer to you and unlock your travel time.
+            </p>
+            <div className="mt-3 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleAllowPreciseLocation}
+                className="rounded-full bg-[#00e5a0] px-4 py-2 text-xs font-bold text-black"
+              >
+                Allow
+              </button>
+              <button
+                type="button"
+                onClick={handleDenyPreciseLocation}
+                className="rounded-full border border-white/10 px-4 py-2 text-xs font-semibold text-[#8b8b9c]"
+              >
+                Deny
+              </button>
+            </div>
+          </div>
+        )}
         {!store.lockedVenue && <MapStrip />}
         <section className="mt-4 space-y-4">
           {(store.isLoadingGroup || (store.isLoadingSuggestions && store.venues.length === 0)) && (
@@ -177,7 +331,7 @@ function HomePage() {
         </section>
       </main>
 
-      {showFinalizeCta && (
+      {showFinalizeCta && leadingVenue && (
         <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30">
           <div
             className="mx-auto w-full max-w-[430px] px-4 pt-3"
@@ -190,14 +344,17 @@ function HomePage() {
             >
               <div className="min-w-0">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#00e5a0]/80">
-                  Finalize venue
+                  Leading venue
                 </p>
                 <p className="mt-1 truncate font-display text-base font-bold tracking-[-0.02em] text-[#f0f0f5]">
-                  {store.selectedVenue?.name}
+                  {leadingVenue.name}
+                </p>
+                <p className="mt-1 text-xs text-[#8b8b9c]">
+                  {formatCompactCount(leadingVoteCount)} {leadingVoteCount === 1 ? "vote" : "votes"}
                 </p>
               </div>
               <span className="ml-3 shrink-0 rounded-full bg-[#00e5a0] px-3 py-2 text-xs font-bold text-black">
-                Finalize Now 🎯
+                Finalize now 🎯
               </span>
             </button>
           </div>
@@ -217,6 +374,44 @@ function HomePage() {
         }}
         onClose={() => setShowInviteDialog(false)}
       />
+      <Dialog
+        isOpen={showNamePrompt}
+        onClose={() => {
+          handleSkipName();
+        }}
+        title="What do friends call you?"
+        description="Your vote is in. Add a name if you want your friends to recognize you."
+      >
+        <div className="mt-4 flex w-full flex-col gap-3">
+          <input
+            value={pendingName}
+            onChange={(event) => {
+              setPendingName(event.target.value);
+              setNameError(null);
+            }}
+            placeholder="Your name"
+            className="w-full rounded-xl border border-slate-200 px-4 py-3 text-base text-ink outline-none"
+          />
+          {nameError ? <p className="text-sm text-red-600">{nameError}</p> : null}
+          <div className="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={handleSkipName}
+              className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-500"
+            >
+              Skip
+            </button>
+            <button
+              type="button"
+              onClick={handleSaveName}
+              disabled={isSavingName}
+              className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+            >
+              {isSavingName ? "Saving..." : "Save name"}
+            </button>
+          </div>
+        </div>
+      </Dialog>
     </div>
   );
 }

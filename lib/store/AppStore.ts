@@ -12,13 +12,21 @@ import type {
 import { shareLinkText } from "../constants";
 import { formatCompactCount } from "../formatCount";
 import { mergeVenues } from "../mergeVenues";
+import { isNativeApp, openNativeShareSheet } from "../nativeShare";
 
 const BROWSER_ID_KEY = "getout-id";
+
+type SessionMember = {
+  browserId: string;
+  userId: string;
+  isOwner: boolean;
+};
 
 type GroupPayload = {
   users: User[];
   venues: Venue[];
   manualVenues?: Venue[];
+  sessionMembers?: SessionMember[];
   votes?: VotesByVenue;
   votingClosesAt?: string | null;
   venueCategory?: VenueCategory | null;
@@ -59,6 +67,7 @@ export class AppStore {
   identityResolved = false;
   shareUrl: string | null = null;
   users: User[] = [];
+  sessionMembers: SessionMember[] = [];
   manualVenues: Venue[] = [];
   venues: Venue[] = [];
   suggestedVenues: Venue[] = [];
@@ -87,6 +96,14 @@ export class AppStore {
 
   get hasCurrentUserLocation() {
     return Boolean(this.currentUser?.location);
+  }
+
+  get currentUserNeedsPreciseLocation() {
+    return this.currentUser?.locationSource === "ip";
+  }
+
+  get currentUserIsAnonymous() {
+    return !this.currentUser?.name?.trim();
   }
 
   get isCurrentUserOrganizer() {
@@ -139,6 +156,29 @@ export class AppStore {
     this.votes = { ...(votes || {}) };
   }
 
+  buildAvatarUrl(name?: string | null, fallbackSeed?: string) {
+    const seed = encodeURIComponent(name?.trim() || fallbackSeed?.trim() || "guest");
+    return `https://api.dicebear.com/7.x/thumbs/svg?seed=${seed}`;
+  }
+
+  reconcileUserNames(namesByBrowserId: Record<string, string | null>) {
+    const userIdByBrowserId = new Map(
+      this.sessionMembers.map((member) => [member.browserId, member.userId]),
+    );
+    this.users = this.users.map((user) => {
+      const matchingEntry = Object.entries(namesByBrowserId).find(
+        ([browserId]) => userIdByBrowserId.get(browserId) === user.id,
+      );
+      if (!matchingEntry) return user;
+      const [, nextName] = matchingEntry;
+      return {
+        ...user,
+        name: nextName,
+        avatarUrl: this.buildAvatarUrl(nextName, user.locationLabel || user.id),
+      };
+    });
+  }
+
   get topVenues() {
     return this.venues;
   }
@@ -159,13 +199,16 @@ export class AppStore {
   }
 
   setSession(sessionId: string, pathname = "/") {
+    const isSameSession = this.sessionId === sessionId;
     this.sessionId = sessionId;
-    this.venueCategory = null;
-    this.votingClosesAt = null;
-    this.lockedVenue = null;
-    this.currentUserId = null;
-    this.isOwner = false;
-    this.identityResolved = false;
+    if (!isSameSession) {
+      this.venueCategory = null;
+      this.votingClosesAt = null;
+      this.lockedVenue = null;
+      this.currentUserId = null;
+      this.isOwner = false;
+      this.identityResolved = false;
+    }
     if (typeof window !== "undefined") {
       this.shareUrl = `${window.location.origin}${pathname}?sessionId=${sessionId}`;
       const storedBrowserId = localStorage.getItem(BROWSER_ID_KEY);
@@ -205,6 +248,7 @@ export class AppStore {
       );
       runInAction(() => {
         this.users = data.users || [];
+        this.sessionMembers = data.sessionMembers || [];
         this.manualVenues = data.manualVenues || [];
         this.venues = mergedVenueState.mergedVenues;
         this.reconcileVotes(data.votes || {});
@@ -368,7 +412,14 @@ export class AppStore {
     }
   }
 
-  async updateUserLocation(userId: string, location: LatLng) {
+  async updateUserLocation(
+    userId: string,
+    location: LatLng,
+    options?: {
+      locationLabel?: string | null;
+      locationSource?: "ip" | "precise";
+    },
+  ) {
     if (!this.sessionId) return;
     try {
       this.groupError = null;
@@ -380,6 +431,8 @@ export class AppStore {
           sessionId: this.sessionId,
           userId,
           location,
+          locationLabel: options?.locationLabel,
+          locationSource: options?.locationSource,
         }),
       });
       if (!response.ok) {
@@ -423,7 +476,7 @@ export class AppStore {
   async vote(venueId: string) {
     if (!this.sessionId || !this.currentUserId) {
       this.groupError = "Join the group to vote.";
-      return;
+      return false;
     }
     try {
       this.groupError = null;
@@ -444,10 +497,12 @@ export class AppStore {
       runInAction(() => {
         this.reconcileVotes(data.votes || {});
       });
+      return true;
     } catch (err: any) {
       runInAction(() => {
         this.groupError = err.message || "Unable to cast vote.";
       });
+      return false;
     }
   }
 
@@ -469,12 +524,15 @@ export class AppStore {
     this.reconcileVotes(votes);
   }
 
-  async joinGroup(
-    name: string,
-    location: LatLng,
-    venueCategory?: VenueCategory,
-    closeVotingInHours?: number,
-  ) {
+  async joinGroup(options?: {
+    createIfMissing?: boolean;
+    name?: string;
+    location?: LatLng;
+    locationLabel?: string;
+    locationSource?: "ip" | "precise";
+    venueCategory?: VenueCategory;
+    closeVotingInHours?: number;
+  }) {
     if (!this.sessionId || !this.browserId) {
       throw new Error("Missing session. Open this page from a group link.");
     }
@@ -485,10 +543,13 @@ export class AppStore {
         action: "join",
         sessionId: this.sessionId,
         browserId: this.browserId,
-        name: name.trim(),
-        location,
-        venueCategory,
-        closeVotingInHours,
+        createIfMissing: options?.createIfMissing,
+        name: options?.name?.trim(),
+        location: options?.location,
+        locationLabel: options?.locationLabel,
+        locationSource: options?.locationSource,
+        venueCategory: options?.venueCategory,
+        closeVotingInHours: options?.closeVotingInHours,
       }),
     });
     if (!response.ok) {
@@ -498,6 +559,7 @@ export class AppStore {
     const data = (await response.json()) as GroupPayload;
     runInAction(() => {
       this.users = data.users || [];
+      this.sessionMembers = data.sessionMembers || [];
       this.manualVenues = data.manualVenues || [];
       this.reconcileVotes(data.votes || {});
       this.votingClosesAt = data.votingClosesAt || null;
@@ -532,6 +594,27 @@ export class AppStore {
 
   setSelectedVenue(venueId: string | null) {
     this.selectedVenueId = venueId;
+  }
+
+  async updateCurrentUserName(name: string) {
+    if (!this.sessionId || !this.currentUserId) {
+      throw new Error("Missing current user.");
+    }
+    const response = await fetch("/api/group", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "updateUser",
+        sessionId: this.sessionId,
+        userId: this.currentUserId,
+        name,
+      }),
+    });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(payload.message || "Unable to update name.");
+    }
+    await this.loadGroup();
   }
 
   setMapError(message: string | null) {
@@ -592,8 +675,21 @@ ${url.toString()}`;
   }
 
   async socialShare() {
+    const shareText = this.buildShareText();
     const shareUrl = this.buildShareUrl();
-    if (!shareUrl) return;
+    if (!shareText || !shareUrl) return;
+
+    if (isNativeApp()) {
+      try {
+        await openNativeShareSheet({
+          title: "Share invite link",
+          text: shareText,
+        });
+        return;
+      } catch {
+        // Fall through to browser/web fallback.
+      }
+    }
 
     if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
       try {
@@ -613,3 +709,5 @@ ${url.toString()}`;
   }
 
 }
+
+

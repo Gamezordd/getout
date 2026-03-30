@@ -2,6 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { observer } from "mobx-react-lite";
 import { formatCompactCount } from "../lib/formatCount";
 import { mergeVenues } from "../lib/mergeVenues";
+import {
+  getUserActivityLabel,
+  getUserLocationSensitiveLabel,
+} from "../lib/userDisplay";
 import { useAppStore } from "../lib/store/AppStoreProvider";
 import Dialog from "./Dialog";
 import PlaceSearch, { PlaceResult } from "./PlaceSearch";
@@ -41,6 +45,7 @@ const DrawerContent = observer(function DrawerContent({
   const [showAllVoters, setShowAllVoters] = useState(false);
 
   const editingUser = users.find((user) => user.id === editingUserId) || null;
+  const preciseUsers = users.filter((user) => user.locationSource === "precise");
 
   const voterNames = useMemo(() => {
     if (!selectedVenue) return [];
@@ -50,12 +55,15 @@ const DrawerContent = observer(function DrawerContent({
     return voterIds
       .map((id) => userById.get(id))
       .filter((user): user is User => Boolean(user))
-      .map((user) => user.name);
+      .map((user) => getUserActivityLabel(user));
   }, [selectedVenue, votes, users]);
 
   const handleUpdateUserLocation = async (place: PlaceResult) => {
     if (!editingUserId) return;
-    await updateUserLocation(editingUserId, place.location);
+    await updateUserLocation(editingUserId, place.location, {
+      locationLabel: place.area || place.name || null,
+      locationSource: "precise",
+    });
     setEditingUserId(null);
   };
 
@@ -78,14 +86,10 @@ const DrawerContent = observer(function DrawerContent({
       (entry) => entry.venueId === selectedVenue.id,
     );
     if (index === -1) return null;
-    if (index === 0) return "🥇 Best based on ratings and travel time";
-    if (index === 1) return "🥈 Second best based on ratings and travel time";
-    return "🥉 Third best based on ratings and travel time";
-  }, [
-    mergedVenues,
-    selectedVenue,
-    totalsByVenue,
-  ]);
+    if (index === 0) return "Best based on ratings and travel time";
+    if (index === 1) return "Second best based on ratings and travel time";
+    return "Third best based on ratings and travel time";
+  }, [mergedVenues, selectedVenue, totalsByVenue]);
 
   const formatVoterNames = (names: string[], maxVisible = 4) => {
     if (names.length === 0) return "";
@@ -104,15 +108,15 @@ const DrawerContent = observer(function DrawerContent({
     if (!selectedVenue) return null;
     const etas = etaMatrix?.[selectedVenue.id];
     if (!etas) return null;
-    const values = Object.values(etas).filter(
-      (value): value is number => typeof value === "number",
-    );
+    const values = preciseUsers
+      .map((user) => etas[user.id])
+      .filter((value): value is number => typeof value === "number");
     if (values.length === 0) return null;
     const min = Math.min(...values);
     const max = Math.max(...values);
-    if(Math.round(max) === Math.round(min)) return `${Math.round(min)} min`;
+    if (Math.round(max) === Math.round(min)) return `${Math.round(min)} min`;
     return `${Math.round(min)} - ${Math.round(max)} min`;
-  }, [etaMatrix, selectedVenue]);
+  }, [etaMatrix, preciseUsers, selectedVenue]);
 
   useEffect(() => {
     if (!isExpanded) {
@@ -122,13 +126,12 @@ const DrawerContent = observer(function DrawerContent({
 
   return (
     <>
-      
       {editingUser && (
         <Dialog
           isOpen={!!editingUser}
           onClose={() => setEditingUserId(null)}
           title="Update location"
-          description={editingUser?.name}
+          description={getUserActivityLabel(editingUser)}
           contentClassName="items-end"
         >
           <div className="mt-4">
@@ -154,7 +157,7 @@ const DrawerContent = observer(function DrawerContent({
         <div className="px-5 pb-2 pt-2">
           {selectedVenue ? (
             <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center flex-grow gap-2">
+              <div className="flex flex-grow items-center gap-2">
                 {suggestedRankById.get(selectedVenue.id) ? (
                   <div className="flex h-7 w-8 items-center justify-center rounded-full bg-ink text-xs font-bold text-white">
                     {suggestedRankById.get(selectedVenue.id)}
@@ -165,7 +168,7 @@ const DrawerContent = observer(function DrawerContent({
                   </div>
                 )}
                 <div className="w-full">
-                  <h2 className="text-sm font-semibold text-ink line-clamp-2 w-full">
+                  <h2 className="line-clamp-2 w-full text-sm font-semibold text-ink">
                     {selectedVenue.name}
                   </h2>
                   {medalNote && (
@@ -177,9 +180,7 @@ const DrawerContent = observer(function DrawerContent({
               </div>
               <div className="flex items-center gap-3 text-xs font-semibold text-slate-500">
                 <span className="whitespace-nowrap">
-                  {typeof currentUserEta === "number"
-                    ? `${Math.round(currentUserEta)} min`
-                    : "--"}
+                  {typeof currentUserEta === "number" ? `${Math.round(currentUserEta)} min` : "--"}
                 </span>
               </div>
             </div>
@@ -193,7 +194,7 @@ const DrawerContent = observer(function DrawerContent({
       {!isLoading && (
         <div className="h-full px-5 pb-6">
           {etaError && <p className="mb-3 text-xs text-red-600">{etaError}</p>}
-          <div className="h-full min-h-0 space-y-4 overflow-y-auto pr-1 flex flex-col">
+          <div className="flex h-full min-h-0 flex-col space-y-4 overflow-y-auto pr-1">
             {!selectedVenue && (
               <PlaceList
                 suggestedVenues={suggestedVenues}
@@ -206,110 +207,99 @@ const DrawerContent = observer(function DrawerContent({
                 selectedVenueId={null}
                 mostEfficientVenueId={mostEfficientVenueId}
                 onSelect={setSelectedVenue}
-                onVote={(venueId) => {
+                onVote={async (venueId) => {
                   if (!currentUserId) return;
                   applyVote(currentUserId, venueId);
-                  vote(venueId);
+                  await vote(venueId);
                 }}
               />
             )}
-            {hasCurrentUserLocation &&
-              selectedVenue &&
-              voterNames.length > 0 && (
-                <div className="pl-1 flex items-start gap-2 text-xs font-semibold text-slate-600 leading-tight">
-                  <svg
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                    aria-hidden="true"
-                    className="h-3.5 w-3.5 text-rose-500"
+            {hasCurrentUserLocation && selectedVenue && voterNames.length > 0 && (
+              <div className="flex items-start gap-2 pl-1 text-xs font-semibold leading-tight text-slate-600">
+                <svg
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  aria-hidden="true"
+                  className="h-3.5 w-3.5 text-rose-500"
+                >
+                  <path d="m9.653 16.915-.005-.003-.019-.01a20.759 20.759 0 0 1-1.162-.682 22.045 22.045 0 0 1-2.582-1.9C4.045 12.733 2 10.352 2 7.5a4.5 4.5 0 0 1 8-2.828A4.5 4.5 0 0 1 18 7.5c0 2.852-2.044 5.233-3.885 6.82a22.049 22.049 0 0 1-3.744 2.582l-.019.01-.005.003h-.002a.739.739 0 0 1-.69.001l-.002-.001Z" />
+                </svg>
+                <span>{formatVoterNames(voterNames)}</span>
+                {voterNames.length > 4 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAllVoters(true)}
+                    className="ml-2 text-xs font-semibold text-slate-500 underline"
                   >
-                    <path d="m9.653 16.915-.005-.003-.019-.01a20.759 20.759 0 0 1-1.162-.682 22.045 22.045 0 0 1-2.582-1.9C4.045 12.733 2 10.352 2 7.5a4.5 4.5 0 0 1 8-2.828A4.5 4.5 0 0 1 18 7.5c0 2.852-2.044 5.233-3.885 6.82a22.049 22.045 0 0 1-3.744 2.582l-.019.01-.005.003h-.002a.739.739 0 0 1-.69.001l-.002-.001Z" />
-                  </svg>
-                  <span>{formatVoterNames(voterNames)}</span>
-                  {voterNames.length > 4 && (
-                    <button
-                      type="button"
-                      onClick={() => setShowAllVoters(true)}
-                      className="ml-2 text-xs font-semibold text-slate-500 underline"
+                    ..and {voterNames.length - 4} more
+                  </button>
+                )}
+              </div>
+            )}
+            {!isLoading && hasCurrentUserLocation && selectedVenue && isExpanded && (
+              <div className="rounded-2xl border border-slate-100 bg-mist p-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex-1">
+                    <p className="text-xs text-slate-500">{selectedVenue.address}</p>
+                    <a
+                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                        `${selectedVenue.name} ${selectedVenue.address || ""}`.trim(),
+                      )}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-1 inline-block text-xs text-blue-600 hover:underline"
                     >
-                      ..and {voterNames.length - 4} more
-                    </button>
+                      View on Google Maps
+                    </a>
+                    {selectedVenue.rating && (
+                      <p className="mt-1 flex items-center gap-1 text-xs text-slate-500">
+                        <svg
+                          viewBox="0 0 20 20"
+                          fill="currentColor"
+                          aria-hidden="true"
+                          className="h-3.5 w-3.5 text-yellow-400"
+                        >
+                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.539 1.118l-2.8-2.034a1 1 0 00-1.176 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.462a1 1 0 00.95-.69l1.07-3.292z" />
+                        </svg>
+                        {selectedVenue.rating} ({formatCompactCount(selectedVenue.userRatingCount || 0)})
+                      </p>
+                    )}
+                    <p className="mt-2 text-xs text-slate-500">
+                      Travel time: {travelTimeRange || "--"}
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-3 space-y-2">
+                  {preciseUsers.map((user) => {
+                    const minutes = etaMatrix?.[selectedVenue.id]?.[user.id];
+                    const userLabel = getUserLocationSensitiveLabel(user, currentUserId);
+                    return (
+                      <div key={user.id} className="flex items-center justify-between text-sm">
+                        <button
+                          type="button"
+                          onClick={() => onEditUser(user.id)}
+                          className="flex items-center gap-2"
+                        >
+                          <img src={user.avatarUrl} alt={userLabel} className="h-6 w-6 rounded-full" />
+                          <span className="font-medium text-ink">
+                            {userLabel}
+                            {user.isOrganizer ? " (Organizer)" : ""}
+                          </span>
+                        </button>
+                        <span className="text-slate-600">
+                          {typeof minutes === "number" ? `${Math.round(minutes)} min` : "--"}
+                        </span>
+                      </div>
+                    );
+                  })}
+                  {preciseUsers.length === 0 && (
+                    <p className="text-xs text-slate-500">
+                      Travel times appear after members allow precise location.
+                    </p>
                   )}
                 </div>
-              )}
-            {!isLoading &&
-              hasCurrentUserLocation &&
-              selectedVenue &&
-              isExpanded && (
-                <div className="rounded-2xl border border-slate-100 bg-mist p-4">
-                  <div className="flex items-start gap-3">
-                    <div className="flex-1">
-                      <p className="text-xs text-slate-500">
-                        {selectedVenue.address}
-                      </p>
-                      <a
-                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                          `${selectedVenue.name} ${selectedVenue.address || ""}`.trim(),
-                        )}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="mt-1 inline-block text-xs text-blue-600 hover:underline"
-                      >
-                        View on Google Maps
-                      </a>
-                      {selectedVenue.rating && (
-                        <p className="mt-1 flex items-center gap-1 text-xs text-slate-500">
-                          <svg
-                            viewBox="0 0 20 20"
-                            fill="currentColor"
-                            aria-hidden="true"
-                            className="h-3.5 w-3.5 text-yellow-400"
-                          >
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.539 1.118l-2.8-2.034a1 1 0 00-1.176 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.462a1 1 0 00.95-.69l1.07-3.292z" />
-                          </svg>
-                          {selectedVenue.rating} (
-                          {formatCompactCount(selectedVenue.userRatingCount || 0)})
-                        </p>
-                      )}
-                      <p className="mt-2 text-xs text-slate-500">
-                        Travel Time : {travelTimeRange || "--"}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="mt-3 space-y-2">
-                    {users.map((user) => {
-                      const minutes = etaMatrix?.[selectedVenue.id]?.[user.id];
-                      return (
-                        <div
-                          key={user.id}
-                          className="flex items-center justify-between text-sm"
-                        >
-                          <button
-                            type="button"
-                            onClick={() => onEditUser(user.id)}
-                            className="flex items-center gap-2"
-                          >
-                            <img
-                              src={user.avatarUrl}
-                              alt={user.name}
-                              className="h-6 w-6 rounded-full"
-                            />
-                            <span className="font-medium text-ink">
-                              {user.name}
-                              {user.isOrganizer ? " (Organizer)" : ""}
-                            </span>
-                          </button>
-                          <span className="text-slate-600">
-                            {typeof minutes === "number"
-                              ? `${Math.round(minutes)} min`
-                              : "--"}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
+              </div>
+            )}
           </div>
         </div>
       )}

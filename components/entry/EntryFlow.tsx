@@ -91,12 +91,38 @@ export function EntryHeader({ title, subtitle, onBack }: HeaderProps) {
   );
 }
 
-export function LandingHero({ onCreate }: { onCreate: () => void }) {
+export function LandingHero({
+  onCreate,
+  controls,
+  createButtonLabel = "Create a group",
+  showBackButton = false,
+  onBack,
+}: {
+  onCreate: () => void;
+  controls?: ReactNode;
+  createButtonLabel?: string;
+  showBackButton?: boolean;
+  onBack?: () => void;
+}) {
   return (
     <div className="flex min-h-[calc(100svh-4rem)] flex-col">
       <div className="flex items-center justify-between pt-8">
-        <div className="font-display text-[22px] font-extrabold tracking-[-0.03em] text-white">
-          Get<span className="text-[#00e5a0]">Out</span>
+        <div className="flex items-center gap-3">
+          {showBackButton ? (
+            <button
+              type="button"
+              onClick={onBack}
+              className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-[#f0f0f5]"
+              aria-label="Back to dashboard"
+            >
+              <svg viewBox="0 0 16 16" fill="none" aria-hidden="true" className="h-4 w-4">
+                <path d="M10 3 5 8l5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+          ) : null}
+          <div className="font-display text-[22px] font-extrabold tracking-[-0.03em] text-white">
+            Get<span className="text-[#00e5a0]">Out</span>
+          </div>
         </div>
         <div className="flex items-center gap-1.5 rounded-full border border-[#ff3b5c40] bg-[#ff3b5c1f] px-3 py-1 text-[11px] font-semibold tracking-[0.2em] text-[#ff3b5c]">
           <span className="h-1.5 w-1.5 rounded-full bg-[#ff3b5c]" />
@@ -172,6 +198,7 @@ export function LandingHero({ onCreate }: { onCreate: () => void }) {
         </div>
 
         <div className="mt-7 space-y-3">
+          {controls}
           <button
             type="button"
             onClick={onCreate}
@@ -180,7 +207,7 @@ export function LandingHero({ onCreate }: { onCreate: () => void }) {
             <svg viewBox="0 0 16 16" fill="none" aria-hidden="true" className="h-4 w-4">
               <path d="M8 1v14M1 8h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
             </svg>
-            Create a group
+            {createButtonLabel}
           </button>
           <div className="text-center text-[13px] text-[#64647a]">
             Have a link? <span className="font-medium text-[#00e5a0]">Open it to join →</span>

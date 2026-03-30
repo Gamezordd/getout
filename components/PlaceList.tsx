@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { mergeVenues } from "../lib/mergeVenues";
+import { getUserActivityLabel } from "../lib/userDisplay";
 import VenueCard from "./VenueCard";
 import type { EtaMatrix, TotalsByVenue, User, Venue, VotesByVenue } from "../lib/types";
 
@@ -64,7 +65,7 @@ export default function PlaceList({
       const names = (voterIds || [])
         .map((id) => userById.get(id))
         .filter((user): user is User => Boolean(user))
-        .map((user) => user.name);
+        .map((user) => getUserActivityLabel(user));
       const count = (voterIds || []).length;
       if (count === 0) return;
       summaryByVenue.set(venueId, {
@@ -92,10 +93,7 @@ export default function PlaceList({
     const noteByVenue = new Map<string, string>();
     ranked.forEach((entry, index) => {
       if (index === 0) {
-        noteByVenue.set(
-          entry.venueId,
-          "Best overall",
-        );
+        noteByVenue.set(entry.venueId, "Best overall");
         return;
       }
       if (index === 1) {
@@ -113,7 +111,7 @@ export default function PlaceList({
       if (!venue.addedByUserId) return;
       const user = userById.get(venue.addedByUserId);
       if (user) {
-        map.set(venue.id, user.name);
+        map.set(venue.id, getUserActivityLabel(user));
       }
     });
     return map;

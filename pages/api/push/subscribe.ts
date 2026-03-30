@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { getGroup, saveGroup } from "../../../lib/groupStore";
+import { findGroup, saveGroup } from "../../../lib/groupStore";
 
 type SubscribeRequest = {
   sessionId: string;
@@ -21,7 +21,10 @@ export default async function handler(
     return res.status(400).json({ message: "Missing subscription details." });
   }
 
-  const group = await getGroup(payload.sessionId);
+  const group = await findGroup(payload.sessionId);
+  if (!group) {
+    return res.status(404).json({ message: "Group not found." });
+  }
   const userExists = group.users.some((user) => user.id === payload.userId);
   if (!userExists) {
     return res.status(404).json({ message: "User not found." });
@@ -34,3 +37,5 @@ export default async function handler(
 
   return res.status(200).json({ ok: true });
 }
+
+
