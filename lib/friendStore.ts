@@ -56,13 +56,17 @@ export const addFriendForUser = async (params: {
   const rows = (await sql`
     WITH inserted AS (
       INSERT INTO user_friends (user_id, friend_user_id)
-      VALUES (${params.userId}, ${params.friendUserId})
+      VALUES
+        (${params.userId}, ${params.friendUserId}),
+        (${params.friendUserId}, ${params.userId})
       ON CONFLICT (user_id, friend_user_id) DO NOTHING
-      RETURNING friend_user_id
+      RETURNING user_id, friend_user_id
     )
     SELECT u.id, u.email, u.display_name, u.avatar_url
     FROM users u
-    INNER JOIN inserted i ON i.friend_user_id = u.id
+    INNER JOIN inserted i
+      ON i.friend_user_id = u.id
+    WHERE i.user_id = ${params.userId}
   `) as FriendRow[];
 
   return rows[0] ? mapFriendSummary(rows[0]) : null;
@@ -92,8 +96,10 @@ export const removeFriendForUser = async (params: {
   const sql = getSql();
   const rows = (await sql`
     DELETE FROM user_friends
-    WHERE user_id = ${params.userId}
-      AND friend_user_id = ${params.friendUserId}
+    WHERE
+      (user_id = ${params.userId} AND friend_user_id = ${params.friendUserId})
+      OR
+      (user_id = ${params.friendUserId} AND friend_user_id = ${params.userId})
     RETURNING friend_user_id
   `) as Array<{ friend_user_id: string }>;
   return rows.length > 0;
