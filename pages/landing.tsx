@@ -195,10 +195,16 @@ function LandingPage() {
             });
             const payload = (await response.json().catch(() => ({}))) as {
               message?: string;
+              notificationDelivered?: boolean;
+              notificationMessage?: string;
             };
             if (!response.ok) {
               throw new Error(payload.message || "Unable to send invite.");
             }
+            return {
+              notificationDelivered: payload.notificationDelivered !== false,
+              notificationMessage: payload.notificationMessage,
+            };
           }),
         );
 
@@ -206,11 +212,23 @@ function LandingPage() {
           (result) => result.status === "rejected",
         ).length;
         const sentCount = inviteResults.length - failedCount;
+        const undeliveredWarnings = inviteResults.flatMap((result) => {
+          if (result.status !== "fulfilled") {
+            return [];
+          }
+          return result.value.notificationDelivered ? [] : [result.value];
+        });
         if (sentCount > 0) {
           toast.success(
             sentCount === 1
               ? "1 invite sent."
               : `${sentCount} invites sent.`,
+          );
+        }
+        if (undeliveredWarnings.length > 0) {
+          toast.warning(
+            undeliveredWarnings[0]?.notificationMessage ||
+              "Some invites were saved, but push delivery did not complete.",
           );
         }
         if (failedCount > 0) {

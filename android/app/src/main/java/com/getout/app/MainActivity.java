@@ -11,6 +11,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     protected void onCreate(android.os.Bundle savedInstanceState) {
         registerPlugin(ShareIntentPlugin.class);
+        registerPlugin(ShareLauncherPlugin.class);
         registerPlugin(GoogleAuthPlugin.class);
         registerPlugin(NativeNotificationsPlugin.class);
         super.onCreate(savedInstanceState);

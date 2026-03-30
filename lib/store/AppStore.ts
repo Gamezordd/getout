@@ -12,6 +12,7 @@ import type {
 import { shareLinkText } from "../constants";
 import { formatCompactCount } from "../formatCount";
 import { mergeVenues } from "../mergeVenues";
+import { isNativeApp, openNativeShareSheet } from "../nativeShare";
 
 const BROWSER_ID_KEY = "getout-id";
 
@@ -674,8 +675,21 @@ ${url.toString()}`;
   }
 
   async socialShare() {
+    const shareText = this.buildShareText();
     const shareUrl = this.buildShareUrl();
-    if (!shareUrl) return;
+    if (!shareText || !shareUrl) return;
+
+    if (isNativeApp()) {
+      try {
+        await openNativeShareSheet({
+          title: "Share invite link",
+          text: shareText,
+        });
+        return;
+      } catch {
+        // Fall through to browser/web fallback.
+      }
+    }
 
     if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
       try {

@@ -23,6 +23,8 @@ type ResponseBody = {
     recipientUserId: string;
     status: string;
   };
+  notificationDelivered?: boolean;
+  notificationMessage?: string;
   message?: string;
 };
 
@@ -87,12 +89,21 @@ export default async function handler(
       message: payload.message,
     });
 
-    await sendInviteNotification({
+    const notificationResult = await sendInviteNotification({
       inviteId: invite.id,
       recipientUserId: recipient.id,
       inviterDisplayName: inviter.displayName,
       sessionId: payload.sessionId,
     });
+
+    const notificationMessage =
+      notificationResult.reason === "no_endpoints"
+        ? "Invite saved, but the recipient has not enabled notifications on this device."
+        : notificationResult.reason === "fcm_not_configured"
+          ? "Invite saved, but the server is missing Firebase FCM credentials."
+          : notificationResult.reason === "not_delivered"
+            ? "Invite saved, but push delivery did not complete."
+            : undefined;
 
     return res.status(200).json({
       invite: {
@@ -101,6 +112,8 @@ export default async function handler(
         recipientUserId: invite.recipient_user_id,
         status: invite.status,
       },
+      notificationDelivered: notificationResult.delivered > 0,
+      notificationMessage,
     });
   } catch (error: any) {
     return res.status(500).json({

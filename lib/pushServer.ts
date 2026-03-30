@@ -184,7 +184,7 @@ export const sendInviteNotification = async (params: {
 }) => {
   const endpoints = await getUserNotificationEndpoints(params.recipientUserId);
   if (endpoints.length === 0) {
-    return { delivered: 0 };
+    return { delivered: 0, reason: "no_endpoints" as const };
   }
 
   const title = "Group invite";
@@ -198,6 +198,10 @@ export const sendInviteNotification = async (params: {
   });
   const webPushConfigured = configureWebPush();
   const messaging = getFirebaseMessagingClient();
+  const hasFcmEndpoint = endpoints.some((endpoint) => endpoint.provider === "fcm");
+  if (hasFcmEndpoint && !messaging) {
+    return { delivered: 0, reason: "fcm_not_configured" as const };
+  }
 
   let delivered = 0;
   await Promise.all(
@@ -207,6 +211,10 @@ export const sendInviteNotification = async (params: {
         try {
           await messaging.send({
             token: endpoint.token,
+            notification: {
+              title,
+              body,
+            },
             android: {
               priority: "high",
             },
@@ -248,5 +256,9 @@ export const sendInviteNotification = async (params: {
     }),
   );
 
-  return { delivered };
+  if (delivered === 0) {
+    return { delivered, reason: "not_delivered" as const };
+  }
+
+  return { delivered, reason: null };
 };

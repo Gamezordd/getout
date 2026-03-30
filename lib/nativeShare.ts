@@ -15,6 +15,15 @@ type ShareIntentPlugin = {
 
 const ShareIntent = registerPlugin<ShareIntentPlugin>("ShareIntent");
 
+type ShareLauncherPlugin = {
+  shareText: (options: {
+    text: string;
+    title?: string;
+  }) => Promise<{ presented: boolean }>;
+};
+
+const ShareLauncher = registerPlugin<ShareLauncherPlugin>("ShareLauncher");
+
 export const LAST_SESSION_ID_KEY = "getout-last-session-id";
 
 export const isNativeApp = () => Capacitor.isNativePlatform();
@@ -76,4 +85,15 @@ export const registerNativeShareListener = async (
   return async () => {
     await listener.remove();
   };
+};
+
+export const openNativeShareSheet = async (params: {
+  text: string;
+  title?: string;
+}) => {
+  if (!isNativeApp()) {
+    throw new Error("Native share is not available.");
+  }
+
+  return ShareLauncher.shareText(params);
 };
