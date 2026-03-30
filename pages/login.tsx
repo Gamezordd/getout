@@ -129,17 +129,7 @@ export default function LoginPage() {
         style={{ animation: "getoutLoginScan 5s ease-in-out 1.2s infinite" }}
       />
 
-      <div className="relative z-[3] flex min-h-[100svh] flex-col">
-        <div className="flex h-11 items-center justify-between px-1">
-          <div className="font-display text-[15px] font-bold tracking-[-0.02em] text-white">
-            9:41
-          </div>
-          <div className="flex items-center gap-2 opacity-70">
-            <div className="h-2 w-4 rounded-sm border border-white/40" />
-            <div className="h-2 w-2 rounded-full bg-white/70" />
-          </div>
-        </div>
-
+      <div className="relative z-[3] flex min-h-[100svh] flex-col pt-5">
         <div className="flex flex-1 flex-col px-3">
           <section className="flex flex-1 flex-col items-center justify-center pt-2 text-center">
             <div className="relative mb-5 flex h-[76px] w-[76px] items-center justify-center overflow-hidden rounded-[22px] border border-[#00e5a040] bg-[linear-gradient(145deg,#0f2018,#1a2e20)] shadow-[0_0_0_0_rgba(0,229,160,0.3)] [animation:getoutLoginPulse_3s_ease-in-out_1s_infinite]">

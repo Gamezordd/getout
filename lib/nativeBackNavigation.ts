@@ -5,7 +5,11 @@ export const isNativeDashboardBackRoute = (params: {
   sessionId: string | null;
 }) => {
   const { pathname, sessionId } = params;
-  return pathname === "/landing" || (pathname === "/" && Boolean(sessionId));
+  return (
+    pathname === "/landing" ||
+    pathname === "/final" ||
+    (pathname === "/" && Boolean(sessionId))
+  );
 };
 
 export const addNativeBackButtonListener = async (

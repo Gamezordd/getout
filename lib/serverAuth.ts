@@ -3,7 +3,7 @@ import { OAuth2Client } from "google-auth-library";
 import { parse, serialize } from "cookie";
 import { randomBytes, randomUUID } from "crypto";
 import type { NextApiRequest, NextApiResponse } from "next";
-import type { AuthenticatedUser } from "./authTypes";
+import type { AuthenticatedUser, FriendSummary } from "./authTypes";
 
 const SESSION_COOKIE_NAME = "getout_auth_session";
 const SESSION_DURATION_MS = 1000 * 60 * 60 * 24 * 30;
@@ -84,6 +84,13 @@ const mapUser = (row: UserRow): AuthenticatedUser => ({
   displayName: row.display_name,
   avatarUrl: row.avatar_url,
   provider: "google",
+});
+
+export const mapFriendSummary = (row: UserRow): FriendSummary => ({
+  id: row.id,
+  email: row.email,
+  displayName: row.display_name,
+  avatarUrl: row.avatar_url,
 });
 
 const buildCookie = (sessionId: string, expiresAt: Date) =>
@@ -243,6 +250,22 @@ export const getUserById = async (userId: string) => {
     SELECT id, email, display_name, avatar_url
     FROM users
     WHERE id = ${userId}
+    LIMIT 1
+  `) as UserRow[];
+  return rows[0] ? mapUser(rows[0]) : null;
+};
+
+export const getUserByEmail = async (email: string) => {
+  await ensureAuthSchema();
+  const normalizedEmail = email.trim().toLowerCase();
+  if (!normalizedEmail) {
+    return null;
+  }
+  const sql = getSql();
+  const rows = (await sql`
+    SELECT id, email, display_name, avatar_url
+    FROM users
+    WHERE LOWER(email) = ${normalizedEmail}
     LIMIT 1
   `) as UserRow[];
   return rows[0] ? mapUser(rows[0]) : null;

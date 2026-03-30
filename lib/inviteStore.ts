@@ -31,6 +31,7 @@ type InviteRow = {
   accepted_at: string | null;
   dismissed_at: string | null;
   expires_at: string;
+  seen_at: string | null;
   inviter_display_name: string;
   inviter_avatar_url: string | null;
 };
@@ -46,6 +47,7 @@ const mapInvite = (row: InviteRow): InviteListItem => ({
   createdAt: row.created_at,
   joinUrl: `/join?sessionId=${encodeURIComponent(row.session_id)}`,
   status: row.status,
+  seenAt: row.seen_at,
 });
 
 const mapNotificationEndpoint = (
@@ -101,6 +103,10 @@ export const ensureInviteSchema = async () => {
       dismissed_at TIMESTAMPTZ,
       expires_at TIMESTAMPTZ NOT NULL
     )
+  `;
+  await sql`
+    ALTER TABLE group_invites
+    ADD COLUMN IF NOT EXISTS seen_at TIMESTAMPTZ
   `;
   await sql`
     CREATE UNIQUE INDEX IF NOT EXISTS group_invites_pending_unique_idx
@@ -279,9 +285,12 @@ export const createInvite = async (params: {
     DO UPDATE SET
       inviter_user_id = EXCLUDED.inviter_user_id,
       message = EXCLUDED.message,
-      expires_at = EXCLUDED.expires_at
+      expires_at = EXCLUDED.expires_at,
+      seen_at = NULL
     RETURNING id, session_id, inviter_user_id, recipient_user_id, status, created_at, accepted_at, dismissed_at, expires_at
-  `) as Array<Omit<InviteRow, "inviter_display_name" | "inviter_avatar_url">>;
+  `) as Array<
+    Omit<InviteRow, "inviter_display_name" | "inviter_avatar_url" | "seen_at">
+  >;
 
   return rows[0];
 };
@@ -307,6 +316,7 @@ export const listPendingInvitesForRecipient = async (recipientUserId: string) =>
       gi.accepted_at,
       gi.dismissed_at,
       gi.expires_at,
+      gi.seen_at,
       u.display_name AS inviter_display_name,
       u.avatar_url AS inviter_avatar_url
     FROM group_invites gi
@@ -336,6 +346,65 @@ export const dismissInvite = async (params: {
     RETURNING id
   `) as Array<{ id: string }>;
   return rows.length > 0;
+};
+
+export const getAndMarkLatestUnreadInvite = async (recipientUserId: string) => {
+  await ensureInviteSchema();
+  const sql = getSql();
+  await sql`
+    UPDATE group_invites
+    SET status = 'expired'
+    WHERE recipient_user_id = ${recipientUserId}
+      AND status = 'pending'
+      AND expires_at <= NOW()
+  `;
+
+  const rows = (await sql`
+    WITH candidate AS (
+      SELECT id
+      FROM group_invites
+      WHERE recipient_user_id = ${recipientUserId}
+        AND status = 'pending'
+        AND expires_at > NOW()
+        AND seen_at IS NULL
+      ORDER BY created_at DESC
+      LIMIT 1
+    ),
+    updated AS (
+      UPDATE group_invites gi
+      SET seen_at = NOW()
+      FROM candidate
+      WHERE gi.id = candidate.id
+      RETURNING
+        gi.id,
+        gi.session_id,
+        gi.inviter_user_id,
+        gi.recipient_user_id,
+        gi.status,
+        gi.created_at,
+        gi.accepted_at,
+        gi.dismissed_at,
+        gi.expires_at,
+        gi.seen_at
+    )
+    SELECT
+      updated.id,
+      updated.session_id,
+      updated.inviter_user_id,
+      updated.recipient_user_id,
+      updated.status,
+      updated.created_at,
+      updated.accepted_at,
+      updated.dismissed_at,
+      updated.expires_at,
+      updated.seen_at,
+      u.display_name AS inviter_display_name,
+      u.avatar_url AS inviter_avatar_url
+    FROM updated
+    INNER JOIN users u ON u.id = updated.inviter_user_id
+  `) as InviteRow[];
+
+  return rows[0] ? mapInvite(rows[0]) : null;
 };
 
 export const acceptInviteForSession = async (params: {

@@ -1,7 +1,8 @@
 import { observer } from "mobx-react-lite";
 import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
-import type { RecentGroupSummary } from "../lib/authTypes";
+import FriendsManager from "../components/FriendsManager";
+import type { InviteListItem, RecentGroupSummary } from "../lib/authTypes";
 import { useAuth } from "../lib/auth/AuthProvider";
 
 const quickActions = [
@@ -22,9 +23,14 @@ function DashboardPage() {
   const router = useRouter();
   const { authStatus, authenticatedUser, isNative } = useAuth();
   const [recentGroups, setRecentGroups] = useState<RecentGroupSummary[]>([]);
+  const [invites, setInvites] = useState<InviteListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"home" | "history">("home");
+  const [inviteLoading, setInviteLoading] = useState(true);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<
+    "home" | "friends" | "invites" | "history"
+  >("home");
   const [joinValue, setJoinValue] = useState("");
 
   useEffect(() => {
@@ -40,20 +46,36 @@ function DashboardPage() {
     const load = async () => {
       try {
         setLoading(true);
+        setInviteLoading(true);
         setError(null);
-        const response = await fetch("/api/recent-groups");
-        const payload = (await response.json().catch(() => ({}))) as {
+        setInviteError(null);
+        const [groupsResponse, invitesResponse] = await Promise.all([
+          fetch("/api/recent-groups"),
+          fetch("/api/invites"),
+        ]);
+        const groupsPayload = (await groupsResponse.json().catch(() => ({}))) as {
           groups?: RecentGroupSummary[];
           message?: string;
         };
-        if (!response.ok) {
-          throw new Error(payload.message || "Unable to load dashboard.");
+        const invitesPayload = (await invitesResponse.json().catch(() => ({}))) as {
+          invites?: InviteListItem[];
+          message?: string;
+        };
+        if (!groupsResponse.ok) {
+          throw new Error(groupsPayload.message || "Unable to load dashboard.");
         }
-        setRecentGroups(payload.groups || []);
+        if (!invitesResponse.ok) {
+          throw new Error(invitesPayload.message || "Unable to load invites.");
+        }
+        setRecentGroups(groupsPayload.groups || []);
+        setInvites(invitesPayload.invites || []);
       } catch (err: any) {
-        setError(err.message || "Unable to load dashboard.");
+        const message = err.message || "Unable to load dashboard.";
+        setError(message);
+        setInviteError(message);
       } finally {
         setLoading(false);
+        setInviteLoading(false);
       }
     };
 
@@ -63,6 +85,10 @@ function DashboardPage() {
   const avatarLabel = useMemo(
     () => authenticatedUser?.displayName?.trim().charAt(0).toUpperCase() || "G",
     [authenticatedUser?.displayName],
+  );
+  const unreadInviteCount = useMemo(
+    () => invites.filter((invite) => !invite.seenAt).length,
+    [invites],
   );
 
   const openCreate = (category?: string) => {
@@ -176,17 +202,7 @@ function DashboardPage() {
 
   return (
     <main className="min-h-[100svh] bg-[#0a0a0d] text-[#f0f0f5]">
-      <div className="mx-auto flex min-h-[100svh] w-full max-w-[430px] flex-col">
-        <div className="flex h-11 items-center justify-between px-[22px]">
-          <div className="font-display text-[15px] font-bold tracking-[-0.02em] text-white">
-            9:41
-          </div>
-          <div className="flex items-center gap-[6px] opacity-70">
-            <div className="h-2 w-4 rounded-sm border border-white/40" />
-            <div className="h-2 w-2 rounded-full bg-white/70" />
-          </div>
-        </div>
-
+      <div className="mx-auto flex min-h-[100svh] w-full max-w-[430px] flex-col pt-5">
         <div className="relative flex-1 overflow-hidden">
           <div className={`absolute inset-0 overflow-y-auto pb-5 transition ${activeTab === "home" ? "opacity-100" : "pointer-events-none opacity-0"}`}>
             <div className="flex items-start justify-between px-5 pb-4 pt-1">
@@ -283,21 +299,6 @@ function DashboardPage() {
               </button>
             </div>
             <div className="px-5">
-              <button
-                type="button"
-                onClick={() => router.push("/invites")}
-                className="mb-4 flex w-full items-center justify-between rounded-[18px] border border-white/10 bg-[#141418] px-4 py-4 text-left"
-              >
-                <div>
-                  <div className="font-display text-[15px] font-bold tracking-[-0.02em] text-white">
-                    Invites
-                  </div>
-                  <div className="mt-1 text-xs text-[#5a5a70]">
-                    Open your invite inbox and jump into active groups
-                  </div>
-                </div>
-                <div className="text-sm text-[#00e5a0]">→</div>
-              </button>
               {loading ? (
                 <div className="rounded-[18px] border border-white/10 bg-[#141418] p-4 text-sm text-[#8b8b9c]">
                   Loading recent groups...
@@ -347,6 +348,84 @@ function DashboardPage() {
               {recentGroups.map((group) => renderGroupCard(group, false))}
             </div>
           </div>
+
+          <div className={`absolute inset-0 overflow-y-auto pb-5 transition ${activeTab === "friends" ? "opacity-100" : "pointer-events-none opacity-0"}`}>
+            <div className="px-5 pb-5 pt-1">
+              <div className="font-display text-2xl font-extrabold tracking-[-0.04em] text-white">
+                Friends
+              </div>
+              <div className="mt-1 text-[13px] text-[#5a5a70]">
+                Keep your invite list ready for the next group you create
+              </div>
+            </div>
+            <div className="px-5">
+              <FriendsManager cardClassName="rounded-[18px] border border-white/10 bg-[#141418] p-4" />
+            </div>
+          </div>
+
+          <div className={`absolute inset-0 overflow-y-auto pb-5 transition ${activeTab === "invites" ? "opacity-100" : "pointer-events-none opacity-0"}`}>
+            <div className="px-5 pb-5 pt-1">
+              <div className="font-display text-2xl font-extrabold tracking-[-0.04em] text-white">
+                Invites
+              </div>
+              <div className="mt-1 text-[13px] text-[#5a5a70]">
+                Groups waiting on your contribution
+              </div>
+            </div>
+            <div className="px-5">
+              {inviteLoading ? (
+                <div className="rounded-[18px] border border-white/10 bg-[#141418] p-4 text-sm text-[#8b8b9c]">
+                  Loading invites...
+                </div>
+              ) : null}
+              {inviteError ? (
+                <div className="rounded-[18px] border border-rose-500/20 bg-rose-500/10 p-4 text-sm text-rose-200">
+                  {inviteError}
+                </div>
+              ) : null}
+              {!inviteLoading && !inviteError && invites.length === 0 ? (
+                <div className="rounded-[18px] border border-white/10 bg-[#141418] p-6 text-center">
+                  <div className="text-4xl">✉</div>
+                  <div className="mt-3 font-display text-lg font-bold tracking-[-0.02em] text-white">
+                    No pending invites
+                  </div>
+                  <div className="mt-2 text-sm text-[#5a5a70]">
+                    When friends invite you into a group, it will show up here.
+                  </div>
+                </div>
+              ) : null}
+              {invites.map((invite) => (
+                <button
+                  key={invite.id}
+                  type="button"
+                  onClick={() => router.push(invite.joinUrl)}
+                  className="mb-3 w-full rounded-[18px] border border-white/10 bg-[#141418] p-5 text-left"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#00e5a0]">
+                        Pending invite
+                      </p>
+                      <p className="mt-2 font-display text-xl font-bold tracking-[-0.03em] text-white">
+                        {invite.inviter.displayName}
+                      </p>
+                    </div>
+                    {!invite.seenAt ? (
+                      <span className="rounded-full bg-[#ff3b5c] px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-white">
+                        New
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="mt-2 text-sm text-[#8b8b9c]">
+                    Invited you to contribute to a group. Open the join flow and we&apos;ll take you there directly.
+                  </p>
+                  <div className="mt-4 inline-flex rounded-full bg-[#00e5a0] px-4 py-2 text-xs font-bold text-black">
+                    Open invite
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         <div className="z-20 flex h-[72px] items-center border-t border-white/10 bg-[rgba(14,14,18,0.96)] px-2 pb-2 backdrop-blur-xl">
@@ -365,10 +444,45 @@ function DashboardPage() {
               Home
             </span>
           </button>
+          <button type="button" onClick={() => setActiveTab("friends")} className="flex flex-1 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2">
+            <svg width="22" height="22" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M7.75 11.25a3.25 3.25 0 1 0 0-6.5 3.25 3.25 0 0 0 0 6.5ZM16.5 12.25a2.75 2.75 0 1 0 0-5.5 2.75 2.75 0 0 0 0 5.5ZM3.75 18.25c0-2.35 2.32-4.25 5.18-4.25 2.87 0 5.2 1.9 5.2 4.25M13.5 18.25c.2-1.7 2-3 4.16-3 2.3 0 4.17 1.5 4.17 3.35"
+                stroke={activeTab === "friends" ? "#00e5a0" : "#5a5a70"}
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                opacity={activeTab === "friends" ? "1" : "0.45"}
+              />
+            </svg>
+            <span className={`text-[10px] font-semibold ${activeTab === "friends" ? "text-[#00e5a0]" : "text-[#5a5a70]"}`}>
+              Friends
+            </span>
+          </button>
           <button type="button" onClick={() => openCreate()} className="mb-[10px] flex h-[58px] w-[58px] shrink-0 items-center justify-center rounded-[18px] bg-[#00e5a0] shadow-[0_4px_20px_rgba(0,229,160,0.35)]">
             <svg width="24" height="24" fill="none" viewBox="0 0 24 24">
               <path d="M12 4v16M4 12h16" stroke="#000" strokeWidth="2.5" strokeLinecap="round" />
             </svg>
+          </button>
+          <button type="button" onClick={() => setActiveTab("invites")} className="relative flex flex-1 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2">
+            {unreadInviteCount > 0 ? (
+              <span className="absolute right-[calc(50%-22px)] top-1 flex min-h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#ff3b5c] px-1 text-[10px] font-bold text-white">
+                {unreadInviteCount > 9 ? "9+" : unreadInviteCount}
+              </span>
+            ) : null}
+            <svg width="22" height="22" fill="none" viewBox="0 0 24 24">
+              <path
+                d="M4 7.5A2.5 2.5 0 0 1 6.5 5h11A2.5 2.5 0 0 1 20 7.5v9A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5v-9Zm1.5.5 6.5 5 6.5-5"
+                stroke={activeTab === "invites" ? "#00e5a0" : "#5a5a70"}
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                opacity={activeTab === "invites" ? "1" : "0.45"}
+              />
+            </svg>
+            <span className={`text-[10px] font-semibold ${activeTab === "invites" ? "text-[#00e5a0]" : "text-[#5a5a70]"}`}>
+              Invites
+            </span>
           </button>
           <button type="button" onClick={() => setActiveTab("history")} className="flex flex-1 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2">
             <svg width="22" height="22" fill="none" viewBox="0 0 24 24">

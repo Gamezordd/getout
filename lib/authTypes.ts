@@ -6,6 +6,13 @@ export type AuthenticatedUser = {
   provider: "google";
 };
 
+export type FriendSummary = {
+  id: string;
+  email: string;
+  displayName: string;
+  avatarUrl?: string | null;
+};
+
 export type AuthStatus = "unknown" | "signed_out" | "signing_in" | "signed_in";
 
 export type InviteStatus = "pending" | "accepted" | "dismissed" | "expired";
@@ -35,6 +42,7 @@ export type InviteListItem = {
   createdAt: string;
   joinUrl: string;
   status: InviteStatus;
+  seenAt?: string | null;
 };
 
 export type RecentGroupSummary = {

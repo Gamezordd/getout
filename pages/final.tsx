@@ -2,6 +2,7 @@ import { observer } from "mobx-react-lite";
 import { useRouter } from "next/router";
 import { useEffect, useMemo } from "react";
 import useInstallPrompt from "../hooks/useInstallPrompt";
+import { useAuth } from "../lib/auth/AuthProvider";
 import { useAppStore } from "../lib/store/AppStoreProvider";
 
 const AVATAR_BACKGROUNDS = [
@@ -109,6 +110,7 @@ function FinalPage() {
   const store = useAppStore();
   const router = useRouter();
   const { triggerInstall } = useInstallPrompt();
+  const { isNative } = useAuth();
 
   const sessionId =
     typeof router.query.sessionId === "string" ? router.query.sessionId : "";
@@ -214,8 +216,33 @@ function FinalPage() {
       <div className="mx-auto flex min-h-screen w-full max-w-[430px] flex-col">
         <header className="sticky top-0 z-20 border-b border-white/10 bg-[#0a0a0d]/90 px-4 py-4 backdrop-blur-xl">
           <div className="flex items-center justify-between gap-4">
-            <div className="font-display text-[21px] font-extrabold tracking-[-0.04em]">
-              Get<span className="text-[#00e5a0]">Out</span>
+            <div className="flex items-center gap-3">
+              {isNative ? (
+                <button
+                  type="button"
+                  onClick={() => void router.replace("/dashboard")}
+                  className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-[#f0f0f5]"
+                  aria-label="Back to dashboard"
+                >
+                  <svg
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    aria-hidden="true"
+                    className="h-4 w-4"
+                  >
+                    <path
+                      d="M10 3 5 8l5 5"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
+              ) : null}
+              <div className="font-display text-[21px] font-extrabold tracking-[-0.04em]">
+                Get<span className="text-[#00e5a0]">Out</span>
+              </div>
             </div>
             <div className="flex items-center">
               {store.users.slice(0, 5).map((user, index) => {

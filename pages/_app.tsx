@@ -4,6 +4,7 @@ import { useRouter } from "next/router";
 import { useEffect } from "react";
 import { Toaster } from "sonner";
 import NativeBackNavigationManager from "../components/NativeBackNavigationManager";
+import UnreadInvitePrompt from "../components/UnreadInvitePrompt";
 import { AuthProvider } from "../lib/auth/AuthProvider";
 import { initInstallPrompt } from "../lib/installPrompt";
 import {
@@ -99,6 +100,7 @@ export default function App({ Component, pageProps }: AppProps) {
   return (
     <AuthProvider>
       <NativeBackNavigationManager />
+      <UnreadInvitePrompt />
       <AppStoreProvider>
         <Head>
           <title>GetOut — Pick a place in minutes</title>
