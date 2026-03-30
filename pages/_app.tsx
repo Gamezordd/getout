@@ -10,6 +10,7 @@ import { initInstallPrompt } from "../lib/installPrompt";
 import {
   addNativeNotificationActionListener,
   isNativeNotificationsSupported,
+  type NativeNotificationPayload,
 } from "../lib/nativeNotifications";
 import {
   getLastSessionId,
@@ -21,6 +22,9 @@ import { registerAppServiceWorker } from "../lib/serviceWorker";
 import { AppStoreProvider } from "../lib/store/AppStoreProvider";
 import "../styles/globals.css";
 import "mapbox-gl/dist/mapbox-gl.css";
+
+const buildJoinRoute = (sessionId: string) =>
+  `/join?sessionId=${encodeURIComponent(sessionId)}`;
 
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter();
@@ -79,14 +83,59 @@ export default function App({ Component, pageProps }: AppProps) {
         }
       | undefined;
 
+    const navigateToLogin = (sessionId: string) => {
+      void router.push({
+        pathname: "/login",
+        query: {
+          redirect: buildJoinRoute(sessionId),
+        },
+      });
+    };
+
     const handleRoute = (route?: string | null) => {
       if (!route) return;
       void router.push(route);
     };
 
+    const handleNotificationAction = async (
+      payload: NativeNotificationPayload,
+    ) => {
+      if (!payload.sessionId || !payload.inviteId) {
+        handleRoute(payload.route);
+        return;
+      }
+
+      try {
+        const params = new URLSearchParams({
+          sessionId: payload.sessionId,
+          inviteId: payload.inviteId,
+        });
+        const response = await fetch(`/api/invites/resolve-route?${params}`);
+
+        if (response.status === 401) {
+          navigateToLogin(payload.sessionId);
+          return;
+        }
+
+        if (response.ok) {
+          const data = (await response.json().catch(() => ({}))) as {
+            route?: string;
+          };
+          if (data.route) {
+            handleRoute(data.route);
+            return;
+          }
+        }
+      } catch {
+        // Fall back to the notification payload route below.
+      }
+
+      handleRoute(payload.route || buildJoinRoute(payload.sessionId));
+    };
+
     const init = async () => {
       listener = await addNativeNotificationActionListener((payload) => {
-        handleRoute(payload.route);
+        void handleNotificationAction(payload);
       }).catch(() => undefined);
     };
 

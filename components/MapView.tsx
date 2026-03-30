@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { observer } from "mobx-react-lite";
 import { useAppStore } from "../lib/store/AppStoreProvider";
 import renderMapMarkers from "./mapElements/renderMapMarkers";
@@ -30,6 +30,23 @@ const MapView = observer(function MapView({
     {},
   );
   const markerClickRef = useRef(false);
+  const [mapReadyVersion, setMapReadyVersion] = useState(0);
+
+  const fitMapToMarkers = useCallback(() => {
+    const map = mapRef.current;
+    const mapboxgl = mapboxRef.current;
+    if (!map || !mapboxgl || typeof map.fitBounds !== "function") return;
+
+    const points = [
+      ...users.map((user) => user.location),
+      ...venues.map((venue) => venue.location),
+    ];
+    if (points.length === 0) return;
+
+    const bounds = new mapboxgl.LngLatBounds();
+    points.forEach((point) => bounds.extend([point.lng, point.lat]));
+    map.fitBounds(bounds, { padding: 80, maxZoom: 14, duration: 700 });
+  }, [users, venues]);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -60,6 +77,9 @@ const MapView = observer(function MapView({
         });
 
         mapRef.current = map;
+        map.on("load", () => {
+          setMapReadyVersion((value) => value + 1);
+        });
 
         map.on("click", () => {
           if (markerClickRef.current) {
@@ -73,31 +93,24 @@ const MapView = observer(function MapView({
       }
     };
 
-    setupMap();
+    void setupMap();
+
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+      }
+      mapboxRef.current = null;
+      venueCoordsRef.current = {};
+    };
   }, [onError, onSelectVenue]);
 
-  renderMapMarkers(
-    mapRef,
-    mapboxRef,
-    venueCoordsRef,
-    markerClickRef,
-  );
+  renderMapMarkers(mapRef, mapboxRef, venueCoordsRef, markerClickRef);
 
   useEffect(() => {
-    const map = mapRef.current;
-    const mapboxgl = mapboxRef.current;
-    if (!map || !mapboxgl) return;
-
-    const points = [
-      ...users.map((user) => user.location),
-      ...venues.map((venue) => venue.location),
-    ];
-    if (points.length === 0) return;
-
-    const bounds = new mapboxgl.LngLatBounds();
-    points.forEach((point) => bounds.extend([point.lng, point.lat]));
-    map.fitBounds(bounds, { padding: 80, maxZoom: 14, duration: 700 });
-  }, [fitAllTrigger, users, venues]);
+    if (mapReadyVersion === 0) return;
+    fitMapToMarkers();
+  }, [fitAllTrigger, fitMapToMarkers, mapReadyVersion]);
 
   useEffect(() => {
     const map = mapRef.current;
