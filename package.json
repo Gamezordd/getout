@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "cleanup:groups": "node scripts/delete-all-groups.mjs",
     "cap:sync": "cap sync android",
     "cap:android": "cap open android"
   },

@@ -36,6 +36,8 @@ function HomePage() {
   const [isSavingName, setIsSavingName] = useState(false);
   const [dismissedPreciseBanner, setDismissedPreciseBanner] = useState(false);
   const [dismissedNamePrompt, setDismissedNamePrompt] = useState(false);
+  const [isDetectingPreciseLocation, setIsDetectingPreciseLocation] =
+    useState(false);
   const pushInitRef = useRef(false);
 
   const preciseBannerKey = store.sessionId
@@ -137,14 +139,16 @@ function HomePage() {
   );
   const handleAllowPreciseLocation = useCallback(async () => {
     const currentUserId = store.currentUserId;
-    if (!currentUserId) return;
-    const locationResult = await getPreciseLocation(isNative);
-    if (!locationResult.ok) {
-      store.setMapError(locationResult.message);
-      return;
-    }
-
+    if (!currentUserId || isDetectingPreciseLocation) return;
+    setIsDetectingPreciseLocation(true);
+    store.setMapError(null);
     try {
+      const locationResult = await getPreciseLocation(isNative);
+      if (!locationResult.ok) {
+        store.setMapError(locationResult.message);
+        return;
+      }
+
       const params = new URLSearchParams({
         lat: String(locationResult.location.lat),
         lng: String(locationResult.location.lng),
@@ -165,8 +169,10 @@ function HomePage() {
       await store.fetchSuggestions();
     } catch (err: any) {
       store.setMapError(err.message || "Unable to detect address.");
+    } finally {
+      setIsDetectingPreciseLocation(false);
     }
-  }, [isNative, store]);
+  }, [isDetectingPreciseLocation, isNative, store]);
 
   const handleDenyPreciseLocation = useCallback(() => {
     if (typeof window !== "undefined" && preciseBannerKey) {
@@ -269,22 +275,33 @@ function HomePage() {
             <p className="font-medium text-[#f0f0f5]">
               Allow precise location to get suggestions closer to you and unlock your travel time.
             </p>
-            <div className="mt-3 flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handleAllowPreciseLocation}
-                className="rounded-full bg-[#00e5a0] px-4 py-2 text-xs font-bold text-black"
-              >
-                Allow
-              </button>
-              <button
-                type="button"
-                onClick={handleDenyPreciseLocation}
-                className="rounded-full border border-white/10 px-4 py-2 text-xs font-semibold text-[#8b8b9c]"
-              >
-                Deny
-              </button>
-            </div>
+            {isDetectingPreciseLocation ? (
+              <Loader
+                variant="dark"
+                title="Detecting location..."
+                description="Waiting for location access and resolving your current area."
+                className="mt-3 rounded-[18px] border-[#00e5a0]/10 bg-[#121c18] px-4 py-4"
+              />
+            ) : (
+              <div className="mt-3 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleAllowPreciseLocation}
+                  disabled={isDetectingPreciseLocation}
+                  className="rounded-full bg-[#00e5a0] px-4 py-2 text-xs font-bold text-black disabled:opacity-60"
+                >
+                  Allow
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDenyPreciseLocation}
+                  disabled={isDetectingPreciseLocation}
+                  className="rounded-full border border-white/10 px-4 py-2 text-xs font-semibold text-[#8b8b9c] disabled:opacity-60"
+                >
+                  Deny
+                </button>
+              </div>
+            )}
           </div>
         )}
         {!store.lockedVenue && <MapStrip />}
@@ -379,7 +396,7 @@ function HomePage() {
         onClose={() => {
           handleSkipName();
         }}
-        title="What do friends call you?"
+        title="What should we call you?"
         description="Your vote is in. Add a name if you want your friends to recognize you."
       >
         <div className="mt-4 flex w-full flex-col gap-3">

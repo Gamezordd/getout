@@ -25,6 +25,7 @@ type SuggestionsSnapshot = {
 };
 
 type GroupPayload = {
+  createdAt: string | null;
   users: User[];
   venues: Venue[];
   manualVenues: Venue[];
@@ -49,6 +50,7 @@ const createEmptySuggestionsSnapshot = (): SuggestionsSnapshot => ({
 });
 
 const createEmptyGroup = (): GroupPayload => ({
+  createdAt: null,
   users: [],
   venues: [],
   manualVenues: [],
@@ -83,6 +85,7 @@ const hydrateGroup = async (sessionId: string, group: GroupPayload) => {
   }
   if (!hydrated.pushSubscriptions) hydrated.pushSubscriptions = {};
   if (!Array.isArray(hydrated.sessionMembers)) hydrated.sessionMembers = [];
+  if (typeof hydrated.createdAt !== "string") hydrated.createdAt = null;
 
   const rawSuggestions = group.suggestions;
   hydrated.suggestions = {
@@ -131,14 +134,28 @@ const findGroup = async (sessionId: string): Promise<GroupPayload | null> => {
 };
 
 const createGroup = async (sessionId: string): Promise<GroupPayload> => {
-  const group = createEmptyGroup();
+  const group = {
+    ...createEmptyGroup(),
+    createdAt: new Date().toISOString(),
+  };
   await saveGroup(sessionId, group);
   return group;
 };
 
 const saveGroup = async (sessionId: string, group: GroupPayload) => {
   const key = `${GROUP_PREFIX}${sessionId}`;
-  await redis.set(key, group);
+  const existingGroup = await redis.get<GroupPayload>(key);
+  const nextGroup = {
+    ...createEmptyGroup(),
+    ...group,
+    createdAt:
+      typeof group.createdAt === "string"
+        ? group.createdAt
+        : typeof existingGroup?.createdAt === "string"
+          ? existingGroup.createdAt
+          : null,
+  };
+  await redis.set(key, nextGroup);
 };
 
 export { createEmptySuggestionsSnapshot, createGroup, findGroup, saveGroup };

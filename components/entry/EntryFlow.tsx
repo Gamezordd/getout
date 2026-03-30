@@ -286,7 +286,7 @@ function NameField({
         <input
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          placeholder="What do your friends call you?"
+          placeholder="What should we call you?"
           className="w-full bg-transparent text-[15px] text-white outline-none placeholder:text-[#64647a]"
         />
         {isValid ? (
