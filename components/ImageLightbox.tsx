@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { registerNativeBackInterceptor } from "../lib/nativeBackNavigation";
 
 type Props = {
   photos: string[];
@@ -31,6 +32,10 @@ export default function ImageLightbox({
 
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    const unregisterNativeBackInterceptor = registerNativeBackInterceptor(() => {
+      onClose();
+      return true;
+    });
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -51,6 +56,7 @@ export default function ImageLightbox({
     return () => {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", handleKeyDown);
+      unregisterNativeBackInterceptor();
     };
   }, [currentIndex, isOpen, onClose, onNavigate, photos.length]);
 

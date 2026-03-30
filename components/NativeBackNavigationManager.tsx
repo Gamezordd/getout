@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { useAuth } from "../lib/auth/AuthProvider";
 import {
   addNativeBackButtonListener,
+  consumeNativeBackPress,
   isNativeDashboardBackRoute,
 } from "../lib/nativeBackNavigation";
 
@@ -21,6 +22,10 @@ export default function NativeBackNavigationManager() {
 
     const init = async () => {
       handle = await addNativeBackButtonListener(() => {
+        if (consumeNativeBackPress()) {
+          return;
+        }
+
         const sessionId =
           typeof router.query.sessionId === "string" ? router.query.sessionId : null;
 
