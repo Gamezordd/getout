@@ -1,4 +1,5 @@
 import { observer } from "mobx-react-lite";
+import { getUserActivityLabel } from "../lib/userDisplay";
 import Dialog from "./Dialog";
 import { useAppStore } from "../lib/store/AppStoreProvider";
 
@@ -13,7 +14,7 @@ const GroupSettingsDialog = observer(function GroupSettingsDialog({
 }: Props) {
   const store = useAppStore();
   const venueById = new Map<string, { name: string }>();
-  [...store.venues, ...store.manualVenues].forEach((venue) => {
+  [...store.manualVenues, ...store.suggestedVenues, ...store.venues].forEach((venue) => {
     venueById.set(venue.id, { name: venue.name });
   });
 
@@ -24,7 +25,7 @@ const GroupSettingsDialog = observer(function GroupSettingsDialog({
       title="Group settings"
       description="Current participants and their picks."
     >
-      <div className="mt-4 space-y-2 flex-grow min-h-0 overflow-y-auto">
+      <div className="mt-4 flex-grow space-y-2 overflow-y-auto">
         {store.users.length === 0 && (
           <p className="rounded-xl bg-slate-100 px-3 py-2 text-xs text-slate-600">
             No participants yet.
@@ -34,9 +35,8 @@ const GroupSettingsDialog = observer(function GroupSettingsDialog({
           const pickedVenueId = Object.keys(store.votes || {}).find((venueId) =>
             store.votes?.[venueId]?.includes(user.id),
           );
-          const pickedName = pickedVenueId
-            ? venueById.get(pickedVenueId)?.name
-            : null;
+          const pickedName = pickedVenueId ? venueById.get(pickedVenueId)?.name : null;
+          const userLabel = getUserActivityLabel(user);
 
           return (
             <div
@@ -44,16 +44,10 @@ const GroupSettingsDialog = observer(function GroupSettingsDialog({
               className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 px-3 py-2"
             >
               <div className="flex items-center gap-2">
-                <img
-                  src={user.avatarUrl}
-                  alt={user.name}
-                  className="h-7 w-7 rounded-full"
-                />
+                <img src={user.avatarUrl} alt={userLabel} className="h-7 w-7 rounded-full" />
                 <div>
-                  <p className="text-sm font-semibold text-ink">{user.name}</p>
-                  {user.isOrganizer && (
-                    <p className="text-[11px] text-slate-500">Organizer</p>
-                  )}
+                  <p className="text-sm font-semibold text-ink">{userLabel}</p>
+                  {user.isOrganizer && <p className="text-[11px] text-slate-500">Organizer</p>}
                 </div>
               </div>
               <div className="flex items-center gap-3">

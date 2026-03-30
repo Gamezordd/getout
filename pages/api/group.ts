@@ -1,8 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { getGroup } from "../../lib/groupStore";
+import { createGroup, findGroup } from "../../lib/groupStore";
 import { GroupRequest } from "./types";
 import { groupActions } from "./group-actions";
 import { buildGroupResponse } from "./utils";
+import { ensureVotingDeadlineState } from "./venue-lock";
 
 export default async function handler(
   req: NextApiRequest,
@@ -15,7 +16,11 @@ export default async function handler(
     }
     const browserId =
       typeof req.query.browserId === "string" ? req.query.browserId : null;
-    const group = await getGroup(sessionId);
+    const group = await findGroup(sessionId);
+    if (!group) {
+      return res.status(404).json({ message: "Group not found." });
+    }
+    await ensureVotingDeadlineState({ sessionId, group });
     const sessionMember = browserId
       ? group.sessionMembers.find((member) => member.browserId === browserId)
       : null;
@@ -40,13 +45,26 @@ export default async function handler(
     return res.status(400).json({ message: "Missing sessionId." });
   }
 
-  const group = await getGroup(payload.sessionId);
   const channel = `private-group-${payload.sessionId}`;
   const actions = groupActions(req, res, channel);
 
   if (payload.action === "join") {
+    let group = await findGroup(payload.sessionId);
+    if (!group) {
+      if (!payload.createIfMissing) {
+        return res.status(404).json({ message: "Group not found." });
+      }
+      group = await createGroup(payload.sessionId);
+    }
+    await ensureVotingDeadlineState({ sessionId: payload.sessionId, group });
     return actions.join(payload, group);
   }
+
+  const group = await findGroup(payload.sessionId);
+  if (!group) {
+    return res.status(404).json({ message: "Group not found." });
+  }
+  await ensureVotingDeadlineState({ sessionId: payload.sessionId, group });
 
   if (payload.action === "setManualVenues") {
     return actions.setManualVenues(payload, group);

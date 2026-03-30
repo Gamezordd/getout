@@ -15,6 +15,7 @@ export type SuggestionsResponse = {
   etaMatrix: EtaMatrix;
   totalsByVenue: TotalsByVenue;
   votes: VotesByVenue;
+  votingClosesAt?: string | null;
   warning?: string;
 };
 
@@ -44,9 +45,14 @@ export type JoinRequest = {
   action: "join";
   sessionId: string;
   browserId: string;
-  name: string;
-  location: LatLng;
+  createIfMissing?: boolean;
+  name?: string;
+  useAuthenticatedProfile?: boolean;
+  location?: LatLng;
+  locationLabel?: string;
+  locationSource?: "ip" | "precise";
   venueCategory?: VenueCategory;
+  closeVotingInHours?: number;
 };
 
 export type SetManualVenuesRequest = {
@@ -71,7 +77,10 @@ export type UpdateUserRequest = {
   action: "updateUser";
   sessionId: string;
   userId: string;
-  location: LatLng;
+  location?: LatLng;
+  locationLabel?: string;
+  locationSource?: "ip" | "precise";
+  name?: string;
 };
 
 export type RemoveUserRequest = {
@@ -101,7 +110,13 @@ export type GroupResponse = {
   users: User[];
   venues: Venue[];
   manualVenues: Venue[];
+  sessionMembers: Array<{
+    browserId: string;
+    userId: string;
+    isOwner: boolean;
+  }>;
   votes: VotesByVenue;
+  votingClosesAt?: string | null;
   venueCategory: VenueCategory | null;
   lockedVenue: LockedVenue | null;
   currentUserId?: string;

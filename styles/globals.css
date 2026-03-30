@@ -1,17 +1,123 @@
-﻿@tailwind base;
+﻿@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Syne:wght@600;700;800&display=swap");
+
+@tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
   color-scheme: light;
+  --getout-bg: #0a0a0d;
+  --getout-surface: #141418;
+  --getout-surface-2: #1c1c22;
+  --getout-surface-3: #22222a;
+  --getout-border: rgba(255, 255, 255, 0.08);
+  --getout-text: #f0f0f5;
+  --getout-muted: #64647a;
+  --getout-accent: #00e5a0;
+  --getout-warn: #ffbe3d;
+  --getout-live: #ff3b5c;
 }
 
 body {
-  @apply bg-mist text-ink;
+  font-family: "DM Sans", sans-serif;
+  background:
+    radial-gradient(circle at top, rgba(0, 229, 160, 0.09), transparent 22%),
+    var(--getout-bg);
+  color: var(--getout-text);
 }
 
 html,
 #__next,
 body {
   @apply h-full w-full overflow-x-hidden;
+}
+
+a,
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.font-display {
+  font-family: "Syne", sans-serif;
+}
+
+@keyframes getoutTicker {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes getoutScanLine {
+  0% {
+    top: 0%;
+    opacity: 0;
+  }
+
+  5% {
+    opacity: 0.5;
+  }
+
+  95% {
+    opacity: 0.5;
+  }
+
+  100% {
+    top: 60%;
+    opacity: 0;
+  }
+}
+
+@keyframes getoutLoginScan {
+  0% {
+    top: 10%;
+    opacity: 0;
+  }
+
+  8% {
+    opacity: 0.45;
+  }
+
+  92% {
+    opacity: 0.25;
+  }
+
+  100% {
+    top: 78%;
+    opacity: 0;
+  }
+}
+
+@keyframes getoutCollageFloat {
+  from {
+    transform: scale(1.02);
+  }
+
+  to {
+    transform: scale(1.12);
+  }
+}
+
+@keyframes getoutLoginPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(0, 229, 160, 0.25);
+  }
+
+  50% {
+    box-shadow: 0 0 0 12px rgba(0, 229, 160, 0);
+  }
+}
+
+@keyframes getoutButtonShimmer {
+  0% {
+    left: -60%;
+  }
+
+  100% {
+    left: 160%;
+  }
 }

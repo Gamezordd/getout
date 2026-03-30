@@ -5,10 +5,13 @@
 
 export type User = {
   id: string;
-  name: string;
+  name?: string | null;
   avatarUrl: string;
   location: LatLng;
+  authenticatedUserId?: string;
   isOrganizer?: boolean;
+  locationLabel?: string | null;
+  locationSource?: "ip" | "precise";
 };
 
 export type Venue = {
@@ -16,6 +19,10 @@ export type Venue = {
   name: string;
   location: LatLng;
   address?: string;
+  area?: string;
+  priceLabel?: string;
+  closingTimeLabel?: string;
+  photos?: string[];
   rating?: number;
   userRatingCount?: number;
   addedByUserId?: string;

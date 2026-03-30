@@ -2,10 +2,13 @@ import { observer } from "mobx-react-lite";
 import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
 import PlaceSearch, { PlaceResult } from "../components/PlaceSearch";
+import { useAuth } from "../lib/auth/AuthProvider";
+import { getPreciseLocation } from "../lib/preciseLocation";
 import { useAppStore } from "../lib/store/AppStoreProvider";
 
 function EditPage() {
   const store = useAppStore();
+  const { isNative } = useAuth();
   const router = useRouter();
   const sessionId =
     typeof router.query.sessionId === "string" ? router.query.sessionId : "";
@@ -34,7 +37,27 @@ function EditPage() {
   }, [sessionId, store]);
 
   useEffect(() => {
+    if (!router.isReady || !store.sessionId || store.isLoadingGroup) return;
+    if (!store.lockedVenue) return;
+
+    router.replace(
+      { pathname: "/final", query: { sessionId: store.sessionId } },
+      undefined,
+      {
+        shallow: true,
+      },
+    );
+  }, [
+    router,
+    router.isReady,
+    store.isLoadingGroup,
+    store.lockedVenue,
+    store.sessionId,
+  ]);
+
+  useEffect(() => {
     if (!router.isReady || !store.sessionId || !store.identityResolved) return;
+    if (store.lockedVenue) return;
     if (store.currentUserId) return;
     router.replace(
       { pathname: "/join", query: { sessionId: store.sessionId } },
@@ -48,46 +71,41 @@ function EditPage() {
     router.isReady,
     store.currentUserId,
     store.identityResolved,
+    store.lockedVenue,
     store.sessionId,
   ]);
 
   const handleDetectLocation = async () => {
-    if (!("geolocation" in navigator)) {
-      setLocationError("Location services are not supported.");
-      return;
-    }
     setLocating(true);
     setLocationError(null);
     setError(null);
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        try {
-          const params = new URLSearchParams({
-            lat: String(position.coords.latitude),
-            lng: String(position.coords.longitude),
-          });
-          const response = await fetch(`/api/reverse-geocode?${params}`);
-          if (!response.ok) {
-            const payload = await response.json().catch(() => ({}));
-            throw new Error(payload.message || "Unable to detect address.");
-          }
-          const data = (await response.json()) as { result?: PlaceResult };
-          if (!data.result) {
-            throw new Error("Unable to detect address.");
-          }
-          setLocation(data.result);
-        } catch (err: any) {
-          setLocationError(err.message || "Unable to detect address.");
-        } finally {
-          setLocating(false);
-        }
-      },
-      () => {
-        setLocationError("Location permission denied.");
-        setLocating(false);
-      },
-      { enableHighAccuracy: true, timeout: 10000 },
-    );
+    const locationResult = await getPreciseLocation(isNative);
+    if (!locationResult.ok) {
+      setLocationError(locationResult.message);
+      setLocating(false);
+      return;
+    }
+
+    try {
+      const params = new URLSearchParams({
+        lat: String(locationResult.location.lat),
+        lng: String(locationResult.location.lng),
+      });
+      const response = await fetch(`/api/reverse-geocode?${params}`);
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.message || "Unable to detect address.");
+      }
+      const data = (await response.json()) as { result?: PlaceResult };
+      if (!data.result) {
+        throw new Error("Unable to detect address.");
+      }
+      setLocation(data.result);
+    } catch (err: any) {
+      setLocationError(err.message || "Unable to detect address.");
+    } finally {
+      setLocating(false);
+    }
   };
 
   const handleUpdate = async () => {

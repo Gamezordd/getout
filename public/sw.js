@@ -73,7 +73,10 @@ self.addEventListener("push", (event) => {
   const title = payload.title || "GetOut";
   const options = {
     body: payload.body || "New activity in your group.",
-    data: { url: payload.url || "/" },
+    data: {
+      url: payload.url || "/",
+      inviteId: payload.inviteId || null,
+    },
   };
   event.waitUntil(self.registration.showNotification(title, options));
 });

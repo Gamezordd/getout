@@ -2,8 +2,8 @@ import { pusher } from "../../lib/pusherServer";
 import { GroupPayload } from "../../lib/groupStore";
 import { GroupResponse } from "./types";
 
-export const buildAvatarUrl = (name: string) => {
-  const seed = encodeURIComponent(name.trim() || "guest");
+export const buildAvatarUrl = (name?: string | null, fallbackSeed?: string) => {
+  const seed = encodeURIComponent(name?.trim() || fallbackSeed?.trim() || "guest");
   return `https://api.dicebear.com/7.x/thumbs/svg?seed=${seed}`;
 };
 
@@ -15,7 +15,9 @@ export const buildGroupResponse = (
   users: group.users,
   venues: group.venues,
   manualVenues: group.manualVenues,
+  sessionMembers: group.sessionMembers,
   votes: group.votes,
+  votingClosesAt: group.votingClosesAt,
   venueCategory: group.venueCategory,
   lockedVenue: group.lockedVenue,
   currentUserId,

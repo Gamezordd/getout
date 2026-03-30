@@ -1,8 +1,10 @@
 ﻿import type { NextApiRequest, NextApiResponse } from "next";
 import type { VotesByVenue } from "../../lib/types";
-import { getGroup, saveGroup } from "../../lib/groupStore";
+import { findGroup, saveGroup } from "../../lib/groupStore";
+import { mergeVenues } from "../../lib/mergeVenues";
 import { pusher } from "../../lib/pusherServer";
 import { sendVoteNotifications } from "../../lib/pushServer";
+import { ensureVotingDeadlineState } from "./venue-lock";
 
 type VoteRequest = {
   sessionId: string;
@@ -37,12 +39,28 @@ export default async function handler(
     return res.status(400).json({ message: "Missing vote details." });
   }
 
-  const group = await getGroup(payload.sessionId);
+  const group = await findGroup(payload.sessionId);
+  if (!group) {
+    return res.status(404).json({ message: "Group not found." });
+  }
+  await ensureVotingDeadlineState({ sessionId: payload.sessionId, group });
   if (group.lockedVenue) {
     return res
       .status(400)
       .json({ message: "Voting is closed. Venue already finalized." });
   }
+
+  const visibleVenueIds = new Set(
+    mergeVenues(
+      group.suggestions?.suggestedVenues || [],
+      group.manualVenues || [],
+      true,
+    ).mergedVenues.map((venue) => venue.id),
+  );
+  if (!visibleVenueIds.has(payload.venueId)) {
+    return res.status(400).json({ message: "Selected venue is no longer available." });
+  }
+
   const votes: VotesByVenue = group.votes || {};
 
   // Remove existing vote from any venue.
@@ -63,6 +81,7 @@ export default async function handler(
   await safeTrigger(`private-group-${payload.sessionId}`, "votes-update", {
     votes: group.votes,
     voterId: payload.userId,
+    venueId: payload.venueId,
   });
 
   const { staleUserIds } = await sendVoteNotifications({

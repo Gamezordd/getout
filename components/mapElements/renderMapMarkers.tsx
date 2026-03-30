@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { mergeVenues } from "../../lib/mergeVenues";
 import renderVenueBadge from "./venueBadge";
 import { useAppStore } from "../../lib/store/AppStoreProvider";
 import renderVoterAvatar from "./voterAvatar";
@@ -9,7 +10,6 @@ export default function renderMapMarkers(
   venueCoordsRef: React.MutableRefObject<
     Record<string, { lng: number; lat: number }>
   >,
-  showSuggestedVenues: boolean,
   markerClickRef: React.MutableRefObject<boolean>,
 ) {
   const {
@@ -27,9 +27,10 @@ export default function renderMapMarkers(
 
   const userById = new Map(users.map((user) => [user.id, user]));
 
-  const visibleSuggestedVenues = showSuggestedVenues ? suggestedVenues : [];
-
-  const visibleVenues = [...visibleSuggestedVenues, ...manualVenues];
+  const { mergedVenues: visibleVenues, suggestedRankById } = mergeVenues(
+    suggestedVenues,
+    manualVenues,
+  );
 
   const totals = visibleVenues
     .map((venue) => totalsByVenue?.[venue.id])
@@ -55,7 +56,6 @@ export default function renderMapMarkers(
   });
 
   useEffect(() => {
-    console.log("Updating map markers");
     const map = mapRef.current;
     const mapboxgl = mapboxRef.current;
     if (!map || !mapboxgl) return;
@@ -77,7 +77,8 @@ export default function renderMapMarkers(
       );
     });
 
-    visibleSuggestedVenues.forEach((venue, index) => {
+    visibleVenues.forEach((venue) => {
+      const suggestedRank = suggestedRankById.get(venue.id);
       renderVenueBadge(
         venue,
         totalsByVenue?.[venue.id],
@@ -94,30 +95,8 @@ export default function renderMapMarkers(
         userById,
         () => undefined,
         medalByVenue,
-        index,
-        false,
-      );
-    });
-
-    manualVenues.forEach((venue) => {
-      renderVenueBadge(
-        venue,
-        totalsByVenue?.[venue.id],
-        map,
-        markersRef,
-        venueCoordsRef,
-        setSelectedVenue,
-        selectedVenueId,
-        votes,
-        markerClickRef,
-        bounds,
-        minTotal,
-        maxTotal,
-        userById,
-        () => undefined,
-        medalByVenue,
-        -1,
-        true,
+        suggestedRank ? suggestedRank - 1 : -1,
+        !suggestedRank,
       );
     });
 
@@ -125,11 +104,9 @@ export default function renderMapMarkers(
     users,
     suggestedVenues,
     manualVenues,
-    showSuggestedVenues,
     votes,
     highlightedVenueId,
     selectedVenueId,
     setSelectedVenue,
   ]);
 }
-

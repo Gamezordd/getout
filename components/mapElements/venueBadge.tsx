@@ -46,8 +46,9 @@ export default function renderVenueBadge(
 
   const pinText = manualVenue ? "M" : String(index + 1);
   pinBody.textContent = pinText;
+  const isSelected = venue.id === selectedVenueId;
 
-  pinBody.style.backgroundColor = "#ef4444";
+  pinBody.style.backgroundColor = isSelected ? "#00e5a0" : "#111111";
   pinBody.style.color = "#ffffff";
   pinBody.style.border = "2px solid #ffffff";
   pinBody.style.borderRadius = "50% 50% 50% 0";
@@ -71,9 +72,9 @@ export default function renderVenueBadge(
     pinBody.appendChild(innerText);
   }
 
-  if (venue.id === selectedVenueId) {
+  if (isSelected) {
     root.style.transform = "scale(1.1)";
-    pinBody.style.boxShadow = "0 0 0 3px rgba(37, 99, 235, 0.35)";
+    pinBody.style.boxShadow = "0 0 0 3px rgba(0, 229, 160, 0.28)";
   }
 
   addMedal(pin, venue.id, medalByVenue);

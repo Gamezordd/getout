@@ -1,5 +1,13 @@
 import mapboxgl from "mapbox-gl";
+import { getUserActivityLabel, getUserInitialsLabel, getUserSeedLabel } from "../../lib/userDisplay";
 import { User } from "../../lib/types";
+
+const MARKER_TONES = ["#7c5cbf", "#3d8ef5", "#e05c8a", "#e07f2b", "#4f46e5"];
+
+const getTone = (seed: string) => {
+  const sum = Array.from(seed).reduce((total, char) => total + char.charCodeAt(0), 0);
+  return MARKER_TONES[sum % MARKER_TONES.length];
+};
 
 export default function renderVoterAvatar(
   user: User,
@@ -13,18 +21,17 @@ export default function renderVoterAvatar(
   wrapper.className = "flex flex-col items-center";
 
   const el = document.createElement("div");
-  el.className = "rounded-full border-2 border-white shadow-lg";
-  el.style.width = "40px";
-  el.style.height = "40px";
-  el.style.backgroundImage = `url(${user.avatarUrl})`;
-  el.style.backgroundSize = "cover";
-  el.style.backgroundPosition = "center";
+  el.className = "flex items-center justify-center rounded-full border-2 border-[#0a0a0d] text-[10px] font-bold text-white shadow-lg";
+  el.style.width = "34px";
+  el.style.height = "34px";
+  el.style.backgroundColor = getTone(getUserSeedLabel(user));
+  el.textContent = getUserInitialsLabel(user);
   wrapper.appendChild(el);
 
   const label = document.createElement("div");
   label.className =
-    "max-w-[108px] rounded-md px-2 py-0.5 text-center text-[10px] font-medium leading-tight text-ink";
-  label.textContent = user.name;
+    "mt-1 max-w-[108px] rounded-md bg-[#141418]/90 px-2 py-0.5 text-center text-[10px] font-medium leading-tight text-white shadow";
+  label.textContent = getUserActivityLabel(user);
   wrapper.appendChild(label);
 
   const marker = new mapboxgl.Marker({ element: wrapper })
@@ -32,5 +39,5 @@ export default function renderVoterAvatar(
     .addTo(map);
   markersRef.current.push(marker);
   bounds.extend([user.location.lng, user.location.lat]);
-  hasPoints = true;
+  setHasPoints(hasPoints || true);
 }

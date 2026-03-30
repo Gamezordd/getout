@@ -7,16 +7,18 @@ const DEFAULT_CENTER = { lng: -73.9857, lat: 40.7484 };
 
 type Props = {
   fitAllTrigger?: number;
+  resizeTrigger?: number;
+  interactive?: boolean;
 };
 
 const MapView = observer(function MapView({
   fitAllTrigger = 0,
+  resizeTrigger = 0,
+  interactive = true,
 }: Props) {
   const {
     users,
-    topVenues: suggestedVenues,
-    manualVenues,
-    showSuggestedVenues,
+    venues,
     selectedVenueId,
     setSelectedVenue: onSelectVenue,
     setMapError: onError,
@@ -46,7 +48,7 @@ const MapView = observer(function MapView({
         }
         const map = new mapboxgl.Map({
           container: containerRef.current,
-          style: "mapbox://styles/mapbox/standard",
+          style: "mapbox://styles/mapbox/dark-v11",
           center: [DEFAULT_CENTER.lng, DEFAULT_CENTER.lat],
           zoom: 12,
         });
@@ -78,7 +80,6 @@ const MapView = observer(function MapView({
     mapRef,
     mapboxRef,
     venueCoordsRef,
-    showSuggestedVenues,
     markerClickRef,
   );
 
@@ -89,17 +90,14 @@ const MapView = observer(function MapView({
 
     const points = [
       ...users.map((user) => user.location),
-      ...(showSuggestedVenues
-        ? suggestedVenues.map((venue) => venue.location)
-        : []),
-      ...manualVenues.map((venue) => venue.location),
+      ...venues.map((venue) => venue.location),
     ];
     if (points.length === 0) return;
 
     const bounds = new mapboxgl.LngLatBounds();
     points.forEach((point) => bounds.extend([point.lng, point.lat]));
     map.fitBounds(bounds, { padding: 80, maxZoom: 14, duration: 700 });
-  }, [fitAllTrigger, users, suggestedVenues, manualVenues, showSuggestedVenues]);
+  }, [fitAllTrigger, users, venues]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -120,7 +118,47 @@ const MapView = observer(function MapView({
     });
   }, [selectedVenueId]);
 
-  return <div ref={containerRef} className="h-full w-full" />;
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const gestureHandlers = [
+      map.boxZoom,
+      map.doubleClickZoom,
+      map.dragPan,
+      map.dragRotate,
+      map.keyboard,
+      map.scrollZoom,
+      map.touchPitch,
+      map.touchZoomRotate,
+    ].filter(Boolean);
+
+    gestureHandlers.forEach((handler) => {
+      if (interactive) {
+        handler.enable();
+      } else {
+        handler.disable();
+      }
+    });
+  }, [interactive]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const timeout = window.setTimeout(() => {
+      map.resize();
+    }, 0);
+
+    return () => window.clearTimeout(timeout);
+  }, [resizeTrigger]);
+
+  return (
+    <div
+      ref={containerRef}
+      className={`h-full w-full ${interactive ? "pointer-events-auto" : "pointer-events-none"}`}
+    />
+  );
 });
 
 export default MapView;
