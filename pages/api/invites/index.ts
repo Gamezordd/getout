@@ -3,7 +3,7 @@ import {
   createInvite,
   listPendingInvitesForRecipient,
 } from "../../../lib/inviteStore";
-import { getGroup } from "../../../lib/groupStore";
+import { findGroup } from "../../../lib/groupStore";
 import { sendInviteNotification } from "../../../lib/pushServer";
 import { getUserById, requireAuthenticatedUser } from "../../../lib/serverAuth";
 import type { InviteListItem } from "../../../lib/authTypes";
@@ -62,7 +62,10 @@ export default async function handler(
       return res.status(400).json({ message: "You cannot invite yourself." });
     }
 
-    const group = await getGroup(payload.sessionId);
+    const group = await findGroup(payload.sessionId);
+    if (!group) {
+      return res.status(404).json({ message: "Group not found." });
+    }
     const actingMember = group.sessionMembers.find(
       (member) => member.browserId === payload.browserId,
     );

@@ -524,6 +524,7 @@ export class AppStore {
   }
 
   async joinGroup(options?: {
+    createIfMissing?: boolean;
     name?: string;
     location?: LatLng;
     locationLabel?: string;
@@ -541,6 +542,7 @@ export class AppStore {
         action: "join",
         sessionId: this.sessionId,
         browserId: this.browserId,
+        createIfMissing: options?.createIfMissing,
         name: options?.name?.trim(),
         location: options?.location,
         locationLabel: options?.locationLabel,
@@ -693,3 +695,5 @@ ${url.toString()}`;
   }
 
 }
+
+

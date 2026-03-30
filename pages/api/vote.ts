@@ -1,6 +1,6 @@
 ﻿import type { NextApiRequest, NextApiResponse } from "next";
 import type { VotesByVenue } from "../../lib/types";
-import { getGroup, saveGroup } from "../../lib/groupStore";
+import { findGroup, saveGroup } from "../../lib/groupStore";
 import { mergeVenues } from "../../lib/mergeVenues";
 import { pusher } from "../../lib/pusherServer";
 import { sendVoteNotifications } from "../../lib/pushServer";
@@ -39,7 +39,10 @@ export default async function handler(
     return res.status(400).json({ message: "Missing vote details." });
   }
 
-  const group = await getGroup(payload.sessionId);
+  const group = await findGroup(payload.sessionId);
+  if (!group) {
+    return res.status(404).json({ message: "Group not found." });
+  }
   await ensureVotingDeadlineState({ sessionId: payload.sessionId, group });
   if (group.lockedVenue) {
     return res

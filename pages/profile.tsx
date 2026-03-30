@@ -74,7 +74,7 @@ function ProfilePage() {
               type="button"
               onClick={async () => {
                 await signOut();
-                router.replace("/landing");
+                router.replace("/login");
               }}
               className="w-full rounded-2xl border border-white/10 px-4 py-3 text-sm font-semibold text-white"
             >

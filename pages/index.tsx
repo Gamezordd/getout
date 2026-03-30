@@ -1,6 +1,8 @@
 import { observer } from "mobx-react-lite";
+import { useRouter } from "next/router";
 import { toast } from "sonner";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import AuthResolvingScreen from "../components/AuthResolvingScreen";
 import { useAuth } from "../lib/auth/AuthProvider";
 import { useAppStore } from "../lib/store/AppStoreProvider";
 import FinalizeDialog from "../components/FinalizeDialog";
@@ -19,10 +21,12 @@ import { registerPushSubscription } from "../lib/pushClient";
 import { formatCompactCount } from "../lib/formatCount";
 import Dialog from "../components/Dialog";
 import { getUserActivityLabel } from "../lib/userDisplay";
+import { getPreciseLocation } from "../lib/preciseLocation";
 
 function HomePage() {
   const store = useAppStore();
-  const { authenticatedUser, isNative } = useAuth();
+  const { authStatus, authenticatedUser, isNative, startupResolved } = useAuth();
+  const router = useRouter();
   const [showFinalizeDialog, setShowFinalizeDialog] = useState(false);
   const [showInviteDialog, setShowInviteDialog] = useState(false);
   const [inviteDialogTitle, setInviteDialogTitle] = useState("You're the first one here!");
@@ -131,46 +135,38 @@ function HomePage() {
     },
     [authenticatedUser, dismissedNamePrompt, isNative, store],
   );
-
   const handleAllowPreciseLocation = useCallback(async () => {
     const currentUserId = store.currentUserId;
     if (!currentUserId) return;
-    if (!("geolocation" in navigator)) {
-      store.setMapError("Location services are not supported.");
+    const locationResult = await getPreciseLocation(isNative);
+    if (!locationResult.ok) {
+      store.setMapError(locationResult.message);
       return;
     }
 
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        try {
-          const params = new URLSearchParams({
-            lat: String(position.coords.latitude),
-            lng: String(position.coords.longitude),
-          });
-          const response = await fetch(`/api/reverse-geocode?${params}`);
-          if (!response.ok) {
-            const payload = await response.json().catch(() => ({}));
-            throw new Error(payload.message || "Unable to detect address.");
-          }
-          const data = (await response.json()) as { result?: { location: { lat: number; lng: number }; area?: string; name?: string } };
-          if (!data.result) {
-            throw new Error("Unable to detect address.");
-          }
-          await store.updateUserLocation(currentUserId, data.result.location, {
-            locationLabel: data.result.area || data.result.name || null,
-            locationSource: "precise",
-          });
-          await store.fetchSuggestions();
-        } catch (err: any) {
-          store.setMapError(err.message || "Unable to detect address.");
-        }
-      },
-      () => {
-        store.setMapError("Location permission denied.");
-      },
-      { enableHighAccuracy: true, timeout: 10000 },
-    );
-  }, [store]);
+    try {
+      const params = new URLSearchParams({
+        lat: String(locationResult.location.lat),
+        lng: String(locationResult.location.lng),
+      });
+      const response = await fetch(`/api/reverse-geocode?${params}`);
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.message || "Unable to detect address.");
+      }
+      const data = (await response.json()) as { result?: { location: { lat: number; lng: number }; area?: string; name?: string } };
+      if (!data.result) {
+        throw new Error("Unable to detect address.");
+      }
+      await store.updateUserLocation(currentUserId, data.result.location, {
+        locationLabel: data.result.area || data.result.name || null,
+        locationSource: "precise",
+      });
+      await store.fetchSuggestions();
+    } catch (err: any) {
+      store.setMapError(err.message || "Unable to detect address.");
+    }
+  }, [isNative, store]);
 
   const handleDenyPreciseLocation = useCallback(() => {
     if (typeof window !== "undefined" && preciseBannerKey) {
@@ -237,6 +233,10 @@ function HomePage() {
     ? store.votes?.[leadingVenue.id]?.length || 0
     : 0;
 
+  if (!startupResolved) {
+    return <AuthResolvingScreen />;
+  }
+
   if (!store.currentUser && !store.isLoadingGroup) {
     return null;
   }
@@ -244,6 +244,10 @@ function HomePage() {
   return (
     <div className="min-h-full bg-[#0a0a0d] text-[#f0f0f5]">
       <Header
+        showNativeBackButton={isNative}
+        onBackClick={() => {
+          void router.replace("/dashboard");
+        }}
         onInviteClick={() => {
           setInviteDialogTitle("Leave no one behind!");
           setShowInviteDialog(true);

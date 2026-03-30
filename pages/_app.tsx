@@ -3,6 +3,7 @@ import Head from "next/head";
 import { useRouter } from "next/router";
 import { useEffect } from "react";
 import { Toaster } from "sonner";
+import NativeBackNavigationManager from "../components/NativeBackNavigationManager";
 import { AuthProvider } from "../lib/auth/AuthProvider";
 import { initInstallPrompt } from "../lib/installPrompt";
 import {
@@ -97,9 +98,10 @@ export default function App({ Component, pageProps }: AppProps) {
 
   return (
     <AuthProvider>
+      <NativeBackNavigationManager />
       <AppStoreProvider>
         <Head>
-          <title>GetOut — Pick a place in 2 minutes</title>
+          <title>GetOut — Pick a place in minutes</title>
 
           <meta
             name="description"
@@ -121,7 +123,7 @@ export default function App({ Component, pageProps }: AppProps) {
           <link rel="apple-touch-icon" href="/icons/getout_icon_md.png" />
 
           {/* Open Graph (WhatsApp, Facebook, etc.) */}
-          <meta property="og:title" content="Pick a place in 2 minutes" />
+          <meta property="og:title" content="Pick a place in minutes" />
           <meta
             property="og:description"
             content="No more group chat chaos. Vote and lock a place instantly."
@@ -134,7 +136,7 @@ export default function App({ Component, pageProps }: AppProps) {
 
           {/* Twitter */}
           <meta name="twitter:card" content="summary_large_image" />
-          <meta name="twitter:title" content="Pick a place in 2 minutes" />
+          <meta name="twitter:title" content="Pick a place in minutes" />
           <meta
             name="twitter:description"
             content="Stop the back and forth. Decide with your group instantly."

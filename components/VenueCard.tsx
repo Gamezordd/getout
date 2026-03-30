@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { formatCompactCount } from "../lib/formatCount";
 import {
   getUserInitialsLabel,
@@ -81,6 +81,9 @@ export default function VenueCard({
   const [lightboxDirection, setLightboxDirection] = useState(0);
   const [heroLoaded, setHeroLoaded] = useState(false);
   const [loadedPhotos, setLoadedPhotos] = useState<Record<string, boolean>>({});
+  const heroImageRef = useRef<HTMLImageElement | null>(null);
+  const thumbnailImageRefs = useRef<Record<string, HTMLImageElement | null>>({});
+  const photoSetKey = useMemo(() => photos.join("|"), [photos]);
 
   useEffect(() => {
     setActivePhoto(firstPhoto);
@@ -89,7 +92,7 @@ export default function VenueCard({
   useEffect(() => {
     setHeroLoaded(false);
     setLoadedPhotos({});
-  }, [venue.id]);
+  }, [venue.id, photoSetKey]);
 
   useEffect(() => {
     if (!activePhoto) {
@@ -109,6 +112,38 @@ export default function VenueCard({
     }
     setHeroLoaded(Boolean(loadedPhotos[activePhoto]));
   }, [activePhoto, loadedPhotos]);
+
+  useEffect(() => {
+    if (!activePhoto) return;
+    const heroImage = heroImageRef.current;
+    if (heroImage?.complete && heroImage.naturalWidth > 0) {
+      setLoadedPhotos((current) =>
+        current[activePhoto] ? current : { ...current, [activePhoto]: true },
+      );
+      setHeroLoaded(true);
+    }
+  }, [activePhoto]);
+
+  useEffect(() => {
+    if (photos.length === 0) return;
+    const cachedPhotos = photos.filter((photo) => {
+      const image = thumbnailImageRefs.current[photo];
+      return image?.complete && image.naturalWidth > 0;
+    });
+    if (cachedPhotos.length === 0) return;
+
+    setLoadedPhotos((current) => {
+      const next = { ...current };
+      let changed = false;
+      cachedPhotos.forEach((photo) => {
+        if (!next[photo]) {
+          next[photo] = true;
+          changed = true;
+        }
+      });
+      return changed ? next : current;
+    });
+  }, [photoSetKey, photos]);
 
   const preciseUsers = users.filter((user) => user.locationSource === "precise");
 
@@ -233,6 +268,7 @@ export default function VenueCard({
               <div className="absolute inset-0 animate-pulse bg-[linear-gradient(135deg,#1b1b22,#262633,#1b1b22)]" />
             )}
             <img
+              ref={heroImageRef}
               src={activePhoto || undefined}
               alt={venue.name}
               loading="lazy"
@@ -318,6 +354,9 @@ export default function VenueCard({
                     <div className="absolute inset-0 animate-pulse bg-[linear-gradient(135deg,#1b1b22,#262633,#1b1b22)]" />
                   )}
                   <img
+                    ref={(element) => {
+                      thumbnailImageRefs.current[photo] = element;
+                    }}
                     src={photo}
                     alt=""
                     loading="lazy"

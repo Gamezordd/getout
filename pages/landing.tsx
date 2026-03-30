@@ -1,6 +1,7 @@
 import { observer } from "mobx-react-lite";
 import { useRouter } from "next/router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import AuthResolvingScreen from "../components/AuthResolvingScreen";
 import MobileAuthCard from "../components/MobileAuthCard";
 import { EntryShell, LandingHero } from "../components/entry/EntryFlow";
 import { useAuth } from "../lib/auth/AuthProvider";
@@ -16,12 +17,37 @@ const CLOSE_VOTING_BADGES = [
 
 function LandingPage() {
   const store = useAppStore();
-  const { authStatus, authenticatedUser, isNative } = useAuth();
+  const { authStatus, authenticatedUser, isNative, startupResolved } = useAuth();
   const router = useRouter();
   const [category, setCategory] = useState<VenueCategory>("bar");
   const [closeVotingInHours, setCloseVotingInHours] = useState(3);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!router.isReady || !startupResolved || !isNative || authStatus !== "signed_out") return;
+    void router.replace({
+      pathname: "/login",
+      query: { redirect: "/dashboard" },
+    });
+  }, [authStatus, isNative, router, router.isReady, startupResolved]);
+
+  useEffect(() => {
+    if (!router.isReady) return;
+    const routeCategory =
+      typeof router.query.category === "string"
+        ? router.query.category
+        : null;
+    if (
+      routeCategory === "bar" ||
+      routeCategory === "restaurant" ||
+      routeCategory === "cafe" ||
+      routeCategory === "night_club" ||
+      routeCategory === "brewery"
+    ) {
+      setCategory(routeCategory);
+    }
+  }, [router.isReady, router.query.category]);
 
   const handleCreate = async () => {
     if (isNative && authStatus !== "signed_in") {
@@ -34,6 +60,7 @@ function LandingPage() {
       setError(null);
       store.setSession(sessionId, "/");
       await store.joinGroup({
+        createIfMissing: true,
         name: isNative ? authenticatedUser?.displayName : undefined,
         venueCategory: category,
         closeVotingInHours,
@@ -46,13 +73,25 @@ function LandingPage() {
     }
   };
 
+  if (!startupResolved) {
+    return <AuthResolvingScreen />;
+  }
+
+  if (isNative && authStatus === "signed_out") {
+    return null;
+  }
+
   return (
     <EntryShell>
       <LandingHero
         onCreate={handleCreate}
+        showBackButton={isNative}
+        onBack={() => {
+          void router.replace("/dashboard");
+        }}
         controls={
           <div className="mt-6 space-y-3 rounded-[24px] border border-white/10 bg-[#141418]/90 p-4 backdrop-blur-sm">
-            {isNative ? (
+            {isNative && authStatus === "signed_in" ? (
               <MobileAuthCard className="border-none bg-transparent p-0" />
             ) : null}
             <div>

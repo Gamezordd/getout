@@ -45,6 +45,7 @@ export type JoinRequest = {
   action: "join";
   sessionId: string;
   browserId: string;
+  createIfMissing?: boolean;
   name?: string;
   useAuthenticatedProfile?: boolean;
   location?: LatLng;

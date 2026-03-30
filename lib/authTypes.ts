@@ -36,3 +36,20 @@ export type InviteListItem = {
   joinUrl: string;
   status: InviteStatus;
 };
+
+export type RecentGroupSummary = {
+  sessionId: string;
+  title: string;
+  subtitle: string;
+  href: string;
+  status: "live" | "picked";
+  lastActiveAt: string;
+  memberCount: number;
+  memberPreview: Array<{
+    id: string;
+    label: string;
+    avatarUrl?: string | null;
+  }>;
+  imageUrl?: string | null;
+  venueCategory?: string | null;
+};

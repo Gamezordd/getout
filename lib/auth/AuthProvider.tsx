@@ -3,9 +3,11 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
+import { useRouter } from "next/router";
 import type { AuthenticatedUser, AuthStatus } from "../authTypes";
 import {
   registerUserPushSubscription,
@@ -22,6 +24,7 @@ type AuthContextValue = {
   authStatus: AuthStatus;
   authenticatedUser: AuthenticatedUser | null;
   isNative: boolean;
+  startupResolved: boolean;
   loadSession: () => Promise<AuthenticatedUser | null>;
   signIn: () => Promise<AuthenticatedUser>;
   signOut: () => Promise<void>;
@@ -34,10 +37,13 @@ const MOBILE_PLATFORM_HEADER =
   typeof navigator !== "undefined" ? navigator.userAgent : "capacitor";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const router = useRouter();
   const [isNative, setIsNative] = useState(false);
+  const [startupResolved, setStartupResolved] = useState(false);
   const [authStatus, setAuthStatus] = useState<AuthStatus>("unknown");
   const [authenticatedUser, setAuthenticatedUser] =
     useState<AuthenticatedUser | null>(null);
+  const startupRouteNormalizedRef = useRef(false);
 
   const loadSession = async () => {
     if (!isNativePlatform()) {
@@ -69,12 +75,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const native = isNativePlatform();
     setIsNative(native);
     if (native) {
-      void loadSession();
+      void loadSession().finally(() => setStartupResolved(true));
       return;
     }
     setAuthStatus("signed_out");
     setAuthenticatedUser(null);
+    setStartupResolved(true);
   }, []);
+
+  useEffect(() => {
+    if (startupRouteNormalizedRef.current) return;
+    if (!router.isReady) return;
+    if (!startupResolved) return;
+    if (!isNative) {
+      startupRouteNormalizedRef.current = true;
+      return;
+    }
+
+    const sessionId =
+      typeof router.query.sessionId === "string" ? router.query.sessionId : null;
+    const isEntryRoute =
+      router.pathname === "/" ||
+      router.pathname === "/landing" ||
+      router.pathname === "/login" ||
+      router.pathname === "/create";
+
+    startupRouteNormalizedRef.current = true;
+
+    if (!isEntryRoute || sessionId || typeof window === "undefined") {
+      return;
+    }
+
+    if (authStatus === "signed_in" && router.pathname !== "/dashboard") {
+      window.location.replace("/dashboard");
+      return;
+    }
+
+    if (authStatus === "signed_out" && router.pathname !== "/login") {
+      window.location.replace("/login?redirect=/dashboard");
+    }
+  }, [authStatus, isNative, router.isReady, router.pathname, router.query.sessionId, startupResolved]);
 
   useEffect(() => {
     if (!authenticatedUser) return;
@@ -175,12 +215,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       authStatus,
       authenticatedUser,
       isNative,
+      startupResolved,
       loadSession,
       signIn,
       signOut,
       updateDisplayName,
     }),
-    [authStatus, authenticatedUser, isNative],
+    [authStatus, authenticatedUser, isNative, startupResolved],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

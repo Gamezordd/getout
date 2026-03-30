@@ -71,6 +71,26 @@ button {
   }
 }
 
+@keyframes getoutLoginScan {
+  0% {
+    top: 10%;
+    opacity: 0;
+  }
+
+  8% {
+    opacity: 0.45;
+  }
+
+  92% {
+    opacity: 0.25;
+  }
+
+  100% {
+    top: 78%;
+    opacity: 0;
+  }
+}
+
 @keyframes getoutCollageFloat {
   from {
     transform: scale(1.02);
@@ -78,5 +98,26 @@ button {
 
   to {
     transform: scale(1.12);
+  }
+}
+
+@keyframes getoutLoginPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(0, 229, 160, 0.25);
+  }
+
+  50% {
+    box-shadow: 0 0 0 12px rgba(0, 229, 160, 0);
+  }
+}
+
+@keyframes getoutButtonShimmer {
+  0% {
+    left: -60%;
+  }
+
+  100% {
+    left: 160%;
   }
 }

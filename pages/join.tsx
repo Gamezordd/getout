@@ -1,7 +1,6 @@
 import { observer } from "mobx-react-lite";
 import { useRouter } from "next/router";
-import { useEffect, useState } from "react";
-import MobileAuthCard from "../components/MobileAuthCard";
+import { useEffect, useMemo, useState } from "react";
 import { EntryHeader, EntryShell } from "../components/entry/EntryFlow";
 import { useAuth } from "../lib/auth/AuthProvider";
 import { useAppStore } from "../lib/store/AppStoreProvider";
@@ -12,6 +11,13 @@ function JoinPage() {
   const router = useRouter();
   const sessionId =
     typeof router.query.sessionId === "string" ? router.query.sessionId : "";
+  const loginRedirect = useMemo(
+    () =>
+      sessionId
+        ? `/join?sessionId=${encodeURIComponent(sessionId)}`
+        : "/landing",
+    [sessionId],
+  );
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -23,6 +29,14 @@ function JoinPage() {
     }
     store.setSession(sessionId, "/");
   }, [router, router.isReady, sessionId, store]);
+
+  useEffect(() => {
+    if (!router.isReady || !isNative || authStatus !== "signed_out") return;
+    void router.replace({
+      pathname: "/login",
+      query: { redirect: loginRedirect },
+    });
+  }, [authStatus, isNative, loginRedirect, router, router.isReady]);
 
   useEffect(() => {
     if (!router.isReady || !sessionId || !store.browserId) return;
@@ -75,19 +89,7 @@ function JoinPage() {
   ]);
 
   if (isNative && authStatus !== "signed_in") {
-    return (
-      <EntryShell>
-        <EntryHeader
-          title="Sign in to join"
-          subtitle="Mobile users join groups with their Google profile."
-          onBack={() => router.push("/landing")}
-        />
-        <MobileAuthCard
-          title="Continue with Google to join"
-          subtitle="Once you sign in, we&apos;ll use your saved profile name when you enter this group."
-        />
-      </EntryShell>
-    );
+    return null;
   }
 
   return (

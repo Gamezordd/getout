@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "634206206798",
+    "project_id": "getout-e0538",
+    "storage_bucket": "getout-e0538.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:634206206798:android:f1fcb6d3b5d5ceb784fc1f",
+        "android_client_info": {
+          "package_name": "com.getout.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "634206206798-t36d1ktrtoj7blom84ul9fsurafjlpdu.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.getout.app",
+            "certificate_hash": "7c58cc5b3797bbc61900ec30542f1c56889efa45"
+          }
+        },
+        {
+          "client_id": "634206206798-08baqd5av9hjb9mn67chll8hglgvuupi.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAgw6lRVzHTGpBiQuFcDv36CiQwgZEs_RQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "634206206798-08baqd5av9hjb9mn67chll8hglgvuupi.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

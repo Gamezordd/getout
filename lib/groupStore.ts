@@ -63,70 +63,77 @@ const createEmptyGroup = (): GroupPayload => ({
   lockedVenue: null,
 });
 
-const getGroup = async (sessionId: string): Promise<GroupPayload> => {
+const hydrateGroup = async (sessionId: string, group: GroupPayload) => {
+  const key = `${GROUP_PREFIX}${sessionId}`;
+  const hydrated = { ...createEmptyGroup(), ...group };
+  if (!Array.isArray(hydrated.manualVenues)) hydrated.manualVenues = [];
+  if (!Array.isArray(hydrated.users)) hydrated.users = [];
+  if (!Array.isArray(hydrated.venues)) hydrated.venues = [];
+  if (!hydrated.votes) hydrated.votes = {};
+  if (typeof hydrated.votingClosesAt !== "string") hydrated.votingClosesAt = null;
+  if (
+    !hydrated.defaultApproximateLocation ||
+    typeof hydrated.defaultApproximateLocation.lat !== "number" ||
+    typeof hydrated.defaultApproximateLocation.lng !== "number"
+  ) {
+    hydrated.defaultApproximateLocation = null;
+  }
+  if (typeof hydrated.defaultApproximateLocationLabel !== "string") {
+    hydrated.defaultApproximateLocationLabel = null;
+  }
+  if (!hydrated.pushSubscriptions) hydrated.pushSubscriptions = {};
+  if (!Array.isArray(hydrated.sessionMembers)) hydrated.sessionMembers = [];
+
+  const rawSuggestions = group.suggestions;
+  hydrated.suggestions = {
+    suggestedVenues: Array.isArray(rawSuggestions?.suggestedVenues)
+      ? rawSuggestions.suggestedVenues
+      : hydrated.venues,
+    etaMatrix: rawSuggestions?.etaMatrix || {},
+    totalsByVenue: rawSuggestions?.totalsByVenue || {},
+    warning: rawSuggestions?.warning,
+    seenVenueIds: Array.isArray(rawSuggestions?.seenVenueIds)
+      ? rawSuggestions.seenVenueIds
+      : hydrated.venues.map((venue) => venue.id),
+  };
+  hydrated.venues = hydrated.suggestions.suggestedVenues;
+
+  if (
+    hydrated.users.length > 0 &&
+    !hydrated.users.some((user) => user.isOrganizer)
+  ) {
+    hydrated.users = hydrated.users.map((user, index) => ({
+      ...user,
+      isOrganizer: index === 0,
+    }));
+  }
+  if (
+    hydrated.sessionMembers.length > 0 &&
+    !hydrated.sessionMembers.some((member) => member.isOwner) &&
+    hydrated.users.length > 0
+  ) {
+    const organizer =
+      hydrated.users.find((user) => user.isOrganizer) || hydrated.users[0];
+    hydrated.sessionMembers = hydrated.sessionMembers.map((member) => ({
+      ...member,
+      isOwner: member.userId === organizer?.id,
+    }));
+  }
+  await redis.set(key, hydrated);
+  return hydrated;
+};
+
+const findGroup = async (sessionId: string): Promise<GroupPayload | null> => {
   const key = `${GROUP_PREFIX}${sessionId}`;
   const group = await redis.get<GroupPayload>(key);
-  if (group) {
-    const hydrated = { ...createEmptyGroup(), ...group };
-    if (!Array.isArray(hydrated.manualVenues)) hydrated.manualVenues = [];
-    if (!Array.isArray(hydrated.users)) hydrated.users = [];
-    if (!Array.isArray(hydrated.venues)) hydrated.venues = [];
-    if (!hydrated.votes) hydrated.votes = {};
-    if (typeof hydrated.votingClosesAt !== "string") hydrated.votingClosesAt = null;
-    if (
-      !hydrated.defaultApproximateLocation ||
-      typeof hydrated.defaultApproximateLocation.lat !== "number" ||
-      typeof hydrated.defaultApproximateLocation.lng !== "number"
-    ) {
-      hydrated.defaultApproximateLocation = null;
-    }
-    if (typeof hydrated.defaultApproximateLocationLabel !== "string") {
-      hydrated.defaultApproximateLocationLabel = null;
-    }
-    if (!hydrated.pushSubscriptions) hydrated.pushSubscriptions = {};
-    if (!Array.isArray(hydrated.sessionMembers)) hydrated.sessionMembers = [];
+  if (!group) return null;
+  return hydrateGroup(sessionId, group);
+};
 
-    const rawSuggestions = group.suggestions;
-    hydrated.suggestions = {
-      suggestedVenues: Array.isArray(rawSuggestions?.suggestedVenues)
-        ? rawSuggestions.suggestedVenues
-        : hydrated.venues,
-      etaMatrix: rawSuggestions?.etaMatrix || {},
-      totalsByVenue: rawSuggestions?.totalsByVenue || {},
-      warning: rawSuggestions?.warning,
-      seenVenueIds: Array.isArray(rawSuggestions?.seenVenueIds)
-        ? rawSuggestions.seenVenueIds
-        : hydrated.venues.map((venue) => venue.id),
-    };
-    hydrated.venues = hydrated.suggestions.suggestedVenues;
-
-    if (
-      hydrated.users.length > 0 &&
-      !hydrated.users.some((user) => user.isOrganizer)
-    ) {
-      hydrated.users = hydrated.users.map((user, index) => ({
-        ...user,
-        isOrganizer: index === 0,
-      }));
-    }
-    if (
-      hydrated.sessionMembers.length > 0 &&
-      !hydrated.sessionMembers.some((member) => member.isOwner) &&
-      hydrated.users.length > 0
-    ) {
-      const organizer =
-        hydrated.users.find((user) => user.isOrganizer) || hydrated.users[0];
-      hydrated.sessionMembers = hydrated.sessionMembers.map((member) => ({
-        ...member,
-        isOwner: member.userId === organizer?.id,
-      }));
-    }
-    await redis.set(key, hydrated);
-    return hydrated;
-  }
-  const empty = createEmptyGroup();
-  await redis.set(key, empty);
-  return empty;
+const createGroup = async (sessionId: string): Promise<GroupPayload> => {
+  const group = createEmptyGroup();
+  await saveGroup(sessionId, group);
+  return group;
 };
 
 const saveGroup = async (sessionId: string, group: GroupPayload) => {
@@ -134,5 +141,5 @@ const saveGroup = async (sessionId: string, group: GroupPayload) => {
   await redis.set(key, group);
 };
 
-export { createEmptySuggestionsSnapshot, getGroup, saveGroup };
+export { createEmptySuggestionsSnapshot, createGroup, findGroup, saveGroup };
 export type { GroupPayload, SessionMember, SuggestionsSnapshot };

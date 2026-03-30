@@ -1,0 +1,388 @@
+import { observer } from "mobx-react-lite";
+import { useRouter } from "next/router";
+import { useEffect, useMemo, useState } from "react";
+import type { RecentGroupSummary } from "../lib/authTypes";
+import { useAuth } from "../lib/auth/AuthProvider";
+
+const quickActions = [
+  { label: "Bars", emoji: "🍸", category: "bar", sub: "Most popular" },
+  { label: "Dinner", emoji: "🍽", category: "restaurant", sub: "Restaurants" },
+  { label: "Cafe", emoji: "☕", category: "cafe", sub: "Chill hangout" },
+  { label: "Club", emoji: "🎵", category: "night_club", sub: "Big night out" },
+] as const;
+
+const getGreeting = () => {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 18) return "Good afternoon";
+  return "Good evening";
+};
+
+function DashboardPage() {
+  const router = useRouter();
+  const { authStatus, authenticatedUser, isNative } = useAuth();
+  const [recentGroups, setRecentGroups] = useState<RecentGroupSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"home" | "history">("home");
+  const [joinValue, setJoinValue] = useState("");
+
+  useEffect(() => {
+    if (!router.isReady || !isNative || authStatus === "unknown") return;
+    if (authStatus === "signed_out") {
+      void router.replace({
+        pathname: "/login",
+        query: { redirect: "/dashboard" },
+      });
+      return;
+    }
+
+    const load = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const response = await fetch("/api/recent-groups");
+        const payload = (await response.json().catch(() => ({}))) as {
+          groups?: RecentGroupSummary[];
+          message?: string;
+        };
+        if (!response.ok) {
+          throw new Error(payload.message || "Unable to load dashboard.");
+        }
+        setRecentGroups(payload.groups || []);
+      } catch (err: any) {
+        setError(err.message || "Unable to load dashboard.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void load();
+  }, [authStatus, isNative, router, router.isReady]);
+
+  const avatarLabel = useMemo(
+    () => authenticatedUser?.displayName?.trim().charAt(0).toUpperCase() || "G",
+    [authenticatedUser?.displayName],
+  );
+
+  const openCreate = (category?: string) => {
+    void router.push({
+      pathname: "/landing",
+      query: category ? { category } : undefined,
+    });
+  };
+
+  const openJoin = () => {
+    const value = joinValue.trim();
+    if (!value) return;
+
+    try {
+      const parsed = new URL(value);
+      const sessionId = parsed.searchParams.get("sessionId");
+      if (sessionId) {
+        void router.push({ pathname: "/join", query: { sessionId } });
+        return;
+      }
+    } catch {
+      // Accept raw session codes too.
+    }
+
+    void router.push({ pathname: "/join", query: { sessionId: value } });
+  };
+
+  if (!isNative || authStatus !== "signed_in") {
+    return null;
+  }
+
+  const renderGroupCard = (group: RecentGroupSummary, compact = false) => (
+    <button
+      key={group.sessionId}
+      type="button"
+      onClick={() => router.push(group.href)}
+      className={
+        compact
+          ? "mb-3 flex w-full items-center gap-3 border-b border-white/10 py-3 text-left last:border-b-0"
+          : "mb-3 flex w-full overflow-hidden rounded-[18px] border border-white/10 bg-[#141418] text-left"
+      }
+    >
+      <div
+        className={
+          compact
+            ? "relative h-11 w-11 shrink-0 overflow-hidden rounded-xl bg-[#1c1c22]"
+            : "h-20 w-20 shrink-0 overflow-hidden bg-[#1c1c22]"
+        }
+      >
+        {group.imageUrl ? (
+          <img src={group.imageUrl} alt="" className="h-full w-full object-cover" />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center text-2xl">
+            {group.status === "picked" ? "✓" : "🎉"}
+          </div>
+        )}
+      </div>
+      <div className={compact ? "min-w-0 flex-1" : "min-w-0 flex-1 p-3"}>
+        <div
+          className={
+            compact
+              ? "truncate text-sm font-semibold text-white"
+              : "truncate font-display text-[15px] font-bold tracking-[-0.02em] text-white"
+          }
+        >
+          {group.title}
+        </div>
+        <div className="mt-1 text-[11.5px] text-[#5a5a70]">{group.subtitle}</div>
+        <div className={compact ? "mt-1 flex items-center gap-1 text-[11.5px] text-[#5a5a70]" : "mt-3 flex items-center justify-between"}>
+          <div className="flex">
+            {group.memberPreview.map((member, index) => (
+              <div
+                key={member.id}
+                className={`flex items-center justify-center rounded-full border border-[#141418] bg-[#252530] text-[7.5px] font-bold text-white ${compact ? `h-4 w-4 ${index === 0 ? "" : "-ml-1"}` : `h-[18px] w-[18px] ${index === 0 ? "" : "-ml-[5px]"}`}`}
+              >
+                {member.label.charAt(0).toUpperCase()}
+              </div>
+            ))}
+          </div>
+          {compact ? (
+            <>
+              <span>·</span>
+              <span>{group.memberCount} people</span>
+            </>
+          ) : (
+            <div
+              className={`rounded-md border px-2 py-0.5 font-display text-[10px] font-bold ${group.status === "picked" ? "border-[#00e5a033] bg-[#00e5a01c] text-[#00e5a0]" : "border-[#ff3b5c33] bg-[#ff3b5c1c] text-[#ff6b87]"}`}
+            >
+              {group.status === "picked" ? "Picked ✓" : "Live"}
+            </div>
+          )}
+        </div>
+      </div>
+      {compact ? (
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          <div className="text-[11px] text-[#5a5a70]">
+            {new Date(group.lastActiveAt).toLocaleTimeString([], {
+              hour: "numeric",
+              minute: "2-digit",
+            })}
+          </div>
+          <div
+            className={`rounded-md border px-2 py-0.5 font-display text-[10px] font-bold ${group.status === "picked" ? "border-[#00e5a033] bg-[#00e5a01c] text-[#00e5a0]" : "border-[#ff3b5c33] bg-[#ff3b5c1c] text-[#ff6b87]"}`}
+          >
+            {group.status === "picked" ? "Picked" : "Live"}
+          </div>
+        </div>
+      ) : null}
+    </button>
+  );
+
+  return (
+    <main className="min-h-[100svh] bg-[#0a0a0d] text-[#f0f0f5]">
+      <div className="mx-auto flex min-h-[100svh] w-full max-w-[430px] flex-col">
+        <div className="flex h-11 items-center justify-between px-[22px]">
+          <div className="font-display text-[15px] font-bold tracking-[-0.02em] text-white">
+            9:41
+          </div>
+          <div className="flex items-center gap-[6px] opacity-70">
+            <div className="h-2 w-4 rounded-sm border border-white/40" />
+            <div className="h-2 w-2 rounded-full bg-white/70" />
+          </div>
+        </div>
+
+        <div className="relative flex-1 overflow-hidden">
+          <div className={`absolute inset-0 overflow-y-auto pb-5 transition ${activeTab === "home" ? "opacity-100" : "pointer-events-none opacity-0"}`}>
+            <div className="flex items-start justify-between px-5 pb-4 pt-1">
+              <div>
+                <div className="text-[13px] text-[#5a5a70]">{getGreeting()} 👋</div>
+                <div className="font-display text-[28px] font-extrabold tracking-[-0.04em] text-white">
+                  Get<span className="text-[#00e5a0]">Out</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => router.push("/profile")}
+                className="mt-[2px] flex h-[38px] w-[38px] items-center justify-center rounded-xl border-2 border-white/10 bg-[#7c5cbf] text-[15px] font-bold text-white"
+              >
+                {avatarLabel}
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => openCreate()}
+              className="mx-5 mb-5 flex w-[calc(100%-40px)] items-center gap-[14px] rounded-[20px] border border-[#00e5a033] bg-[linear-gradient(135deg,#0f1f18_0%,#141418_100%)] px-[18px] py-4 text-left"
+            >
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] bg-[#00e5a0] shadow-[0_0_0_0_rgba(0,229,160,0.4)] [animation:getoutLoginPulse_2.5s_infinite]">
+                <svg width="22" height="22" fill="none" viewBox="0 0 24 24">
+                  <path d="M12 2v20M2 12h20" stroke="#000" strokeWidth="2.5" strokeLinecap="round" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <div className="font-display text-[15px] font-bold tracking-[-0.02em] text-white">
+                  Create a group
+                </div>
+                <div className="mt-1 text-xs text-[#5a5a70]">
+                  Pick a spot together · share link instantly
+                </div>
+              </div>
+            </button>
+
+            <div className="px-5 pb-3">
+              <div className="font-display text-base font-bold tracking-[-0.02em] text-white">
+                Join a group
+              </div>
+            </div>
+            <div className="mx-5 rounded-[18px] border border-white/10 bg-[#141418] p-4">
+              <div className="mb-[10px] text-[11px] font-semibold uppercase tracking-[0.06em] text-[#5a5a70]">
+                Have an invite link?
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  value={joinValue}
+                  onChange={(event) => setJoinValue(event.target.value)}
+                  placeholder="Paste link or code..."
+                  className="flex-1 rounded-xl border border-white/10 bg-[#1c1c22] px-4 py-3 text-sm text-white outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={openJoin}
+                  className="rounded-xl border border-white/10 bg-[#1c1c22] px-4 py-3 font-display text-[13px] font-bold text-[#8b8b9c]"
+                >
+                  Join →
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between px-5 pb-3 pt-6">
+              <div className="font-display text-base font-bold tracking-[-0.02em] text-white">
+                Quick start
+              </div>
+              <button type="button" onClick={() => openCreate()} className="text-xs font-medium text-[#00e5a0]">
+                All options →
+              </button>
+            </div>
+            <div className="flex gap-[10px] overflow-x-auto px-5 pb-6">
+              {quickActions.map((item, index) => (
+                <button
+                  key={item.label}
+                  type="button"
+                  onClick={() => openCreate(item.category)}
+                  className={`min-w-[86px] flex-1 rounded-[14px] border px-[10px] py-[14px] text-center ${index === 0 ? "border-[#00e5a038] bg-[linear-gradient(145deg,#0f1f18,#141418)]" : "border-white/10 bg-[#141418]"}`}
+                >
+                  <div className="text-[22px]">{item.emoji}</div>
+                  <div className="mt-1 font-display text-xs font-bold text-white">{item.label}</div>
+                  <div className="mt-1 text-[10px] text-[#5a5a70]">{item.sub}</div>
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-center justify-between px-5 pb-3">
+              <div className="font-display text-base font-bold tracking-[-0.02em] text-white">
+                Recent
+              </div>
+              <button type="button" onClick={() => setActiveTab("history")} className="text-xs font-medium text-[#00e5a0]">
+                See all →
+              </button>
+            </div>
+            <div className="px-5">
+              <button
+                type="button"
+                onClick={() => router.push("/invites")}
+                className="mb-4 flex w-full items-center justify-between rounded-[18px] border border-white/10 bg-[#141418] px-4 py-4 text-left"
+              >
+                <div>
+                  <div className="font-display text-[15px] font-bold tracking-[-0.02em] text-white">
+                    Invites
+                  </div>
+                  <div className="mt-1 text-xs text-[#5a5a70]">
+                    Open your invite inbox and jump into active groups
+                  </div>
+                </div>
+                <div className="text-sm text-[#00e5a0]">→</div>
+              </button>
+              {loading ? (
+                <div className="rounded-[18px] border border-white/10 bg-[#141418] p-4 text-sm text-[#8b8b9c]">
+                  Loading recent groups...
+                </div>
+              ) : null}
+              {error ? (
+                <div className="rounded-[18px] border border-rose-500/20 bg-rose-500/10 p-4 text-sm text-rose-200">
+                  {error}
+                </div>
+              ) : null}
+              {!loading && !error && recentGroups.length === 0 ? (
+                <div className="rounded-[18px] border border-white/10 bg-[#141418] p-5 text-center">
+                  <div className="text-4xl">🎉</div>
+                  <div className="mt-3 font-display text-lg font-bold tracking-[-0.02em] text-white">
+                    No recent groups yet
+                  </div>
+                  <div className="mt-2 text-sm text-[#5a5a70]">
+                    Once you join or create groups, the last 48 hours will appear here.
+                  </div>
+                </div>
+              ) : null}
+              {recentGroups.slice(0, 3).map((group) => renderGroupCard(group, true))}
+            </div>
+          </div>
+
+          <div className={`absolute inset-0 overflow-y-auto pb-5 transition ${activeTab === "history" ? "opacity-100" : "pointer-events-none opacity-0"}`}>
+            <div className="px-5 pb-5 pt-1">
+              <div className="font-display text-2xl font-extrabold tracking-[-0.04em] text-white">
+                History
+              </div>
+              <div className="mt-1 text-[13px] text-[#5a5a70]">
+                Your last 48 hours of GetOut sessions
+              </div>
+            </div>
+            <div className="px-5">
+              {!loading && recentGroups.length === 0 ? (
+                <div className="rounded-[18px] border border-white/10 bg-[#141418] p-6 text-center">
+                  <div className="text-4xl">🕘</div>
+                  <div className="mt-3 font-display text-lg font-bold tracking-[-0.02em] text-white">
+                    No session history yet
+                  </div>
+                  <div className="mt-2 text-sm text-[#5a5a70]">
+                    Recent groups you belong to will show up here automatically.
+                  </div>
+                </div>
+              ) : null}
+              {recentGroups.map((group) => renderGroupCard(group, false))}
+            </div>
+          </div>
+        </div>
+
+        <div className="z-20 flex h-[72px] items-center border-t border-white/10 bg-[rgba(14,14,18,0.96)] px-2 pb-2 backdrop-blur-xl">
+          <button type="button" onClick={() => setActiveTab("home")} className="flex flex-1 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2">
+            <svg width="22" height="22" fill="none" viewBox="0 0 24 24">
+              <path
+                d="M3 12L12 3l9 9M5 10v9a1 1 0 001 1h4v-5h4v5h4a1 1 0 001-1v-9"
+                stroke={activeTab === "home" ? "#00e5a0" : "#5a5a70"}
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                opacity={activeTab === "home" ? "1" : "0.45"}
+              />
+            </svg>
+            <span className={`text-[10px] font-semibold ${activeTab === "home" ? "text-[#00e5a0]" : "text-[#5a5a70]"}`}>
+              Home
+            </span>
+          </button>
+          <button type="button" onClick={() => openCreate()} className="mb-[10px] flex h-[58px] w-[58px] shrink-0 items-center justify-center rounded-[18px] bg-[#00e5a0] shadow-[0_4px_20px_rgba(0,229,160,0.35)]">
+            <svg width="24" height="24" fill="none" viewBox="0 0 24 24">
+              <path d="M12 4v16M4 12h16" stroke="#000" strokeWidth="2.5" strokeLinecap="round" />
+            </svg>
+          </button>
+          <button type="button" onClick={() => setActiveTab("history")} className="flex flex-1 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2">
+            <svg width="22" height="22" fill="none" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="9" stroke={activeTab === "history" ? "#00e5a0" : "#5a5a70"} strokeWidth="1.8" opacity={activeTab === "history" ? "1" : "0.45"} />
+              <path d="M12 7v5l3 3" stroke={activeTab === "history" ? "#00e5a0" : "#5a5a70"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" opacity={activeTab === "history" ? "1" : "0.45"} />
+            </svg>
+            <span className={`text-[10px] font-semibold ${activeTab === "history" ? "text-[#00e5a0]" : "text-[#5a5a70]"}`}>
+              History
+            </span>
+          </button>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+export default observer(DashboardPage);

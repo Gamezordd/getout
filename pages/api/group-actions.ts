@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from "next";
 import { GroupPayload, saveGroup } from "../../lib/groupStore";
 import { User, Venue } from "../../lib/types";
 import { acceptInviteForSession } from "../../lib/inviteStore";
+import { touchRecentGroupMembership } from "../../lib/recentGroupStore";
 import { getAuthenticatedUser } from "../../lib/serverAuth";
 import {
   recomputeSuggestionsForGroup,
@@ -36,14 +37,21 @@ export const groupActions = (
     const existingMember = group.sessionMembers.find(
       (member) => member.browserId === payload.browserId,
     );
+    const authenticatedUser = await getAuthenticatedUser(req);
+
     if (existingMember) {
+      if (authenticatedUser?.id) {
+        await touchRecentGroupMembership({
+          userId: authenticatedUser.id,
+          sessionId: payload.sessionId,
+        });
+      }
       return res
         .status(200)
         .json(
           buildGroupResponse(group, existingMember.userId, existingMember.isOwner),
         );
     }
-    const authenticatedUser = await getAuthenticatedUser(req);
 
     const trimmedName =
       payload.name?.trim() || authenticatedUser?.displayName?.trim() || "";
@@ -162,6 +170,10 @@ export const groupActions = (
       await acceptInviteForSession({
         sessionId: payload.sessionId,
         recipientUserId: authenticatedUser.id,
+      });
+      await touchRecentGroupMembership({
+        userId: authenticatedUser.id,
+        sessionId: payload.sessionId,
       });
     }
     await safeTrigger(channel, "group-updated", { reason: "join", userId: user.id });
