@@ -32,7 +32,7 @@ const ActivityStrip = observer(function ActivityStrip() {
         : "Waiting for the first vote";
 
   return (
-    <section className="sticky top-[61px] z-[19] border-y border-white/10 bg-[#141418]/95 px-4 py-2.5 backdrop-blur-xl">
+    <section className="sticky top-[58px] z-[19] border-y border-white/10 bg-[#141418]/95 px-4 py-2.5 backdrop-blur-xl">
       <div className="mx-auto flex max-w-[430px] items-center gap-3">
         <div className="mt-0.5 h-2 w-2 shrink-0 animate-pulse rounded-full bg-[#ff3b5c]" />
         <p className="min-w-0 flex flex-1 gap-1 text-xs text-[#8b8b9c]">

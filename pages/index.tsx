@@ -14,7 +14,6 @@ import useForegroundResume from "../hooks/useForegroundResume";
 import PlaceList from "../components/PlaceList";
 import ActivityStrip from "../components/ActivityStrip";
 import SessionSummary from "../components/SessionSummary";
-import MapStrip from "../components/MapStrip";
 import Loader from "../components/Loader";
 import VotingCountdown from "../components/VotingCountdown";
 import { registerPushSubscription } from "../lib/pushClient";
@@ -271,19 +270,17 @@ function HomePage() {
         <VotingCountdown />
         <SessionSummary />
         {showPreciseLocationBanner && (
-          <div className="mt-4 rounded-[20px] border border-[#00e5a0]/20 bg-[#0f1714] px-4 py-3 text-sm text-[#d7f7ea]">
-            <p className="font-medium text-[#f0f0f5]">
-              Allow precise location to get suggestions closer to you and unlock your travel time.
+          <div className="mt-4 flex flex-wrap items-center gap-3 rounded-[18px] border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-[#a7acb8]">
+            <p className="min-w-0 flex-1 leading-5">
+              Share your precise location for closer suggestions and travel times.
             </p>
             {isDetectingPreciseLocation ? (
-              <Loader
-                variant="dark"
-                title="Detecting location..."
-                description="Waiting for location access and resolving your current area."
-                className="mt-3 rounded-[18px] border-[#00e5a0]/10 bg-[#121c18] px-4 py-4"
-              />
+              <div className="flex items-center gap-2 text-xs font-medium text-[#d7f7ea]">
+                <span className="h-2 w-2 rounded-full bg-[#00e5a0] animate-pulse" />
+                Detecting...
+              </div>
             ) : (
-              <div className="mt-3 flex items-center gap-2">
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={handleAllowPreciseLocation}
@@ -296,15 +293,27 @@ function HomePage() {
                   type="button"
                   onClick={handleDenyPreciseLocation}
                   disabled={isDetectingPreciseLocation}
-                  className="rounded-full border border-white/10 px-4 py-2 text-xs font-semibold text-[#8b8b9c] disabled:opacity-60"
+                  aria-label="Dismiss precise location prompt"
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 text-[#8b8b9c] transition hover:text-white disabled:opacity-60"
                 >
-                  Deny
+                  <svg
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    aria-hidden="true"
+                    className="h-4 w-4"
+                  >
+                    <path
+                      d="M4 4l8 8M12 4 4 12"
+                      stroke="currentColor"
+                      strokeWidth="1.7"
+                      strokeLinecap="round"
+                    />
+                  </svg>
                 </button>
               </div>
             )}
           </div>
         )}
-        {!store.lockedVenue && <MapStrip />}
         <section className="mt-4 space-y-4">
           {(store.isLoadingGroup || (store.isLoadingSuggestions && store.venues.length === 0)) && (
             <Loader

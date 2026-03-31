@@ -45,6 +45,8 @@ const AVATAR_TONES = [
 ];
 
 const BASE_TRAVEL_RANGE_MINUTES = 40;
+const AUTO_ADVANCE_INTERVAL_MS = 2600;
+const CARD_VISIBILITY_THRESHOLD = 0.6;
 
 const getTravelRange = (etas?: Record<string, number>) => {
   if (!etas) return "--";
@@ -75,14 +77,17 @@ export default function VenueCard({
 }: Props) {
   const photos = Array.isArray(venue.photos) ? venue.photos.slice(0, 5) : [];
   const firstPhoto = photos[0] || null;
+  const cardRef = useRef<HTMLElement | null>(null);
   const [activePhoto, setActivePhoto] = useState<string | null>(firstPhoto);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [lightboxDirection, setLightboxDirection] = useState(0);
   const [heroLoaded, setHeroLoaded] = useState(false);
   const [loadedPhotos, setLoadedPhotos] = useState<Record<string, boolean>>({});
+  const [isCardVisible, setIsCardVisible] = useState(false);
   const heroImageRef = useRef<HTMLImageElement | null>(null);
   const thumbnailImageRefs = useRef<Record<string, HTMLImageElement | null>>({});
+  const thumbnailButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const photoSetKey = useMemo(() => photos.join("|"), [photos]);
 
   useEffect(() => {
@@ -144,6 +149,55 @@ export default function VenueCard({
       return changed ? next : current;
     });
   }, [photoSetKey, photos]);
+
+  useEffect(() => {
+    const card = cardRef.current;
+    if (!card || typeof IntersectionObserver === "undefined") {
+      setIsCardVisible(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsCardVisible(entry.isIntersecting && entry.intersectionRatio >= CARD_VISIBILITY_THRESHOLD);
+      },
+      {
+        threshold: [0, CARD_VISIBILITY_THRESHOLD, 1],
+      },
+    );
+
+    observer.observe(card);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (photos.length <= 1 || !isCardVisible || isLightboxOpen) return;
+
+    const intervalId = window.setInterval(() => {
+      setActivePhoto((current) => {
+        const currentIndex = current ? photos.indexOf(current) : -1;
+        const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % photos.length : 0;
+        return photos[nextIndex] || current;
+      });
+    }, AUTO_ADVANCE_INTERVAL_MS);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [isCardVisible, isLightboxOpen, photos]);
+
+  useEffect(() => {
+    if (!activePhoto) return;
+    const activeThumbnail = thumbnailButtonRefs.current[activePhoto];
+    activeThumbnail?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+      inline: "center",
+    });
+  }, [activePhoto]);
 
   const preciseUsers = users.filter((user) => user.locationSource === "precise");
 
@@ -242,6 +296,7 @@ export default function VenueCard({
   return (
     <>
       <article
+        ref={cardRef}
         className={`overflow-hidden rounded-[24px] border bg-[#141418] shadow-[0_18px_40px_rgba(0,0,0,0.22)] transition ${
           isSelected
             ? "border-[#00e5a0]/60"
@@ -341,6 +396,9 @@ export default function VenueCard({
                 <button
                   key={`${venue.id}-photo-${index}`}
                   type="button"
+                  ref={(element) => {
+                    thumbnailButtonRefs.current[photo] = element;
+                  }}
                   onClick={(event) => {
                     event.stopPropagation();
                     setActivePhoto(photo);
