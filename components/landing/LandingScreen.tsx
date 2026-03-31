@@ -177,7 +177,7 @@ export default function LandingScreen({
           </div>
         </section>
 
-        <section className="flex flex-1 flex-col bg-[#0a0a0d] px-5 pb-7 pt-[18px] animate-[fadeUp_0.45s_ease_0.35s_both]">
+        <section className="flex flex-1 flex-col bg-[#0a0a0d] px-5 pb-7 animate-[fadeUp_0.45s_ease_0.35s_both]">
           <div className="flex-1">{children}</div>
 
           <button
