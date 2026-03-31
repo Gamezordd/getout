@@ -56,7 +56,7 @@ export default function LandingScreen({
   showBackButton = false,
 }: LandingScreenProps) {
   return (
-    <main className="min-h-full bg-[#050507] py-3 text-[#f0f0f5] sm:flex sm:min-h-screen sm:items-center sm:justify-center sm:px-6 sm:py-6">
+    <main className="min-h-full bg-[#050507] text-[#f0f0f5] sm:flex sm:min-h-screen sm:items-center sm:justify-center sm:px-6 sm:py-6">
       <div className="pointer-events-none absolute inset-0 hidden bg-[radial-gradient(circle_at_top,rgba(0,229,160,0.12),transparent_24%),linear-gradient(180deg,#09090c_0%,#040405_100%)] sm:block" />
       <section className="relative mx-auto flex h-[100svh] w-full max-w-[430px] flex-col overflow-hidden bg-[#0a0a0d] text-[#f0f0f5] sm:h-[900px] sm:max-h-[calc(100svh-3rem)] sm:rounded-[32px] sm:border sm:border-white/10 sm:shadow-[0_40px_120px_rgba(0,0,0,0.45)]">
         <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-px bg-white/10 sm:hidden" />
@@ -82,7 +82,7 @@ export default function LandingScreen({
             style={{ animation: "getoutScanLine 4s ease-in-out 1s infinite" }}
           />
 
-          <div className="relative z-[1] flex flex-col px-5 pb-5 pt-[52px] min-h-0">
+          <div className="relative z-[1] flex flex-col px-5 pb-5 pt-[15px] min-h-0">
             <div className="animate-[fadeUp_0.45s_ease_0.05s_both] flex items-center justify-between">
               <div className="flex items-center gap-3">
                 {showBackButton ? (
@@ -137,7 +137,7 @@ export default function LandingScreen({
                 ))}
               </div>
             </div>
-            <div className="overflow-auto min-h-0 mt-12">
+            <div className="overflow-auto min-h-0 mt-8">
             <div className="animate-[fadeUp_0.45s_ease_0.25s_both] pb-1">
               <div className="mb-[10px] font-display text-[10px] font-bold uppercase tracking-[0.2em] text-[#00e5a0]">
                 For going out
