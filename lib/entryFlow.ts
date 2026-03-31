@@ -5,11 +5,11 @@ export const CATEGORY_OPTIONS: Array<{
   label: string;
   emoji: string;
 }> = [
-  { value: "bar", label: "Bars", emoji: "🍸" },
-  { value: "restaurant", label: "Restaurants", emoji: "🍽" },
-  { value: "cafe", label: "Cafes", emoji: "☕" },
-  { value: "night_club", label: "Night clubs", emoji: "🎵" },
-  { value: "brewery", label: "Breweries", emoji: "🍺" },
+  { value: "bar", label: "Bars", emoji: "\u{1F378}" },
+  { value: "restaurant", label: "Restaurants", emoji: "\u{1F37D}" },
+  { value: "cafe", label: "Cafes", emoji: "\u2615" },
+  { value: "night_club", label: "Night clubs", emoji: "\u{1F3B5}" },
+  { value: "brewery", label: "Breweries", emoji: "\u{1F37A}" },
 ];
 
 export const CLOSE_VOTING_OPTIONS = Array.from({ length: 12 }, (_, index) => {

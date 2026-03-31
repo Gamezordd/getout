@@ -4,30 +4,25 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import AuthResolvingScreen from "../components/AuthResolvingScreen";
 import Dialog from "../components/Dialog";
-import MobileAuthCard from "../components/MobileAuthCard";
-import { EntryShell, LandingHero } from "../components/entry/EntryFlow";
+import LandingScreen from "../components/landing/LandingScreen";
 import { useAuth } from "../lib/auth/AuthProvider";
 import type { FriendSummary } from "../lib/authTypes";
 import { CATEGORY_OPTIONS } from "../lib/entryFlow";
 import { useAppStore } from "../lib/store/AppStoreProvider";
 import type { VenueCategory } from "../lib/types";
 
-const CLOSE_VOTING_BADGES = [
-  { value: 1, label: "1h" },
-  { value: 3, label: "3h" },
-  { value: 6, label: "6h" },
-];
-
 type InviteCandidate = FriendSummary & {
   isFriend: boolean;
 };
+
+
 
 function LandingPage() {
   const store = useAppStore();
   const { authStatus, authenticatedUser, isNative, startupResolved } = useAuth();
   const router = useRouter();
   const [category, setCategory] = useState<VenueCategory>("bar");
-  const [closeVotingInHours, setCloseVotingInHours] = useState(3);
+  const closeVotingInHours = 3;
   const [friends, setFriends] = useState<FriendSummary[]>([]);
   const [selectedInvitees, setSelectedInvitees] = useState<InviteCandidate[]>([]);
   const [friendsLoading, setFriendsLoading] = useState(false);
@@ -256,123 +251,13 @@ function LandingPage() {
   }
 
   return (
-    <EntryShell>
-      <LandingHero
+    <>
+      <LandingScreen
         onCreate={handleCreate}
         showBackButton={isNative}
         onBack={() => {
           void router.replace("/dashboard");
         }}
-        controls={
-          <div className="mt-6 space-y-3 rounded-[24px] border border-white/10 bg-[#141418]/90 p-4 backdrop-blur-sm">
-            {isNative && authStatus === "signed_in" ? (
-              <MobileAuthCard className="border-none bg-transparent p-0" />
-            ) : null}
-            <div>
-              {isNative && authStatus === "signed_in" ? (
-                <div className="mb-4">
-                  <div className="mb-2 flex items-center justify-between">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8b8b9c]">
-                      Invite people
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => void router.push("/profile")}
-                      className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#00e5a0]"
-                    >
-                      Manage
-                    </button>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setInviteDialogOpen(true)}
-                    className="w-full rounded-2xl border border-white/10 bg-[#1c1c22] px-4 py-3 text-left text-sm font-semibold text-white"
-                  >
-                    {selectedInvitees.length > 0
-                      ? `${selectedInvitees.length} invitee${selectedInvitees.length === 1 ? "" : "s"} selected`
-                      : friendsLoading
-                        ? "Loading people..."
-                        : "Search friends or enter an app user's email"}
-                  </button>
-                  <p className="mt-2 text-sm text-[#8b8b9c]">
-                    Search saved friends by name or email. You can also invite any current app user by exact email.
-                  </p>
-                  {selectedInvitees.length > 0 ? (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {selectedInvitees.map((invitee) => (
-                        <button
-                          key={invitee.id}
-                          type="button"
-                          onClick={() =>
-                            setSelectedInvitees((current) =>
-                              current.filter((entry) => entry.id !== invitee.id),
-                            )
-                          }
-                          className="rounded-full bg-[#ff3b5c] px-4 py-2 text-sm font-semibold text-white"
-                        >
-                          {invitee.displayName}
-                        </button>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
-              <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8b8b9c]">
-                Looking for
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {CATEGORY_OPTIONS.map((option) => {
-                  const isSelected = option.value === category;
-                  return (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() => setCategory(option.value)}
-                      className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
-                        isSelected
-                          ? "bg-[#00e5a0] text-black"
-                          : "border border-white/10 bg-[#1c1c22] text-[#d7d7e0]"
-                      }`}
-                    >
-                      <span className="mr-1.5">{option.emoji}</span>
-                      {option.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-            <div>
-              <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8b8b9c]">
-                Close voting in?
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {CLOSE_VOTING_BADGES.map((option) => {
-                  const isSelected = option.value === closeVotingInHours;
-                  return (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() => setCloseVotingInHours(option.value)}
-                      className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
-                        isSelected
-                          ? "bg-[#00e5a0] text-black"
-                          : "border border-white/10 bg-[#1c1c22] text-[#d7d7e0]"
-                      }`}
-                    >
-                      {option.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-            {error ? <p className="text-sm text-rose-300">{error}</p> : null}
-            <p className="text-xs text-[#64647a]">
-              {isNative
-                ? "Your Google profile name will be used automatically for mobile-created groups."
-                : "We&apos;ll start with an approximate location, then ask for precise access inside the group."}
-            </p>
-          </div>
-        }
         createButtonLabel={
           isNative && authStatus !== "signed_in"
             ? "Sign in to create"
@@ -380,7 +265,75 @@ function LandingPage() {
               ? "Creating group..."
               : "Create group"
         }
-      />
+      >
+
+
+        <div className="mt-4 text-[10.5px] font-bold uppercase tracking-[0.07em] text-[#5e5e74]">
+          Looking for
+        </div>
+        <div className="mt-2 grid grid-cols-3 gap-[7px]">
+          {CATEGORY_OPTIONS.map((option) => {
+            const isSelected = option.value === category;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setCategory(option.value)}
+                className={`flex flex-col items-center justify-center gap-1 rounded-xl border-[1.5px] px-2 py-3 text-center transition active:scale-[0.95] ${
+                  isSelected
+                    ? "border-[#00e5a0] bg-[rgba(0,229,160,0.11)]"
+                    : "border-white/10 bg-[#141418]"
+                }`}
+              >
+                <span className="text-[19px] leading-none">{option.emoji}</span>
+                <span
+                  className={`text-[11.5px] font-semibold ${
+                    isSelected ? "text-[#00e5a0]" : "text-[#5e5e74]"
+                  }`}
+                >
+                  {option.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {isNative && authStatus === "signed_in" ? (
+          <div className="mt-8 mb-5">
+            <button
+              type="button"
+              onClick={() => setInviteDialogOpen(true)}
+              className="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-[#141418] px-4 py-3 text-left transition active:scale-[0.99]"
+            >
+              <div>
+                <div className="text-[10.5px] font-bold uppercase tracking-[0.07em] text-[#5e5e74]">
+                  Invite people
+                </div>
+                <div className="mt-1 text-[13px] font-semibold text-white">
+                  {friendsLoading
+                    ? "Loading contacts..."
+                    : selectedInvitees.length > 0
+                      ? `${selectedInvitees.length} selected`
+                      : "Open invite picker"}
+                </div>
+              </div>
+              <div className="rounded-full border border-white/10 px-3 py-1 text-[11px] font-semibold text-[#00e5a0]">
+                Open
+              </div>
+            </button>
+            <p className="mt-2 text-[11px] leading-4 text-[#5e5e74]">
+              Pick friends before creating the group. Invites are sent right after creation.
+            </p>
+          </div>
+        ) : null}
+
+        {error ? <p className="mt-3 text-[12px] leading-4 text-rose-300">{error}</p> : null}
+        <p className="mt-3 text-[11px] leading-4 text-[#5e5e74]">
+          {isNative
+            ? "Your Google profile name is used automatically for mobile-created groups."
+            : "We&apos;ll start with an approximate location, then ask for precise access inside the group."}
+        </p>
+      </LandingScreen>
       <Dialog
         isOpen={inviteDialogOpen}
         onClose={() => setInviteDialogOpen(false)}
@@ -498,7 +451,7 @@ function LandingPage() {
           </div>
         </div>
       </Dialog>
-    </EntryShell>
+    </>
   );
 }
 

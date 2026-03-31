@@ -1,8 +1,7 @@
 import { Fragment } from "react";
 import type { ReactNode } from "react";
 import PlaceSearch, { PlaceResult } from "../PlaceSearch";
-import TranslucentSelect from "../TranslucentSelect";
-import { CATEGORY_OPTIONS, CLOSE_VOTING_OPTIONS, getVenueCategoryLabel } from "../../lib/entryFlow";
+import { CATEGORY_OPTIONS, getVenueCategoryLabel } from "../../lib/entryFlow";
 import type { VenueCategory } from "../../lib/types";
 
 const collageImages = [
@@ -30,7 +29,7 @@ type EntryShellProps = {
 
 export function EntryShell({ children }: EntryShellProps) {
   return (
-    <main className="relative min-h-[100svh] overflow-hidden bg-[#0a0a0d] text-[#f0f0f5]">
+    <main className="relative h-[100svh] overflow-hidden bg-[#0a0a0d] text-[#f0f0f5]">
       <div className="absolute inset-0">
         <div className="grid h-full grid-cols-3 grid-rows-3 gap-[3px] opacity-90">
           {collageImages.map((imageUrl, index) => (
@@ -52,7 +51,7 @@ export function EntryShell({ children }: EntryShellProps) {
         />
       </div>
 
-      <div className="relative mx-auto flex min-h-[100svh] w-full max-w-[430px] flex-col px-[18px] pb-8 pt-6">
+      <div className="relative mx-auto flex h-[100svh] w-full max-w-[430px] flex-col overflow-hidden px-[18px] pb-6 pt-5">
         {children}
       </div>
     </main>
@@ -105,8 +104,8 @@ export function LandingHero({
   onBack?: () => void;
 }) {
   return (
-    <div className="flex min-h-[calc(100svh-4rem)] flex-col">
-      <div className="flex items-center justify-between pt-8">
+    <div className="flex flex-1 min-h-0 flex-col">
+      <div className="flex items-center justify-between pt-4">
         <div className="flex items-center gap-3">
           {showBackButton ? (
             <button
@@ -130,7 +129,7 @@ export function LandingHero({
         </div>
       </div>
 
-      <div className="mt-6 overflow-hidden">
+      <div className="mt-4 shrink-0 overflow-hidden">
         <div
           className="flex w-max gap-2"
           style={{ animation: "getoutTicker 18s linear infinite" }}
@@ -146,11 +145,12 @@ export function LandingHero({
         </div>
       </div>
 
-      <div className="mt-auto pb-6 pt-16">
+      <div className="flex-1 min-h-0 overflow-y-auto pb-4 pt-6">
+        <div className="flex min-h-full flex-col justify-end">
         <div className="font-display text-[11px] font-semibold uppercase tracking-[0.25em] text-[#00e5a0]">
           For going out
         </div>
-        <h1 className="mt-4 font-display text-[42px] font-extrabold leading-[0.98] tracking-[-0.04em] text-white">
+        <h1 className="mt-3 font-display text-[42px] font-extrabold leading-[0.98] tracking-[-0.04em] text-white">
           Pick a spot
           <br />
           <span className="text-[#00e5a0]">together</span>
@@ -162,7 +162,7 @@ export function LandingHero({
           Stop the group-chat spiral. GetOut finds venues that actually work for everyone&apos;s location, then you vote and go.
         </p>
 
-        <div className="mt-6 flex flex-wrap gap-2">
+        <div className="mt-5 flex flex-wrap gap-2">
           {[
             "📍 Live travel times",
             "🗳 Group voting",
@@ -174,7 +174,7 @@ export function LandingHero({
           ))}
         </div>
 
-        <div className="mt-7 flex items-center gap-3">
+        <div className="mt-6 flex items-center gap-3">
           <div className="flex">
             {[
               ["R", "#7c5cbf"],
@@ -197,7 +197,7 @@ export function LandingHero({
           </div>
         </div>
 
-        <div className="mt-7 space-y-3">
+        <div className="mt-6 space-y-3">
           {controls}
           <button
             type="button"
@@ -212,6 +212,7 @@ export function LandingHero({
           <div className="text-center text-[13px] text-[#64647a]">
             Have a link? <span className="font-medium text-[#00e5a0]">Open it to join →</span>
           </div>
+      </div>
         </div>
       </div>
     </div>
@@ -430,15 +431,6 @@ export function CreateGroupForm({
               })}
             </div>
           </div>
-
-          <TranslucentSelect
-            label="Close voting in?"
-            value={closeVotingInHours}
-            onChange={(event) => setCloseVotingInHours(Number(event.target.value))}
-            options={CLOSE_VOTING_OPTIONS}
-            variant="dark"
-            className="rounded-2xl border-white/10 bg-[#141418]"
-          />
 
           {locationError ? <p className="text-sm text-rose-300">{locationError}</p> : null}
           {error ? <p className="text-sm text-rose-300">{error}</p> : null}
