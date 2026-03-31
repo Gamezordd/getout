@@ -56,13 +56,13 @@ export default function LandingScreen({
   showBackButton = false,
 }: LandingScreenProps) {
   return (
-    <main className="min-h-full bg-[#050507] px-4 py-3 text-[#f0f0f5] sm:flex sm:min-h-screen sm:items-center sm:justify-center sm:px-6 sm:py-6">
+    <main className="min-h-full bg-[#050507] py-3 text-[#f0f0f5] sm:flex sm:min-h-screen sm:items-center sm:justify-center sm:px-6 sm:py-6">
       <div className="pointer-events-none absolute inset-0 hidden bg-[radial-gradient(circle_at_top,rgba(0,229,160,0.12),transparent_24%),linear-gradient(180deg,#09090c_0%,#040405_100%)] sm:block" />
       <section className="relative mx-auto flex h-[100svh] w-full max-w-[430px] flex-col overflow-hidden bg-[#0a0a0d] text-[#f0f0f5] sm:h-[900px] sm:max-h-[calc(100svh-3rem)] sm:rounded-[32px] sm:border sm:border-white/10 sm:shadow-[0_40px_120px_rgba(0,0,0,0.45)]">
         <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-px bg-white/10 sm:hidden" />
         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-px bg-white/10 sm:hidden" />
 
-        <section className="relative min-h-0">
+        <section className="relative min-h-0 flex flex-col">
           <div className="absolute inset-0 grid grid-cols-3 grid-rows-2 gap-[2px]">
             {collageImages.map((imageUrl, index) => (
               <div key={imageUrl} className="overflow-hidden bg-[#111114]">
