@@ -2,6 +2,7 @@ import { Capacitor, registerPlugin } from "@capacitor/core";
 
 type ShareIntentPayload = {
   text?: string | null;
+  target?: "group_venue" | "collection" | null;
 };
 
 type ShareIntentPlugin = {
@@ -55,8 +56,16 @@ export const setLastSessionId = (sessionId: string) => {
   window.localStorage.setItem(LAST_SESSION_ID_KEY, sessionId);
 };
 
+export const clearLastSessionId = () => {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(LAST_SESSION_ID_KEY);
+};
+
 export const registerNativeShareListener = async (
-  onShareText: (text: string) => void,
+  onShareIntent: (payload: {
+    text: string;
+    target: "group_venue" | "collection";
+  }) => void | Promise<void>,
 ) => {
   if (!isNativeApp()) {
     return () => undefined;
@@ -65,8 +74,10 @@ export const registerNativeShareListener = async (
   const emitIfPresent = async () => {
     const pending = await ShareIntent.getPendingShare().catch(() => null);
     const nextText = pending?.text?.trim();
+    const nextTarget =
+      pending?.target === "collection" ? "collection" : "group_venue";
     if (!nextText) return;
-    onShareText(nextText);
+    await onShareIntent({ text: nextText, target: nextTarget });
     await ShareIntent.clearPendingShare().catch(() => undefined);
   };
 
@@ -74,10 +85,11 @@ export const registerNativeShareListener = async (
 
   const listener = await ShareIntent.addListener(
     "shareIntentReceived",
-    async ({ text }) => {
+    async ({ text, target }) => {
       const nextText = text?.trim();
+      const nextTarget = target === "collection" ? "collection" : "group_venue";
       if (!nextText) return;
-      onShareText(nextText);
+      await onShareIntent({ text: nextText, target: nextTarget });
       await ShareIntent.clearPendingShare().catch(() => undefined);
     },
   );

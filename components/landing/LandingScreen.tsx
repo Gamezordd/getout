@@ -82,7 +82,7 @@ export default function LandingScreen({
             style={{ animation: "getoutScanLine 4s ease-in-out 1s infinite" }}
           />
 
-          <div className="relative z-[1] flex flex-col px-5 pb-5 pt-[15px] min-h-0">
+          <div className="relative z-[1] flex flex-col px-5 pb-2 pt-[15px] min-h-0">
             <div className="animate-[fadeUp_0.45s_ease_0.05s_both] flex items-center justify-between">
               <div className="flex items-center gap-3">
                 {showBackButton ? (

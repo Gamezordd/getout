@@ -7,6 +7,9 @@ import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginHandle;
 
 public class MainActivity extends BridgeActivity {
+    private static final String EXTRA_SHARE_TARGET = "share_target";
+    private static final String TARGET_COLLECTION = "collection";
+    private static final String TARGET_GROUP_VENUE = "group_venue";
 
     @Override
     protected void onCreate(android.os.Bundle savedInstanceState) {
@@ -36,7 +39,8 @@ public class MainActivity extends BridgeActivity {
             return;
         }
 
-        ShareIntentPlugin.setPendingShareText(sharedText);
+        String shareTarget = resolveShareTarget(intent);
+        ShareIntentPlugin.setPendingShare(sharedText, shareTarget);
 
         if (bridge == null) {
             return;
@@ -49,8 +53,17 @@ public class MainActivity extends BridgeActivity {
 
         Plugin plugin = pluginHandle.getInstance();
         if (plugin instanceof ShareIntentPlugin) {
-            ((ShareIntentPlugin) plugin).emitPendingShare(sharedText);
+            ((ShareIntentPlugin) plugin).emitPendingShare(sharedText, shareTarget);
         }
+    }
+
+    private String resolveShareTarget(Intent intent) {
+        String target = intent.getStringExtra(EXTRA_SHARE_TARGET);
+        if (TARGET_COLLECTION.equals(target)) {
+            return TARGET_COLLECTION;
+        }
+
+        return TARGET_GROUP_VENUE;
     }
 
     private void handleNotificationIntent(Intent intent) {

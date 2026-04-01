@@ -1,8 +1,13 @@
 import { observer } from "mobx-react-lite";
 import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
+import CollectionsList from "../components/CollectionsList";
 import FriendsManager from "../components/FriendsManager";
-import type { InviteListItem, RecentGroupSummary } from "../lib/authTypes";
+import type {
+  CollectionListItem,
+  InviteListItem,
+  RecentGroupSummary,
+} from "../lib/authTypes";
 import { useAuth } from "../lib/auth/AuthProvider";
 
 const quickActions = [
@@ -24,14 +29,37 @@ function DashboardPage() {
   const { authStatus, authenticatedUser, isNative } = useAuth();
   const [recentGroups, setRecentGroups] = useState<RecentGroupSummary[]>([]);
   const [invites, setInvites] = useState<InviteListItem[]>([]);
+  const [collections, setCollections] = useState<CollectionListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [inviteLoading, setInviteLoading] = useState(true);
   const [inviteError, setInviteError] = useState<string | null>(null);
+  const [collectionLoading, setCollectionLoading] = useState(true);
+  const [collectionError, setCollectionError] = useState<string | null>(null);
+  const [removingCollectionIds, setRemovingCollectionIds] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<
-    "home" | "friends" | "invites" | "history"
+    "home" | "friends" | "collections" | "history"
   >("home");
   const [joinValue, setJoinValue] = useState("");
+
+  useEffect(() => {
+    if (!router.isReady) return;
+    if (router.query.tab === "collections") {
+      setActiveTab("collections");
+      return;
+    }
+    if (router.query.tab === "history") {
+      setActiveTab("history");
+      return;
+    }
+    if (router.query.tab === "friends") {
+      setActiveTab("friends");
+      return;
+    }
+    if (router.query.tab === "home") {
+      setActiveTab("home");
+    }
+  }, [router.isReady, router.query.tab]);
 
   useEffect(() => {
     if (!router.isReady || !isNative || authStatus === "unknown") return;
@@ -47,11 +75,14 @@ function DashboardPage() {
       try {
         setLoading(true);
         setInviteLoading(true);
+        setCollectionLoading(true);
         setError(null);
         setInviteError(null);
-        const [groupsResponse, invitesResponse] = await Promise.all([
+        setCollectionError(null);
+        const [groupsResponse, invitesResponse, collectionsResponse] = await Promise.all([
           fetch("/api/recent-groups"),
           fetch("/api/invites"),
+          fetch("/api/collections"),
         ]);
         const groupsPayload = (await groupsResponse.json().catch(() => ({}))) as {
           groups?: RecentGroupSummary[];
@@ -61,21 +92,35 @@ function DashboardPage() {
           invites?: InviteListItem[];
           message?: string;
         };
+        const collectionsPayload = (await collectionsResponse
+          .json()
+          .catch(() => ({}))) as {
+          collections?: CollectionListItem[];
+          message?: string;
+        };
         if (!groupsResponse.ok) {
           throw new Error(groupsPayload.message || "Unable to load dashboard.");
         }
         if (!invitesResponse.ok) {
           throw new Error(invitesPayload.message || "Unable to load invites.");
         }
+        if (!collectionsResponse.ok) {
+          throw new Error(
+            collectionsPayload.message || "Unable to load collections.",
+          );
+        }
         setRecentGroups(groupsPayload.groups || []);
         setInvites(invitesPayload.invites || []);
+        setCollections(collectionsPayload.collections || []);
       } catch (err: any) {
         const message = err.message || "Unable to load dashboard.";
         setError(message);
         setInviteError(message);
+        setCollectionError(message);
       } finally {
         setLoading(false);
         setInviteLoading(false);
+        setCollectionLoading(false);
       }
     };
 
@@ -116,9 +161,66 @@ function DashboardPage() {
     void router.push({ pathname: "/join", query: { sessionId: value } });
   };
 
+  const handleRemoveCollection = async (placeId: string) => {
+    try {
+      setRemovingCollectionIds((current) =>
+        current.includes(placeId) ? current : [...current, placeId],
+      );
+      const response = await fetch(`/api/collections/${encodeURIComponent(placeId)}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.message || "Unable to remove collection item.");
+      }
+      setCollections((current) =>
+        current.filter((item) => item.placeId !== placeId),
+      );
+    } catch (err: any) {
+      setCollectionError(err.message || "Unable to remove collection item.");
+    } finally {
+      setRemovingCollectionIds((current) =>
+        current.filter((item) => item !== placeId),
+      );
+    }
+  };
+
   if (!isNative || authStatus !== "signed_in") {
     return null;
   }
+
+  const renderDashboardActions = () => (
+    <div className="flex items-center gap-2">
+      <button
+        type="button"
+        onClick={() => router.push("/invites")}
+        className="relative mt-[2px] flex h-[38px] w-[38px] items-center justify-center rounded-xl border border-white/10 bg-[#141418] text-white"
+        aria-label="Open invites"
+      >
+        {unreadInviteCount > 0 ? (
+          <span className="absolute -right-1 -top-1 flex min-h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#ff3b5c] px-1 text-[10px] font-bold text-white">
+            {unreadInviteCount > 9 ? "9+" : unreadInviteCount}
+          </span>
+        ) : null}
+        <svg width="18" height="18" fill="none" viewBox="0 0 24 24">
+          <path
+            d="M4 7.5A2.5 2.5 0 0 1 6.5 5h11A2.5 2.5 0 0 1 20 7.5v9A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5v-9Zm1.5.5 6.5 5 6.5-5"
+            stroke="#00e5a0"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </button>
+      <button
+        type="button"
+        onClick={() => router.push("/profile")}
+        className="mt-[2px] flex h-[38px] w-[38px] items-center justify-center rounded-xl border-2 border-white/10 bg-[#7c5cbf] text-[15px] font-bold text-white"
+      >
+        {avatarLabel}
+      </button>
+    </div>
+  );
 
   const renderGroupCard = (group: RecentGroupSummary, compact = false) => (
     <button
@@ -212,13 +314,7 @@ function DashboardPage() {
                   Get<span className="text-[#00e5a0]">Out</span>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => router.push("/profile")}
-                className="mt-[2px] flex h-[38px] w-[38px] items-center justify-center rounded-xl border-2 border-white/10 bg-[#7c5cbf] text-[15px] font-bold text-white"
-              >
-                {avatarLabel}
-              </button>
+              {renderDashboardActions()}
             </div>
 
             <button
@@ -325,13 +421,16 @@ function DashboardPage() {
           </div>
 
           <div className={`absolute inset-0 overflow-y-auto pb-5 transition ${activeTab === "history" ? "opacity-100" : "pointer-events-none opacity-0"}`}>
-            <div className="px-5 pb-5 pt-1">
-              <div className="font-display text-2xl font-extrabold tracking-[-0.04em] text-white">
-                History
+            <div className="flex items-start justify-between px-5 pb-5 pt-1">
+              <div>
+                <div className="font-display text-2xl font-extrabold tracking-[-0.04em] text-white">
+                  History
+                </div>
+                <div className="mt-1 text-[13px] text-[#5a5a70]">
+                  Your last 48 hours of GetOut sessions
+                </div>
               </div>
-              <div className="mt-1 text-[13px] text-[#5a5a70]">
-                Your last 48 hours of GetOut sessions
-              </div>
+              {renderDashboardActions()}
             </div>
             <div className="px-5">
               {!loading && recentGroups.length === 0 ? (
@@ -350,80 +449,43 @@ function DashboardPage() {
           </div>
 
           <div className={`absolute inset-0 overflow-y-auto pb-5 transition ${activeTab === "friends" ? "opacity-100" : "pointer-events-none opacity-0"}`}>
-            <div className="px-5 pb-5 pt-1">
-              <div className="font-display text-2xl font-extrabold tracking-[-0.04em] text-white">
-                Friends
+            <div className="flex items-start justify-between px-5 pb-5 pt-1">
+              <div>
+                <div className="font-display text-2xl font-extrabold tracking-[-0.04em] text-white">
+                  Friends
+                </div>
+                <div className="mt-1 text-[13px] text-[#5a5a70]">
+                  Keep your invite list ready for the next group you create
+                </div>
               </div>
-              <div className="mt-1 text-[13px] text-[#5a5a70]">
-                Keep your invite list ready for the next group you create
-              </div>
+              {renderDashboardActions()}
             </div>
             <div className="px-5">
               <FriendsManager cardClassName="rounded-[18px] border border-white/10 bg-[#141418] p-4" />
             </div>
           </div>
 
-          <div className={`absolute inset-0 overflow-y-auto pb-5 transition ${activeTab === "invites" ? "opacity-100" : "pointer-events-none opacity-0"}`}>
-            <div className="px-5 pb-5 pt-1">
-              <div className="font-display text-2xl font-extrabold tracking-[-0.04em] text-white">
-                Invites
+          <div className={`absolute inset-0 overflow-y-auto pb-5 transition ${activeTab === "collections" ? "opacity-100" : "pointer-events-none opacity-0"}`}>
+            <div className="flex items-start justify-between px-5 pb-5 pt-1">
+              <div>
+                <div className="font-display text-2xl font-extrabold tracking-[-0.04em] text-white">
+                  Collections
+                </div>
+                <div className="mt-1 text-[13px] text-[#5a5a70]">
+                  Your saved spots, ready for the next plan
+                </div>
               </div>
-              <div className="mt-1 text-[13px] text-[#5a5a70]">
-                Groups waiting on your contribution
-              </div>
+              {renderDashboardActions()}
             </div>
             <div className="px-5">
-              {inviteLoading ? (
-                <div className="rounded-[18px] border border-white/10 bg-[#141418] p-4 text-sm text-[#8b8b9c]">
-                  Loading invites...
-                </div>
-              ) : null}
-              {inviteError ? (
-                <div className="rounded-[18px] border border-rose-500/20 bg-rose-500/10 p-4 text-sm text-rose-200">
-                  {inviteError}
-                </div>
-              ) : null}
-              {!inviteLoading && !inviteError && invites.length === 0 ? (
-                <div className="rounded-[18px] border border-white/10 bg-[#141418] p-6 text-center">
-                  <div className="text-4xl">✉</div>
-                  <div className="mt-3 font-display text-lg font-bold tracking-[-0.02em] text-white">
-                    No pending invites
-                  </div>
-                  <div className="mt-2 text-sm text-[#5a5a70]">
-                    When friends invite you into a group, it will show up here.
-                  </div>
-                </div>
-              ) : null}
-              {invites.map((invite) => (
-                <button
-                  key={invite.id}
-                  type="button"
-                  onClick={() => router.push(invite.joinUrl)}
-                  className="mb-3 w-full rounded-[18px] border border-white/10 bg-[#141418] p-5 text-left"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#00e5a0]">
-                        Pending invite
-                      </p>
-                      <p className="mt-2 font-display text-xl font-bold tracking-[-0.03em] text-white">
-                        {invite.inviter.displayName}
-                      </p>
-                    </div>
-                    {!invite.seenAt ? (
-                      <span className="rounded-full bg-[#ff3b5c] px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-white">
-                        New
-                      </span>
-                    ) : null}
-                  </div>
-                  <p className="mt-2 text-sm text-[#8b8b9c]">
-                    Invited you to contribute to a group. Open the join flow and we&apos;ll take you there directly.
-                  </p>
-                  <div className="mt-4 inline-flex rounded-full bg-[#00e5a0] px-4 py-2 text-xs font-bold text-black">
-                    Open invite
-                  </div>
-                </button>
-              ))}
+              <CollectionsList
+                collections={collections}
+                loading={collectionLoading}
+                error={collectionError}
+                onRemove={handleRemoveCollection}
+                removingPlaceIds={removingCollectionIds}
+                emptyBody="Save places from Google Maps and they’ll stay ready here for your next group."
+              />
             </div>
           </div>
         </div>
@@ -464,24 +526,19 @@ function DashboardPage() {
               <path d="M12 4v16M4 12h16" stroke="#000" strokeWidth="2.5" strokeLinecap="round" />
             </svg>
           </button>
-          <button type="button" onClick={() => setActiveTab("invites")} className="relative flex flex-1 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2">
-            {unreadInviteCount > 0 ? (
-              <span className="absolute right-[calc(50%-22px)] top-1 flex min-h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#ff3b5c] px-1 text-[10px] font-bold text-white">
-                {unreadInviteCount > 9 ? "9+" : unreadInviteCount}
-              </span>
-            ) : null}
+          <button type="button" onClick={() => setActiveTab("collections")} className="relative flex flex-1 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2">
             <svg width="22" height="22" fill="none" viewBox="0 0 24 24">
               <path
-                d="M4 7.5A2.5 2.5 0 0 1 6.5 5h11A2.5 2.5 0 0 1 20 7.5v9A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5v-9Zm1.5.5 6.5 5 6.5-5"
-                stroke={activeTab === "invites" ? "#00e5a0" : "#5a5a70"}
+                d="M6.5 5.75h11A1.75 1.75 0 0 1 19.25 7.5v9A1.75 1.75 0 0 1 17.5 18.25h-11A1.75 1.75 0 0 1 4.75 16.5v-9A1.75 1.75 0 0 1 6.5 5.75Zm0 0L8 4.25h8l1.5 1.5"
+                stroke={activeTab === "collections" ? "#00e5a0" : "#5a5a70"}
                 strokeWidth="1.8"
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                opacity={activeTab === "invites" ? "1" : "0.45"}
+                opacity={activeTab === "collections" ? "1" : "0.45"}
               />
             </svg>
-            <span className={`text-[10px] font-semibold ${activeTab === "invites" ? "text-[#00e5a0]" : "text-[#5a5a70]"}`}>
-              Invites
+            <span className={`text-[10px] font-semibold ${activeTab === "collections" ? "text-[#00e5a0]" : "text-[#5a5a70]"}`}>
+              Collections
             </span>
           </button>
           <button type="button" onClick={() => setActiveTab("history")} className="flex flex-1 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2">

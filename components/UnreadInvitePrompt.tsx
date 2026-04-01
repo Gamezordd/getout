@@ -24,7 +24,8 @@ export default function UnreadInvitePrompt() {
     if (
       router.pathname === "/login" ||
       router.pathname === "/join" ||
-      router.pathname === "/invites"
+      router.pathname === "/invites" ||
+      router.pathname === "/collections"
     ) {
       return;
     }

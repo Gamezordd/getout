@@ -13,6 +13,7 @@ import {
   type NativeNotificationPayload,
 } from "../lib/nativeNotifications";
 import {
+  clearLastSessionId,
   getLastSessionId,
   isGoogleMapsShareUrl,
   registerNativeShareListener,
@@ -25,6 +26,8 @@ import "mapbox-gl/dist/mapbox-gl.css";
 
 const buildJoinRoute = (sessionId: string) =>
   `/join?sessionId=${encodeURIComponent(sessionId)}`;
+const buildShareToGroupRoute = (sharedMapsUrl: string) =>
+  `/share-to-group?sharedMapsUrl=${encodeURIComponent(sharedMapsUrl)}`;
 
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter();
@@ -48,19 +51,73 @@ export default function App({ Component, pageProps }: AppProps) {
   useEffect(() => {
     let cleanup: () => void | Promise<void> = () => undefined;
 
+    const isLiveGroupSession = async (sessionId: string) => {
+      try {
+        const response = await fetch(
+          `/api/group?sessionId=${encodeURIComponent(sessionId)}`,
+        );
+        if (!response.ok) {
+          return false;
+        }
+        const payload = (await response.json().catch(() => ({}))) as {
+          lockedVenue?: { id?: string } | null;
+        };
+        return !payload.lockedVenue;
+      } catch {
+        return false;
+      }
+    };
+
+    const resolveShareSessionId = async () => {
+      const currentSessionId =
+        typeof router.query.sessionId === "string"
+          ? router.query.sessionId
+          : null;
+      if (currentSessionId && (await isLiveGroupSession(currentSessionId))) {
+        return currentSessionId;
+      }
+
+      const lastSessionId = getLastSessionId();
+      if (
+        lastSessionId &&
+        lastSessionId !== currentSessionId &&
+        (await isLiveGroupSession(lastSessionId))
+      ) {
+        return lastSessionId;
+      }
+
+      if (lastSessionId) {
+        clearLastSessionId();
+      }
+
+      return null;
+    };
+
     const initNativeShare = async () => {
-      cleanup = await registerNativeShareListener((sharedText) => {
+      cleanup = await registerNativeShareListener(
+        async ({ text: sharedText, target }) => {
         if (!isGoogleMapsShareUrl(sharedText)) return;
+        if (target === "collection") {
+          await router.push({
+            pathname: "/collections",
+            query: {
+              sharedMapsUrl: sharedText,
+            },
+          });
+          return;
+        }
 
-        const sessionId =
-          typeof router.query.sessionId === "string"
-            ? router.query.sessionId
-            : getLastSessionId();
+        const sessionId = await resolveShareSessionId();
 
-        void router.push({
+        if (!sessionId) {
+          await router.push(buildShareToGroupRoute(sharedText));
+          return;
+        }
+
+        await router.push({
           pathname: "/add-venue",
           query: {
-            ...(sessionId ? { sessionId } : {}),
+            sessionId,
             sharedMapsUrl: sharedText,
           },
         });
@@ -144,7 +201,7 @@ export default function App({ Component, pageProps }: AppProps) {
     return () => {
       void listener?.remove();
     };
-  }, [router]);
+  }, [router, router.query.sessionId]);
 
   return (
     <AuthProvider>

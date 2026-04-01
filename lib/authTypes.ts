@@ -1,3 +1,5 @@
+import type { LatLng } from "./types";
+
 export type AuthenticatedUser = {
   id: string;
   email: string;
@@ -60,4 +62,17 @@ export type RecentGroupSummary = {
   }>;
   imageUrl?: string | null;
   venueCategory?: string | null;
+};
+
+export type CollectionListItem = {
+  id: string;
+  placeId: string;
+  name: string;
+  address?: string | null;
+  area?: string | null;
+  priceLabel?: string | null;
+  closingTimeLabel?: string | null;
+  photos?: string[];
+  location: LatLng;
+  createdAt: string;
 };
