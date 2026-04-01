@@ -26,6 +26,7 @@ export type Venue = {
   rating?: number;
   userRatingCount?: number;
   addedByUserId?: string;
+  source?: "manual" | "collection" | "google";
 };
 
 export type LockedVenue = {

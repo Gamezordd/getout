@@ -14,6 +14,8 @@ type PlaceResult = {
   priceLabel?: string;
   closingTimeLabel?: string;
   photos?: string[];
+  rating?: number;
+  userRatingCount?: number;
   venueCategory?: VenueCategory;
   location: LatLng;
 };
@@ -106,7 +108,7 @@ const searchTextPlaces = async (
         "Content-Type": "application/json",
         "X-Goog-Api-Key": apiKey,
         "X-Goog-FieldMask":
-          "places.id,places.displayName,places.formattedAddress,places.addressComponents,places.location,places.photos,places.priceLevel,places.currentOpeningHours,places.primaryType,places.types",
+          "places.id,places.displayName,places.formattedAddress,places.addressComponents,places.location,places.photos,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours,places.primaryType,places.types",
       },
       body: JSON.stringify({
         textQuery: query,
@@ -136,6 +138,11 @@ const searchTextPlaces = async (
         priceLabel: getPriceLabel(place.priceLevel),
         closingTimeLabel: getClosingTimeLabel(place.currentOpeningHours),
         photos: await resolvePhotoUrls(apiKey, place.photos),
+        rating: typeof place.rating === "number" ? place.rating : undefined,
+        userRatingCount:
+          typeof place.userRatingCount === "number"
+            ? place.userRatingCount
+            : undefined,
         venueCategory: resolveVenueCategoryFromGooglePlace(place),
         location: {
           lat: location.latitude,

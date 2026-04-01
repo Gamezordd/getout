@@ -14,6 +14,8 @@ type PlaceResult = {
   priceLabel?: string;
   closingTimeLabel?: string;
   photos?: string[];
+  rating?: number;
+  userRatingCount?: number;
   venueCategory?: VenueCategory;
   location: LatLng;
 };
@@ -122,6 +124,11 @@ const mapPlaceToResult = async (apiKey: string, place: any) => {
     priceLabel: getPriceLabel(place.priceLevel),
     closingTimeLabel: getClosingTimeLabel(place.currentOpeningHours),
     photos: await resolvePhotoUrls(apiKey, place.photos),
+    rating: typeof place.rating === "number" ? place.rating : undefined,
+    userRatingCount:
+      typeof place.userRatingCount === "number"
+        ? place.userRatingCount
+        : undefined,
     venueCategory: resolveVenueCategoryFromGooglePlace(place),
     location: {
       lat: location.latitude,
@@ -132,7 +139,7 @@ const mapPlaceToResult = async (apiKey: string, place: any) => {
 
 const fetchPlaceById = async (apiKey: string, placeId: string) => {
   const response = await fetch(
-    `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}?fields=id,displayName,formattedAddress,addressComponents,location,photos,priceLevel,currentOpeningHours,primaryType,types&key=${encodeURIComponent(apiKey)}`,
+    `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}?fields=id,displayName,formattedAddress,addressComponents,location,photos,rating,userRatingCount,priceLevel,currentOpeningHours,primaryType,types&key=${encodeURIComponent(apiKey)}`,
   );
 
   if (!response.ok) {
@@ -150,7 +157,7 @@ const searchTextPlace = async (apiKey: string, query: string) => {
       "Content-Type": "application/json",
       "X-Goog-Api-Key": apiKey,
       "X-Goog-FieldMask":
-        "places.id,places.displayName,places.formattedAddress,places.addressComponents,places.location,places.photos,places.priceLevel,places.currentOpeningHours,places.primaryType,places.types",
+        "places.id,places.displayName,places.formattedAddress,places.addressComponents,places.location,places.photos,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours,places.primaryType,places.types",
     },
     body: JSON.stringify({
       textQuery: query,

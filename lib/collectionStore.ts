@@ -14,6 +14,8 @@ type CollectionRow = {
   price_label: string | null;
   closing_time_label: string | null;
   photos_json: string[] | null;
+  rating: number | null;
+  user_rating_count: number | null;
   venue_category: VenueCategory | null;
   location_json: LatLng;
   created_at: string;
@@ -29,6 +31,8 @@ type SaveCollectionPlaceParams = {
     priceLabel?: string;
     closingTimeLabel?: string;
     photos?: string[];
+    rating?: number;
+    userRatingCount?: number;
     venueCategory: VenueCategory;
     location: LatLng;
   };
@@ -45,6 +49,8 @@ const mapCollection = (row: CollectionRow): CollectionListItem => ({
   priceLabel: row.price_label,
   closingTimeLabel: row.closing_time_label,
   photos: Array.isArray(row.photos_json) ? row.photos_json : [],
+  rating: row.rating,
+  userRatingCount: row.user_rating_count,
   venueCategory: row.venue_category,
   location: row.location_json,
   createdAt: row.created_at,
@@ -83,6 +89,8 @@ export const ensureCollectionSchema = async () => {
           price_label TEXT,
           closing_time_label TEXT,
           photos_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+          rating DOUBLE PRECISION,
+          user_rating_count INTEGER,
           venue_category TEXT,
           location_json JSONB NOT NULL,
           created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -91,6 +99,14 @@ export const ensureCollectionSchema = async () => {
       await sql`
         ALTER TABLE user_collections
         ADD COLUMN IF NOT EXISTS venue_category TEXT
+      `;
+      await sql`
+        ALTER TABLE user_collections
+        ADD COLUMN IF NOT EXISTS rating DOUBLE PRECISION
+      `;
+      await sql`
+        ALTER TABLE user_collections
+        ADD COLUMN IF NOT EXISTS user_rating_count INTEGER
       `;
       await sql`
         CREATE UNIQUE INDEX IF NOT EXISTS user_collections_user_place_idx
@@ -125,6 +141,8 @@ export const listCollectionsForUser = async (
       price_label,
       closing_time_label,
       photos_json,
+      rating,
+      user_rating_count,
       venue_category,
       location_json,
       created_at
@@ -179,6 +197,8 @@ export const saveCollectionPlaceForUser = async ({
         price_label,
         closing_time_label,
         photos_json,
+        rating,
+        user_rating_count,
         venue_category,
         location_json
       )
@@ -192,6 +212,12 @@ export const saveCollectionPlaceForUser = async ({
         ${place.priceLabel || null},
         ${place.closingTimeLabel || null},
         ${JSON.stringify(place.photos || [])}::jsonb,
+        ${typeof place.rating === "number" ? place.rating : null},
+        ${
+          typeof place.userRatingCount === "number"
+            ? Math.round(place.userRatingCount)
+            : null
+        },
         ${place.venueCategory},
         ${JSON.stringify(place.location)}::jsonb
       )
@@ -206,6 +232,8 @@ export const saveCollectionPlaceForUser = async ({
         price_label,
         closing_time_label,
         photos_json,
+        rating,
+        user_rating_count,
         venue_category,
         location_json,
         created_at
@@ -222,6 +250,8 @@ export const saveCollectionPlaceForUser = async ({
       price_label,
       closing_time_label,
       photos_json,
+      rating,
+      user_rating_count,
       venue_category,
       location_json,
       created_at

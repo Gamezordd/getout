@@ -17,6 +17,7 @@ type Props = {
   venue: Venue;
   badgeText: string;
   badgeTone: "ranked" | "manual";
+  sourceLabel?: string;
   medalNote?: string;
   addedByName?: string;
   users: User[];
@@ -62,6 +63,7 @@ export default function VenueCard({
   venue,
   badgeText,
   badgeTone,
+  sourceLabel,
   medalNote,
   addedByName,
   users,
@@ -273,6 +275,8 @@ export default function VenueCard({
         }
       : null,
   ].filter(Boolean) as MetadataItem[];
+  const resolvedSourceLabel =
+    sourceLabel || (badgeTone === "manual" ? "Manual pick" : "Suggested");
 
   const openLightbox = () => {
     const nextIndex = activePhoto
@@ -375,7 +379,7 @@ export default function VenueCard({
                         <span className="text-white/60">({formatCompactCount(venue.userRatingCount || 0)})</span>
                       </span>
                     ) : null}
-                    <span>{badgeTone === "manual" ? "Manual pick" : "Suggested"}</span>
+                    <span>{resolvedSourceLabel}</span>
                   </div>
                 </div>
                 {medalNote && (
@@ -473,7 +477,7 @@ export default function VenueCard({
                         {venue.rating} <span className="text-[#7d7d90]">({formatCompactCount(venue.userRatingCount || 0)})</span>
                       </span>
                     )}
-                    <span>{badgeTone === "manual" ? "Manual pick" : "Suggested"}</span>
+                    <span>{resolvedSourceLabel}</span>
                   </div>
                 </div>
                 {medalNote && (

@@ -73,6 +73,8 @@ export type CollectionListItem = {
   priceLabel?: string | null;
   closingTimeLabel?: string | null;
   photos?: string[];
+  rating?: number | null;
+  userRatingCount?: number | null;
   venueCategory?: VenueCategory | null;
   location: LatLng;
   createdAt: string;

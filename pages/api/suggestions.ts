@@ -457,7 +457,12 @@ const getCollectionCandidates = async (params: {
 
   if (cached?.venues) {
     return dedupeVenues(
-      cached.venues.filter((venue) => !params.excludedVenueIds.has(venue.id)),
+      cached.venues
+        .filter((venue) => !params.excludedVenueIds.has(venue.id))
+        .map((venue) => ({
+          ...venue,
+          source: "collection" as const,
+        })),
     );
   }
 
@@ -474,8 +479,15 @@ const getCollectionCandidates = async (params: {
       priceLabel: item.priceLabel || undefined,
       closingTimeLabel: item.closingTimeLabel || undefined,
       photos: item.photos || [],
+      rating:
+        typeof item.rating === "number" ? item.rating : undefined,
+      userRatingCount:
+        typeof item.userRatingCount === "number"
+          ? item.userRatingCount
+          : undefined,
       venueCategory: item.venueCategory || undefined,
       location: item.location,
+      source: "collection",
     })),
   );
   await writeRedisCache(redisKey, { venues: mappedVenues } satisfies SuggestionsCandidateCacheEntry);
@@ -501,7 +513,10 @@ const getGoogleCandidates = async (params: {
   const redisKey = buildRedisKey(GOOGLE_SUGGESTIONS_CACHE_PREFIX, fingerprint);
   const cached = await readRedisCache<SuggestionsCandidateCacheEntry>(redisKey);
   if (cached?.venues) {
-    return cached.venues.slice(0, params.limit);
+    return cached.venues.slice(0, params.limit).map((venue) => ({
+      ...venue,
+      source: "google" as const,
+    }));
   }
 
   const candidates: Venue[] = [];
@@ -543,9 +558,15 @@ const getGoogleCandidates = async (params: {
   }
 
   await writeRedisCache(redisKey, {
-    venues: candidates,
+    venues: candidates.map((venue) => ({
+      ...venue,
+      source: "google" as const,
+    })),
   } satisfies SuggestionsCandidateCacheEntry);
-  return candidates;
+  return candidates.map((venue) => ({
+    ...venue,
+    source: "google" as const,
+  }));
 };
 
 const buildEtaData = (
@@ -669,13 +690,21 @@ export const recomputeSuggestionsForGroup = async (
     rows,
   );
 
-  const rankedSuggested = scoreVenues(
-    candidates,
+  const rankedCollectionCandidates = scoreVenues(
+    collectionCandidates,
     totalsByVenue,
     group.users.length || 1,
-  )
-    .map((entry) => entry.venue)
-    .slice(0, TARGET_SUGGESTION_COUNT);
+  ).map((entry) => entry.venue);
+  const rankedGoogleCandidates = scoreVenues(
+    googleCandidates,
+    totalsByVenue,
+    group.users.length || 1,
+  ).map((entry) => entry.venue);
+
+  const rankedSuggested = [
+    ...rankedCollectionCandidates,
+    ...rankedGoogleCandidates,
+  ].slice(0, TARGET_SUGGESTION_COUNT);
 
   rankedSuggested.forEach((venue) => seenVenueIds.add(venue.id));
 

@@ -239,6 +239,12 @@ export default function PlaceList({
         const badge = suggestedRankById.get(venue.id)
           ? { text: String(suggestedRankById.get(venue.id)), tone: "ranked" as const }
           : { text: "M", tone: "manual" as const };
+        const sourceLabel =
+          badge.tone === "manual"
+            ? "Manual pick"
+            : venue.source === "collection"
+              ? "From collections"
+              : "Suggested";
 
         const voterIds = voterIdsByVenue.get(venue.id) || [];
 
@@ -248,6 +254,7 @@ export default function PlaceList({
             venue={venue}
             badgeText={badge.text}
             badgeTone={badge.tone}
+            sourceLabel={sourceLabel}
             medalNote={medalNoteByVenue.get(venue.id)}
             addedByName={addedByNameByVenue.get(venue.id)}
             users={users}

@@ -16,6 +16,8 @@ type RequestBody = {
     priceLabel?: string;
     closingTimeLabel?: string;
     photos?: string[];
+    rating?: number;
+    userRatingCount?: number;
     venueCategory?: VenueCategory;
     location?: {
       lat?: number;
@@ -81,6 +83,11 @@ export default async function handler(
         photos: Array.isArray(place.photos)
           ? place.photos.filter((photo): photo is string => typeof photo === "string")
           : [],
+        rating: typeof place.rating === "number" ? place.rating : undefined,
+        userRatingCount:
+          typeof place.userRatingCount === "number"
+            ? place.userRatingCount
+            : undefined,
         venueCategory: place.venueCategory,
         location: {
           lat: place.location!.lat!,

@@ -9,6 +9,8 @@ export type PlaceResult = {
   priceLabel?: string;
   closingTimeLabel?: string;
   photos?: string[];
+  rating?: number;
+  userRatingCount?: number;
   venueCategory?: VenueCategory;
   location: LatLng;
 };
