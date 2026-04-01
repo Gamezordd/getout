@@ -37,6 +37,7 @@ function DashboardPage() {
   const [collectionLoading, setCollectionLoading] = useState(true);
   const [collectionError, setCollectionError] = useState<string | null>(null);
   const [removingCollectionIds, setRemovingCollectionIds] = useState<string[]>([]);
+  const [togglingCollectionIds, setTogglingCollectionIds] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<
     "home" | "friends" | "collections" | "history"
   >("home");
@@ -180,6 +181,40 @@ function DashboardPage() {
       setCollectionError(err.message || "Unable to remove collection item.");
     } finally {
       setRemovingCollectionIds((current) =>
+        current.filter((item) => item !== placeId),
+      );
+    }
+  };
+
+  const handleToggleVisitedCollection = async (
+    placeId: string,
+    visited: boolean,
+  ) => {
+    try {
+      setTogglingCollectionIds((current) =>
+        current.includes(placeId) ? current : [...current, placeId],
+      );
+      const response = await fetch(`/api/collections/${encodeURIComponent(placeId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ visited }),
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        collection?: CollectionListItem;
+        message?: string;
+      };
+      if (!response.ok || !payload.collection) {
+        throw new Error(payload.message || "Unable to update collection item.");
+      }
+      setCollections((current) =>
+        current.map((item) =>
+          item.placeId === placeId ? payload.collection || item : item,
+        ),
+      );
+    } catch (err: any) {
+      setCollectionError(err.message || "Unable to update collection item.");
+    } finally {
+      setTogglingCollectionIds((current) =>
         current.filter((item) => item !== placeId),
       );
     }
@@ -483,7 +518,9 @@ function DashboardPage() {
                 loading={collectionLoading}
                 error={collectionError}
                 onRemove={handleRemoveCollection}
+                onToggleVisited={handleToggleVisitedCollection}
                 removingPlaceIds={removingCollectionIds}
+                togglingPlaceIds={togglingCollectionIds}
                 emptyBody="Save places from Google Maps and they’ll stay ready here for your next group."
               />
             </div>
@@ -557,3 +594,4 @@ function DashboardPage() {
 }
 
 export default observer(DashboardPage);
+

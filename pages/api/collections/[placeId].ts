@@ -1,18 +1,26 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { removeCollectionPlaceForUser } from "../../../lib/collectionStore";
+import {
+  removeCollectionPlaceForUser,
+  updateCollectionVisitedForUser,
+} from "../../../lib/collectionStore";
 import { requireAuthenticatedUser } from "../../../lib/serverAuth";
 
 type ResponseBody = {
   success?: boolean;
+  collection?: import("../../../lib/authTypes").CollectionListItem;
   message?: string;
+};
+
+type RequestBody = {
+  visited?: boolean;
 };
 
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<ResponseBody>,
 ) {
-  if (req.method !== "DELETE") {
-    res.setHeader("Allow", "DELETE");
+  if (req.method !== "DELETE" && req.method !== "PATCH") {
+    res.setHeader("Allow", "DELETE, PATCH");
     return res.status(405).json({ message: "Method not allowed." });
   }
 
@@ -24,6 +32,21 @@ export default async function handler(
 
   try {
     const user = await requireAuthenticatedUser(req);
+    if (req.method === "PATCH") {
+      const visited = (req.body as RequestBody | undefined)?.visited;
+      if (typeof visited !== "boolean") {
+        return res.status(400).json({ message: "Missing visited state." });
+      }
+      const collection = await updateCollectionVisitedForUser({
+        userId: user.id,
+        placeId,
+        visited,
+      });
+      if (!collection) {
+        return res.status(404).json({ message: "Collection item not found." });
+      }
+      return res.status(200).json({ success: true, collection });
+    }
     const removed = await removeCollectionPlaceForUser({
       userId: user.id,
       placeId,

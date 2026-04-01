@@ -5,7 +5,12 @@ type Props = {
   loading: boolean;
   error: string | null;
   onRemove?: (placeId: string) => void | Promise<void>;
+  onToggleVisited?: (
+    placeId: string,
+    visited: boolean,
+  ) => void | Promise<void>;
   removingPlaceIds?: string[];
+  togglingPlaceIds?: string[];
   emptyTitle?: string;
   emptyBody?: string;
   variant?: "dashboard" | "entry";
@@ -23,7 +28,9 @@ export default function CollectionsList({
   loading,
   error,
   onRemove,
+  onToggleVisited,
   removingPlaceIds = [],
+  togglingPlaceIds = [],
   emptyTitle = "No saved places yet",
   emptyBody = "Places you save from Google Maps will show up here.",
   variant = "dashboard",
@@ -71,6 +78,7 @@ export default function CollectionsList({
       ) : null}
       {collections.map((item) => {
         const removing = removingPlaceIds.includes(item.placeId);
+        const toggling = togglingPlaceIds.includes(item.placeId);
         const imageUrl = item.photos?.[0] || null;
 
         return (
@@ -78,8 +86,16 @@ export default function CollectionsList({
             key={item.id}
             className={
               isEntry
-                ? "overflow-hidden rounded-[24px] border border-white/10 bg-[#141418]/90 backdrop-blur-sm"
-                : "overflow-hidden rounded-[18px] border border-white/10 bg-[#141418]"
+                ? `overflow-hidden rounded-[24px] border backdrop-blur-sm ${
+                    item.visited
+                      ? "border-[#00e5a0]/20 bg-[#101813]/90"
+                      : "border-white/10 bg-[#141418]/90"
+                  }`
+                : `overflow-hidden rounded-[18px] border ${
+                    item.visited
+                      ? "border-[#00e5a0]/20 bg-[#101813]"
+                      : "border-white/10 bg-[#141418]"
+                  }`
             }
           >
             <div className="flex">
@@ -100,6 +116,13 @@ export default function CollectionsList({
                 <div className="font-display text-[18px] font-bold tracking-[-0.03em] text-white">
                   {item.name}
                 </div>
+                {item.visited ? (
+                  <div className="mt-2">
+                    <span className="rounded-full border border-[#00e5a0]/30 bg-[#00e5a0]/10 px-2 py-1 text-[11px] font-semibold text-[#8ef5cb]">
+                      Visited
+                    </span>
+                  </div>
+                ) : null}
                 {item.address ? (
                   <div className="mt-1 text-sm text-[#8b8b9c]">{item.address}</div>
                 ) : null}
@@ -129,6 +152,28 @@ export default function CollectionsList({
                   >
                     View
                   </a>
+                  {onToggleVisited ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        void onToggleVisited(item.placeId, !item.visited)
+                      }
+                      disabled={toggling}
+                      className={`inline-flex rounded-full border px-4 py-2 text-xs font-semibold disabled:opacity-50 ${
+                        item.visited
+                          ? "border-[#00e5a0]/25 bg-[#00e5a0]/12 text-[#8ef5cb]"
+                          : "border-white/10 text-[#f0f0f5]"
+                      }`}
+                    >
+                      {toggling
+                        ? item.visited
+                          ? "Updating..."
+                          : "Updating..."
+                        : item.visited
+                          ? "Mark unvisited"
+                          : "Mark visited"}
+                    </button>
+                  ) : null}
                   {onRemove ? (
                     <button
                       type="button"

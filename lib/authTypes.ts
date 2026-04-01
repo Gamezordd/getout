@@ -76,6 +76,8 @@ export type CollectionListItem = {
   rating?: number | null;
   userRatingCount?: number | null;
   venueCategory?: VenueCategory | null;
+  visited: boolean;
+  visitedAt?: string | null;
   location: LatLng;
   createdAt: string;
 };

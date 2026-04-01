@@ -19,6 +19,7 @@ function CollectionsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [removingPlaceIds, setRemovingCollectionIds] = useState<string[]>([]);
+  const [togglingPlaceIds, setTogglingCollectionIds] = useState<string[]>([]);
   const [isImporting, setIsImporting] = useState(false);
   const [resolvedSharedUrl, setResolvedSharedUrl] = useState<string | null>(null);
 
@@ -171,6 +172,40 @@ function CollectionsPage() {
     }
   };
 
+  const handleToggleVisitedCollection = async (
+    placeId: string,
+    visited: boolean,
+  ) => {
+    try {
+      setTogglingCollectionIds((current) =>
+        current.includes(placeId) ? current : [...current, placeId],
+      );
+      const response = await fetch(`/api/collections/${encodeURIComponent(placeId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ visited }),
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        collection?: CollectionListItem;
+        message?: string;
+      };
+      if (!response.ok || !payload.collection) {
+        throw new Error(payload.message || "Unable to update collection item.");
+      }
+      setCollections((current) =>
+        current.map((item) =>
+          item.placeId === placeId ? payload.collection || item : item,
+        ),
+      );
+    } catch (err: any) {
+      setError(err.message || "Unable to update collection item.");
+    } finally {
+      setTogglingCollectionIds((current) =>
+        current.filter((item) => item !== placeId),
+      );
+    }
+  };
+
   if (!isNative || authStatus !== "signed_in") {
     return null;
   }
@@ -199,7 +234,9 @@ function CollectionsPage() {
           loading={loading}
           error={error}
           onRemove={handleRemoveCollection}
+          onToggleVisited={handleToggleVisitedCollection}
           removingPlaceIds={removingPlaceIds}
+          togglingPlaceIds={togglingPlaceIds}
           variant="entry"
         />
       </div>

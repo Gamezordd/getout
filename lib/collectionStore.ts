@@ -17,6 +17,7 @@ type CollectionRow = {
   rating: number | null;
   user_rating_count: number | null;
   venue_category: VenueCategory | null;
+  visited_at: string | null;
   location_json: LatLng;
   created_at: string;
 };
@@ -52,6 +53,8 @@ const mapCollection = (row: CollectionRow): CollectionListItem => ({
   rating: row.rating,
   userRatingCount: row.user_rating_count,
   venueCategory: row.venue_category,
+  visited: Boolean(row.visited_at),
+  visitedAt: row.visited_at,
   location: row.location_json,
   createdAt: row.created_at,
 });
@@ -92,6 +95,7 @@ export const ensureCollectionSchema = async () => {
           rating DOUBLE PRECISION,
           user_rating_count INTEGER,
           venue_category TEXT,
+          visited_at TIMESTAMPTZ,
           location_json JSONB NOT NULL,
           created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )
@@ -107,6 +111,10 @@ export const ensureCollectionSchema = async () => {
       await sql`
         ALTER TABLE user_collections
         ADD COLUMN IF NOT EXISTS user_rating_count INTEGER
+      `;
+      await sql`
+        ALTER TABLE user_collections
+        ADD COLUMN IF NOT EXISTS visited_at TIMESTAMPTZ
       `;
       await sql`
         CREATE UNIQUE INDEX IF NOT EXISTS user_collections_user_place_idx
@@ -144,6 +152,7 @@ export const listCollectionsForUser = async (
       rating,
       user_rating_count,
       venue_category,
+      visited_at,
       location_json,
       created_at
     FROM user_collections
@@ -167,7 +176,8 @@ export const listCollectionsForUsers = async (params: {
     userIds.map(async (userId) => {
       const collections = await listCollectionsForUser(userId);
       return collections.filter(
-        (item) => item.venueCategory === params.venueCategory,
+        (item) =>
+          item.venueCategory === params.venueCategory && !item.visited,
       );
     }),
   );
@@ -200,6 +210,7 @@ export const saveCollectionPlaceForUser = async ({
         rating,
         user_rating_count,
         venue_category,
+        visited_at,
         location_json
       )
       VALUES (
@@ -235,6 +246,7 @@ export const saveCollectionPlaceForUser = async ({
         rating,
         user_rating_count,
         venue_category,
+        visited_at,
         location_json,
         created_at
     )
@@ -253,6 +265,7 @@ export const saveCollectionPlaceForUser = async ({
       rating,
       user_rating_count,
       venue_category,
+      visited_at,
       location_json,
       created_at
     FROM user_collections
@@ -267,6 +280,44 @@ export const saveCollectionPlaceForUser = async ({
   }
 
   await bumpCollectionVersion(userId);
+  return mapCollection(rows[0]);
+};
+
+export const updateCollectionVisitedForUser = async (params: {
+  userId: string;
+  placeId: string;
+  visited: boolean;
+}): Promise<CollectionListItem | null> => {
+  await ensureCollectionSchema();
+  const sql = getSql();
+  const rows = (await sql`
+    UPDATE user_collections
+    SET visited_at = ${params.visited ? new Date().toISOString() : null}
+    WHERE user_id = ${params.userId}
+      AND place_id = ${params.placeId}
+    RETURNING
+      id,
+      user_id,
+      place_id,
+      name,
+      address,
+      area,
+      price_label,
+      closing_time_label,
+      photos_json,
+      rating,
+      user_rating_count,
+      venue_category,
+      visited_at,
+      location_json,
+      created_at
+  `) as CollectionRow[];
+
+  if (!rows[0]) {
+    return null;
+  }
+
+  await bumpCollectionVersion(params.userId);
   return mapCollection(rows[0]);
 };
 
