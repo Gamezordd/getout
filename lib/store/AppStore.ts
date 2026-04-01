@@ -1,4 +1,5 @@
 import { makeAutoObservable, runInAction } from "mobx";
+import type { SuggestionsStatus } from "../groupStore";
 import type {
   EtaMatrix,
   LatLng,
@@ -30,6 +31,7 @@ type GroupPayload = {
   votes?: VotesByVenue;
   votingClosesAt?: string | null;
   venueCategory?: VenueCategory | null;
+  suggestionsStatus?: SuggestionsStatus;
   lockedVenue?: LockedVenue | null;
   currentUserId?: string;
   isOwner?: boolean;
@@ -43,6 +45,7 @@ type SuggestionsPayload = {
   votes?: VotesByVenue;
   votingClosesAt?: string | null;
   warning?: string;
+  suggestionsStatus?: SuggestionsStatus;
 };
 
 const generateSessionId = () => {
@@ -76,6 +79,7 @@ export class AppStore {
   votingClosesAt: string | null = null;
   venueCategory: VenueCategory | null = null;
   lockedVenue: LockedVenue | null = null;
+  suggestionsStatus: SuggestionsStatus = "idle";
   selectedVenueId: string | null = null;
   groupError: string | null = null;
   copyStatus: string | null = null;
@@ -205,6 +209,7 @@ export class AppStore {
       this.venueCategory = null;
       this.votingClosesAt = null;
       this.lockedVenue = null;
+      this.suggestionsStatus = "idle";
       this.currentUserId = null;
       this.isOwner = false;
       this.identityResolved = false;
@@ -254,6 +259,7 @@ export class AppStore {
         this.reconcileVotes(data.votes || {});
         this.votingClosesAt = data.votingClosesAt || null;
         this.venueCategory = data.venueCategory || null;
+        this.suggestionsStatus = data.suggestionsStatus || "idle";
         this.lockedVenue = data.lockedVenue || null;
         this.currentUserId = data.currentUserId || null;
         this.isOwner = Boolean(data.isOwner);
@@ -275,6 +281,7 @@ export class AppStore {
       this.suggestedVenues = [];
       this.totalsByVenue = {};
       this.etaMatrix = {};
+      this.suggestionsStatus = "idle";
       return;
     }
 
@@ -307,6 +314,7 @@ export class AppStore {
         this.reconcileVotes(data.votes || {});
         this.votingClosesAt = data.votingClosesAt || null;
         this.suggestionWarning = data.warning || null;
+        this.suggestionsStatus = data.suggestionsStatus || "ready";
         this.isLoadingSuggestions = false;
         const hasSelected =
           this.selectedVenueId &&
@@ -332,6 +340,7 @@ export class AppStore {
     } catch (err: any) {
       runInAction(() => {
         this.etaError = err.message || "Unable to calculate ETAs.";
+        this.suggestionsStatus = "error";
         this.isLoadingSuggestions = false;
       });
     }
@@ -564,6 +573,7 @@ export class AppStore {
       this.reconcileVotes(data.votes || {});
       this.votingClosesAt = data.votingClosesAt || null;
       this.venueCategory = data.venueCategory || null;
+      this.suggestionsStatus = data.suggestionsStatus || "idle";
       this.lockedVenue = data.lockedVenue || null;
       this.currentUserId = data.currentUserId || null;
       this.isOwner = Boolean(data.isOwner);
@@ -709,5 +719,10 @@ ${url.toString()}`;
   }
 
 }
+
+
+
+
+
 
 

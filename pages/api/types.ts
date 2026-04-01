@@ -8,6 +8,7 @@ import {
   VenueCategory,
   VotesByVenue,
 } from "../../lib/types";
+import type { SuggestionsStatus } from "../../lib/groupStore";
 
 export type SuggestionsResponse = {
   venues: Venue[];
@@ -17,12 +18,17 @@ export type SuggestionsResponse = {
   votes: VotesByVenue;
   votingClosesAt?: string | null;
   warning?: string;
+  suggestionsStatus?: SuggestionsStatus;
 };
 
 export type CacheEntry = {
   timestamp: number;
   payload: Omit<SuggestionsResponse, "votes">;
   seenVenueIds: string[];
+};
+
+export type SuggestionsCandidateCacheEntry = {
+  venues: Venue[];
 };
 
 export interface DistanceMatrixElement {
@@ -118,6 +124,7 @@ export type GroupResponse = {
   votes: VotesByVenue;
   votingClosesAt?: string | null;
   venueCategory: VenueCategory | null;
+  suggestionsStatus?: SuggestionsStatus;
   lockedVenue: LockedVenue | null;
   currentUserId?: string;
   isOwner?: boolean;

@@ -1,4 +1,10 @@
 import type { NextApiRequest, NextApiResponse } from "next";
+import { createHash } from "crypto";
+import {
+  getCollectionVersionTokens,
+  listCollectionsForUsers,
+} from "../../lib/collectionStore";
+import { redis } from "../../lib/redis";
 import type {
   EtaMatrix,
   LatLng,
@@ -13,11 +19,17 @@ import {
 import {
   GroupPayload,
   SuggestionsSnapshot,
+  SuggestionsStatus,
   createEmptySuggestionsSnapshot,
   findGroup,
   saveGroup,
 } from "../../lib/groupStore";
-import { CacheEntry, DistanceMatrixRow, SuggestionsResponse } from "./types";
+import {
+  CacheEntry,
+  DistanceMatrixRow,
+  SuggestionsCandidateCacheEntry,
+  SuggestionsResponse,
+} from "./types";
 import {
   CACHE_TTL_MS,
   MAX_FETCH_ATTEMPTS,
@@ -27,8 +39,6 @@ import {
 } from "./constants";
 import { safeTrigger } from "./utils";
 import { ensureVotingDeadlineState } from "./venue-lock";
-
-const suggestionsCache = new Map<string, CacheEntry>();
 
 type SuggestionsPayload = Omit<SuggestionsResponse, "votes">;
 
@@ -63,19 +73,12 @@ const computeCentroid = (points: LatLng[]): LatLng => {
 };
 
 const buildCacheKey = (
-  sessionId: string,
-  points: LatLng[],
-  manualVenues: Venue[],
-) => {
-  const coords = points
-    .map((point) => `${point.lat.toFixed(5)},${point.lng.toFixed(5)}`)
-    .join("|");
-  const manual = manualVenues
-    .map((venue) => venue.id)
-    .sort()
-    .join(",");
-  return `${sessionId}:${coords}:${manual}`;
-};
+  value: unknown,
+) =>
+  createHash("sha1").update(JSON.stringify(value)).digest("hex");
+
+const buildRedisKey = (prefix: string, fingerprint: string) =>
+  `${prefix}:${fingerprint}`;
 
 const dedupeVenues = (venues: Venue[]) => {
   const seen = new Set<string>();
@@ -159,21 +162,70 @@ const buildPayloadFromGroup = (group: GroupPayload): SuggestionsPayload => ({
   totalsByVenue: group.suggestions?.totalsByVenue || {},
   votingClosesAt: group.votingClosesAt,
   warning: group.suggestions?.warning,
+  suggestionsStatus: group.suggestionsStatus,
 });
 
-const refreshSuggestionsCache = (sessionId: string, group: GroupPayload) => {
-  const payload = buildPayloadFromGroup(group);
-  suggestionsCache.set(
-    buildCacheKey(
-      sessionId,
-      group.users.map((user) => user.location),
-      group.manualVenues,
+const CACHE_TTL_SECONDS = Math.max(60, Math.round(CACHE_TTL_MS / 1000));
+const FINAL_SUGGESTIONS_CACHE_PREFIX = "suggestions:final";
+const COLLECTION_SUGGESTIONS_CACHE_PREFIX = "suggestions:collections";
+const GOOGLE_SUGGESTIONS_CACHE_PREFIX = "suggestions:google";
+const SUGGESTION_LOCK_PREFIX = "suggestions:lock";
+const SUGGESTION_LOCK_TTL_SECONDS = 45;
+
+const readRedisCache = async <T>(key: string) => redis.get<T>(key);
+
+const writeRedisCache = async (key: string, value: unknown) => {
+  await redis.set(key, value, { ex: CACHE_TTL_SECONDS });
+};
+
+const buildGroupFingerprint = async (
+  sessionId: string,
+  group: GroupPayload,
+  options: RecomputeOptions,
+) => {
+  const collectionUserIds = Array.from(
+    new Set(
+      group.users
+        .map((user) => user.authenticatedUserId)
+        .filter((value): value is string => Boolean(value)),
     ),
+  ).sort();
+  const collectionVersions = await getCollectionVersionTokens(collectionUserIds);
+  return {
+    sessionId,
+    options,
+    category: group.venueCategory || "bar",
+    userLocations: group.users.map((user) => ({
+      id: user.id,
+      lat: Number(user.location.lat.toFixed(5)),
+      lng: Number(user.location.lng.toFixed(5)),
+      authenticatedUserId: user.authenticatedUserId || null,
+    })),
+    manualVenueIds: (group.manualVenues || []).map((venue) => venue.id).sort(),
+    suggestedVenueIds: (group.suggestions?.suggestedVenues || [])
+      .map((venue) => venue.id)
+      .sort(),
+    seenVenueIds: [...(group.suggestions?.seenVenueIds || [])].sort(),
+    collectionVersions,
+  };
+};
+
+const refreshSuggestionsCache = async (
+  sessionId: string,
+  group: GroupPayload,
+  options: RecomputeOptions = { rotateSuggestions: false },
+) => {
+  const payload = buildPayloadFromGroup(group);
+  const fingerprint = buildCacheKey(
+    await buildGroupFingerprint(sessionId, group, options),
+  );
+  await writeRedisCache(
+    buildRedisKey(FINAL_SUGGESTIONS_CACHE_PREFIX, fingerprint),
     {
       timestamp: Date.now(),
       payload,
       seenVenueIds: group.suggestions.seenVenueIds,
-    },
+    } satisfies CacheEntry,
   );
   return payload;
 };
@@ -182,6 +234,7 @@ const persistSuggestionsSnapshot = async (
   sessionId: string,
   group: GroupPayload,
   snapshot: SuggestionsSnapshot,
+  status: SuggestionsStatus = "ready",
 ) => {
   group.suggestions = {
     suggestedVenues: snapshot.suggestedVenues || [],
@@ -190,15 +243,42 @@ const persistSuggestionsSnapshot = async (
     warning: snapshot.warning,
     seenVenueIds: snapshot.seenVenueIds || [],
   };
+  group.suggestionsStatus = status;
   group.venues = group.suggestions.suggestedVenues;
   await saveGroup(sessionId, group);
-  return refreshSuggestionsCache(sessionId, group);
+  return refreshSuggestionsCache(sessionId, group, {
+    rotateSuggestions: false,
+  });
 };
 
 const hydrateSuggestionsFromGroup = async (
   sessionId: string,
   group: GroupPayload,
-) => refreshSuggestionsCache(sessionId, group);
+) => refreshSuggestionsCache(sessionId, group, {
+  rotateSuggestions: false,
+});
+
+const setSuggestionsStatus = async (
+  sessionId: string,
+  group: GroupPayload,
+  status: SuggestionsStatus,
+) => {
+  group.suggestionsStatus = status;
+  await saveGroup(sessionId, group);
+};
+
+const tryAcquireSuggestionLock = async (sessionId: string) => {
+  const result = await redis.set(
+    `${SUGGESTION_LOCK_PREFIX}:${sessionId}`,
+    Date.now().toString(),
+    { nx: true, ex: SUGGESTION_LOCK_TTL_SECONDS },
+  );
+  return result === "OK";
+};
+
+const releaseSuggestionLock = async (sessionId: string) => {
+  await redis.del(`${SUGGESTION_LOCK_PREFIX}:${sessionId}`);
+};
 
 const getGoogleMapsApiKey = () => {
   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
@@ -360,6 +440,114 @@ const scoreVenues = (
       return scoreB - scoreA;
     });
 
+const getCollectionCandidates = async (params: {
+  userIds: string[];
+  venueCategory: VenueCategory;
+  excludedVenueIds: Set<string>;
+}) => {
+  const collectionVersions = await getCollectionVersionTokens(params.userIds);
+  const fingerprint = buildCacheKey({
+    userIds: [...params.userIds].sort(),
+    venueCategory: params.venueCategory,
+    versions: collectionVersions,
+  });
+  const redisKey = buildRedisKey(COLLECTION_SUGGESTIONS_CACHE_PREFIX, fingerprint);
+  const cached = await readRedisCache<SuggestionsCandidateCacheEntry>(redisKey);
+  const venues = cached?.venues || [];
+
+  if (cached?.venues) {
+    return dedupeVenues(
+      cached.venues.filter((venue) => !params.excludedVenueIds.has(venue.id)),
+    );
+  }
+
+  const collections = await listCollectionsForUsers({
+    userIds: params.userIds,
+    venueCategory: params.venueCategory,
+  });
+  const mappedVenues = dedupeVenues(
+    collections.map<Venue>((item) => ({
+      id: item.placeId,
+      name: item.name,
+      address: item.address || undefined,
+      area: item.area || undefined,
+      priceLabel: item.priceLabel || undefined,
+      closingTimeLabel: item.closingTimeLabel || undefined,
+      photos: item.photos || [],
+      venueCategory: item.venueCategory || undefined,
+      location: item.location,
+    })),
+  );
+  await writeRedisCache(redisKey, { venues: mappedVenues } satisfies SuggestionsCandidateCacheEntry);
+  return mappedVenues.filter((venue) => !params.excludedVenueIds.has(venue.id));
+};
+
+const getGoogleCandidates = async (params: {
+  centroid: LatLng;
+  apiKey: string;
+  venueCategory: VenueCategory;
+  excludedVenueIds: Set<string>;
+  limit: number;
+  isRelevantPlace: (name: string) => boolean;
+}) => {
+  const fingerprint = buildCacheKey({
+    centroid: {
+      lat: Number(params.centroid.lat.toFixed(4)),
+      lng: Number(params.centroid.lng.toFixed(4)),
+    },
+    venueCategory: params.venueCategory,
+    excludedVenueIds: Array.from(params.excludedVenueIds).sort(),
+  });
+  const redisKey = buildRedisKey(GOOGLE_SUGGESTIONS_CACHE_PREFIX, fingerprint);
+  const cached = await readRedisCache<SuggestionsCandidateCacheEntry>(redisKey);
+  if (cached?.venues) {
+    return cached.venues.slice(0, params.limit);
+  }
+
+  const candidates: Venue[] = [];
+  let attempts = 0;
+  let radiusIndex = 0;
+  let pageToken: string | undefined;
+
+  while (candidates.length < params.limit && attempts < MAX_FETCH_ATTEMPTS) {
+    const radiusMeters =
+      RADIUS_OPTIONS_METERS[radiusIndex] ??
+      RADIUS_OPTIONS_METERS[RADIUS_OPTIONS_METERS.length - 1];
+    const result = await fetchTopPlaces(
+      params.centroid,
+      params.apiKey,
+      params.venueCategory,
+      radiusMeters,
+      pageToken,
+    );
+    const filtered = result.venues
+      .filter((venue) => params.isRelevantPlace(venue.name))
+      .filter((venue) => !params.excludedVenueIds.has(venue.id));
+
+    filtered.forEach((venue) => {
+      if (!candidates.find((item) => item.id === venue.id)) {
+        candidates.push(venue);
+      }
+    });
+
+    if (candidates.length >= params.limit) break;
+
+    if (result.nextPageToken) {
+      pageToken = result.nextPageToken;
+    } else {
+      radiusIndex += 1;
+      pageToken = undefined;
+    }
+
+    attempts += 1;
+  }
+
+  await writeRedisCache(redisKey, {
+    venues: candidates,
+  } satisfies SuggestionsCandidateCacheEntry);
+  return candidates;
+};
+
 const buildEtaData = (
   users: GroupPayload["users"],
   venues: Venue[],
@@ -403,11 +591,12 @@ export const recomputeSuggestionsForGroup = async (
     return persistSuggestionsSnapshot(sessionId, group, {
       ...createEmptySuggestionsSnapshot(),
       seenVenueIds: Array.from(seenVenueIds),
-    });
+    }, "ready");
   }
 
   const apiKey = getGoogleMapsApiKey();
   const excludedVenueIds = new Set<string>();
+  (group.manualVenues || []).forEach((venue) => excludedVenueIds.add(venue.id));
   if (options.rotateSuggestions) {
     (group.suggestions.seenVenueIds || []).forEach((id) => excludedVenueIds.add(id));
     (group.suggestions.suggestedVenues || []).forEach((venue) =>
@@ -423,46 +612,35 @@ export const recomputeSuggestionsForGroup = async (
     return !negativeKeywords.some((keyword) => normalized.includes(keyword));
   };
 
-  const candidates: Venue[] = [];
-  let attempts = 0;
-  let radiusIndex = 0;
-  let pageToken: string | undefined;
+  const collectionUserIds = Array.from(
+    new Set(
+      group.users
+        .map((user) => user.authenticatedUserId)
+        .filter((value): value is string => Boolean(value)),
+    ),
+  );
 
-  while (
-    candidates.length < TARGET_SUGGESTION_COUNT &&
-    attempts < MAX_FETCH_ATTEMPTS
-  ) {
-    const radiusMeters =
-      RADIUS_OPTIONS_METERS[radiusIndex] ??
-      RADIUS_OPTIONS_METERS[RADIUS_OPTIONS_METERS.length - 1];
-    const result = await fetchTopPlaces(
-      centroid,
-      apiKey,
-      category,
-      radiusMeters,
-      pageToken,
-    );
-    const filtered = result.venues
-      .filter((venue) => isRelevantPlace(venue.name))
-      .filter((venue) => !excludedVenueIds.has(venue.id));
+  const collectionCandidates = await getCollectionCandidates({
+    userIds: collectionUserIds,
+    venueCategory: category,
+    excludedVenueIds,
+  });
 
-    filtered.forEach((venue) => {
-      if (!candidates.find((item) => item.id === venue.id)) {
-        candidates.push(venue);
-      }
-    });
+  collectionCandidates.forEach((venue) => excludedVenueIds.add(venue.id));
 
-    if (candidates.length >= TARGET_SUGGESTION_COUNT) break;
+  const googleCandidates = await getGoogleCandidates({
+    centroid,
+    apiKey,
+    venueCategory: category,
+    excludedVenueIds,
+    limit: TARGET_SUGGESTION_COUNT,
+    isRelevantPlace,
+  });
 
-    if (result.nextPageToken) {
-      pageToken = result.nextPageToken;
-    } else {
-      radiusIndex += 1;
-      pageToken = undefined;
-    }
-
-    attempts += 1;
-  }
+  const candidates = dedupeVenues([
+    ...collectionCandidates,
+    ...googleCandidates,
+  ]).slice(0, TARGET_SUGGESTION_COUNT);
 
   const manualVenues = group.manualVenues || [];
   const combinedDestinations = dedupeVenues([...manualVenues, ...candidates]);
@@ -475,9 +653,9 @@ export const recomputeSuggestionsForGroup = async (
       warning:
         options.rotateSuggestions && excludedVenueIds.size > 0
           ? "No new suggestions available right now."
-          : "No places matched the rating and review filters.",
+          : "No places matched the collection or Google Places filters.",
       seenVenueIds: Array.from(seenVenueIds),
-    });
+    }, "ready");
   }
 
   const rows = await fetchDriveTimes(
@@ -510,7 +688,7 @@ export const recomputeSuggestionsForGroup = async (
         ? "No new suggestions available right now."
         : undefined,
     seenVenueIds: Array.from(seenVenueIds),
-  });
+  }, "ready");
 };
 
 export const syncManualVenueMetricsForGroup = async (
@@ -561,7 +739,7 @@ export const syncManualVenueMetricsForGroup = async (
     totalsByVenue,
     warning: snapshot.warning,
     seenVenueIds: snapshot.seenVenueIds || [],
-  });
+  }, group.suggestionsStatus === "error" ? "error" : "ready");
 };
 
 export default async function handler(
@@ -597,20 +775,34 @@ export default async function handler(
     });
   }
 
-  const cacheKey = buildCacheKey(
-    sessionId,
-    group.users.map((user) => user.location),
-    group.manualVenues,
-  );
-  const cached = suggestionsCache.get(cacheKey);
-  if (cached && !refresh && Date.now() - cached.timestamp < CACHE_TTL_MS) {
-    return res.status(200).json(
-      buildSuggestionsResponse(cached.payload, group.votes || {}),
-    );
-  }
-
   try {
     let payload: SuggestionsPayload;
+    const snapshotPrepared =
+      (group.suggestions?.suggestedVenues || []).length > 0 ||
+      Boolean(group.suggestions?.warning) ||
+      (group.suggestions?.seenVenueIds || []).length > 0;
+    const shouldGenerateInitialSuggestions =
+      !refresh &&
+      (!snapshotPrepared ||
+        group.suggestionsStatus === "pending" ||
+        group.suggestionsStatus === "generating");
+
+    const fingerprint = buildCacheKey(
+      await buildGroupFingerprint(sessionId, group, {
+        rotateSuggestions: refresh,
+        clearVotes: refresh,
+      }),
+    );
+    const cached = !refresh
+      ? await readRedisCache<CacheEntry>(
+          buildRedisKey(FINAL_SUGGESTIONS_CACHE_PREFIX, fingerprint),
+        )
+      : null;
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+      return res.status(200).json(
+        buildSuggestionsResponse(cached.payload, group.votes || {}),
+      );
+    }
 
     if (refresh) {
       const actingMember = browserId
@@ -619,14 +811,42 @@ export default async function handler(
       if (!actingMember?.isOwner) {
         return res.status(403).json({ message: "Only organizers can refresh." });
       }
-      payload = await recomputeSuggestionsForGroup(sessionId, group, {
-        rotateSuggestions: true,
-        clearVotes: true,
-      });
+      await setSuggestionsStatus(sessionId, group, "generating");
+      try {
+        payload = await recomputeSuggestionsForGroup(sessionId, group, {
+          rotateSuggestions: true,
+          clearVotes: true,
+        });
+      } catch (error) {
+        await setSuggestionsStatus(sessionId, group, "error");
+        throw error;
+      }
       const channel = `private-group-${sessionId}`;
       await safeTrigger(channel, "group-updated", {
         reason: "suggestions-refreshed",
       });
+    } else if (shouldGenerateInitialSuggestions) {
+      const lockAcquired = await tryAcquireSuggestionLock(sessionId);
+      if (!lockAcquired) {
+        group.suggestionsStatus = "generating";
+        payload = buildPayloadFromGroup(group);
+      } else {
+        await setSuggestionsStatus(sessionId, group, "generating");
+        try {
+          payload = await recomputeSuggestionsForGroup(sessionId, group, {
+            rotateSuggestions: false,
+          });
+          const channel = `private-group-${sessionId}`;
+          await safeTrigger(channel, "group-updated", {
+            reason: "suggestions-ready",
+          });
+        } catch (error) {
+          await setSuggestionsStatus(sessionId, group, "error");
+          throw error;
+        } finally {
+          await releaseSuggestionLock(sessionId);
+        }
+      }
     } else {
       payload = await hydrateSuggestionsFromGroup(sessionId, group);
     }

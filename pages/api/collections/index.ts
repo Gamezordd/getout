@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
+import type { VenueCategory } from "../../../lib/types";
 import type { CollectionListItem } from "../../../lib/authTypes";
 import {
   listCollectionsForUser,
@@ -15,6 +16,7 @@ type RequestBody = {
     priceLabel?: string;
     closingTimeLabel?: string;
     photos?: string[];
+    venueCategory?: VenueCategory;
     location?: {
       lat?: number;
       lng?: number;
@@ -56,7 +58,12 @@ export default async function handler(
   }
 
   const place = (req.body as RequestBody)?.place;
-  if (!place?.id?.trim() || !place?.name?.trim() || !isValidLocation(place)) {
+  if (
+    !place?.id?.trim() ||
+    !place?.name?.trim() ||
+    !isValidLocation(place) ||
+    !place.venueCategory
+  ) {
     return res.status(400).json({ message: "Missing collection place details." });
   }
 
@@ -74,6 +81,7 @@ export default async function handler(
         photos: Array.isArray(place.photos)
           ? place.photos.filter((photo): photo is string => typeof photo === "string")
           : [],
+        venueCategory: place.venueCategory,
         location: {
           lat: place.location!.lat!,
           lng: place.location!.lng!,

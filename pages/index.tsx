@@ -110,10 +110,7 @@ function HomePage() {
   }, [store.currentUserId, store.sessionId]);
 
   useEffect(() => {
-    const timeout = setTimeout(() => {
-      store.fetchSuggestions();
-    }, 400);
-    return () => clearTimeout(timeout);
+    void store.fetchSuggestions();
   }, [store, store.sessionId, store.users.length, store.manualVenues.length]);
 
   const handleVote = useCallback(
@@ -237,6 +234,11 @@ function HomePage() {
   const leadingVoteCount = leadingVenue
     ? store.votes?.[leadingVenue.id]?.length || 0
     : 0;
+  const showSuggestionSkeletons =
+    !store.isLoadingGroup &&
+    (store.isLoadingSuggestions ||
+      store.suggestionsStatus === "pending" ||
+      store.suggestionsStatus === "generating");
 
   if (!startupResolved) {
     return <AuthResolvingScreen />;
@@ -315,28 +317,15 @@ function HomePage() {
           </div>
         )}
         <section className="mt-4 space-y-4">
-          {(store.isLoadingGroup || (store.isLoadingSuggestions && store.venues.length === 0)) && (
+          {store.isLoadingGroup && (
             <Loader
               variant="dark"
-              title={store.isLoadingGroup ? "Loading group..." : "Syncing..."}
-              description={
-                store.isLoadingGroup
-                  ? "Fetching members, votes, and venues."
-                  : "Pulling the latest votes and venue data."
-              }
+              title="Loading group..."
+              description="Fetching members, votes, and venues."
             />
           )}
 
-          {!store.isLoadingGroup && store.isLoadingSuggestions && store.venues.length > 0 && (
-            <Loader
-              variant="dark"
-              title="Syncing..."
-              description="Refreshing votes and venue rankings without replacing your current view."
-              className="rounded-[20px] px-4 py-4"
-            />
-          )}
-
-          {store.venues.length > 0 && (
+          {(!store.isLoadingGroup && (showSuggestionSkeletons || store.venues.length > 0)) && (
             <PlaceList
               suggestedVenues={store.suggestedVenues}
               manualVenues={store.manualVenues}
@@ -352,6 +341,7 @@ function HomePage() {
               showRefreshAction={store.isCurrentUserOrganizer}
               isRefreshing={store.isLoadingSuggestions}
               onRefresh={handleRefreshSuggestions}
+              loadingState={showSuggestionSkeletons ? "skeleton" : "idle"}
             />
           )}
         </section>

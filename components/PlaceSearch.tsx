@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { LatLng } from "../lib/types";
+import type { LatLng, VenueCategory } from "../lib/types";
 
 export type PlaceResult = {
   id: string;
@@ -9,6 +9,7 @@ export type PlaceResult = {
   priceLabel?: string;
   closingTimeLabel?: string;
   photos?: string[];
+  venueCategory?: VenueCategory;
   location: LatLng;
 };
 

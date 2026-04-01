@@ -19,7 +19,78 @@ type Props = {
   showRefreshAction?: boolean;
   isRefreshing?: boolean;
   onRefresh?: () => void;
+  loadingState?: "idle" | "skeleton";
 };
+
+const SKELETON_COUNT = 6;
+
+function SuggestionCardSkeleton({ index }: { index: number }) {
+  return (
+    <article className="overflow-hidden rounded-[24px] border border-white/10 bg-[#141418] shadow-[0_18px_40px_rgba(0,0,0,0.22)]">
+      <div className="relative h-[212px] overflow-hidden rounded-[24px] bg-[linear-gradient(135deg,#17171d,#20202a,#17171d)] animate-pulse">
+        <div className="absolute left-4 top-4 h-9 w-9 rounded-xl bg-white/10" />
+        <div className="absolute right-4 top-4 h-6 w-20 rounded-full bg-white/10" />
+        <div className="absolute inset-x-0 bottom-0 px-4 pb-4 pt-10">
+          <div className="h-6 w-40 rounded-full bg-white/10" />
+          <div className="mt-3 flex gap-2">
+            <div className="h-3 w-20 rounded-full bg-white/10" />
+            <div className="h-3 w-16 rounded-full bg-white/10" />
+          </div>
+        </div>
+      </div>
+
+      <div className="flex gap-2 overflow-hidden px-4 pb-1 pt-3">
+        {Array.from({ length: 4 }).map((_, photoIndex) => (
+          <div
+            key={`skeleton-photo-${index}-${photoIndex}`}
+            className="h-12 w-16 shrink-0 rounded-2xl bg-[linear-gradient(135deg,#1b1b22,#262633,#1b1b22)] animate-pulse"
+          />
+        ))}
+      </div>
+
+      <div className="mx-4 rounded-[18px] bg-[#1c1c22] px-4 py-3">
+        <div className="mb-3 flex items-center justify-between">
+          <div className="h-3 w-24 rounded-full bg-white/10 animate-pulse" />
+          <div className="h-5 w-16 rounded-full bg-white/10 animate-pulse" />
+        </div>
+        <div className="space-y-2.5">
+          {Array.from({ length: 3 }).map((_, rowIndex) => (
+            <div
+              key={`skeleton-eta-${index}-${rowIndex}`}
+              className="flex items-center gap-2.5"
+            >
+              <div className="h-5 w-5 rounded-full bg-white/10 animate-pulse" />
+              <div className="h-3 flex-1 rounded-full bg-white/10 animate-pulse" />
+              <div className="h-1.5 flex-1 rounded-full bg-white/10 animate-pulse" />
+              <div className="h-3 w-10 rounded-full bg-white/10 animate-pulse" />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="px-4 pt-3 text-sm text-[#8b8b9c]">
+        <div className="flex flex-wrap gap-2">
+          <div className="h-3 w-24 rounded-full bg-white/10 animate-pulse" />
+          <div className="h-3 w-[4.5rem] rounded-full bg-white/10 animate-pulse" />
+          <div className="h-3 w-28 rounded-full bg-white/10 animate-pulse" />
+        </div>
+      </div>
+
+      <div className="mx-4 mt-3 h-px bg-white/10" />
+
+      <div className="px-4 pb-4 pt-3">
+        <div className="mb-3 h-1.5 rounded-full bg-white/10 animate-pulse" />
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="h-4 w-20 rounded-full bg-white/10 animate-pulse" />
+            <div className="mt-2 h-3 w-32 rounded-full bg-white/10 animate-pulse" />
+          </div>
+          <div className="h-10 w-24 rounded-full bg-white/10 animate-pulse" />
+        </div>
+      </div>
+    </article>
+  );
+}
 
 const formatVoterNames = (names: string[], maxVisible = 3) => {
   if (names.length === 0) return "";
@@ -44,6 +115,7 @@ export default function PlaceList({
   showRefreshAction = false,
   isRefreshing = false,
   onRefresh,
+  loadingState = "idle",
 }: Props) {
   const { mergedVenues: rankedVenues, suggestedRankById } = useMemo(
     () => mergeVenues(suggestedVenues, manualVenues),
@@ -116,6 +188,42 @@ export default function PlaceList({
     });
     return map;
   }, [rankedVenues, userById]);
+
+  if (loadingState === "skeleton") {
+    return (
+      <div className="flex flex-col gap-4">
+        {Array.from({ length: SKELETON_COUNT }).map((_, index) => (
+          <SuggestionCardSkeleton key={`suggestion-skeleton-${index}`} index={index} />
+        ))}
+        {showRefreshAction && (
+          <button
+            type="button"
+            disabled
+            className="flex items-center justify-between rounded-[24px] border border-white/10 bg-[#141418] px-5 py-4 text-left opacity-60"
+          >
+            <div>
+              <p className="font-display text-base font-bold tracking-[-0.02em] text-[#f0f0f5]">
+                Refresh suggestions
+              </p>
+              <p className="mt-1 text-sm text-[#7d7d90]">
+                Regenerating the ranked list.
+              </p>
+            </div>
+            <span className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-[#1c1c22] text-[#00e5a0]">
+              <svg
+                viewBox="0 0 22 22"
+                fill="currentColor"
+                aria-hidden="true"
+                className="h-5 w-5 animate-spin [animation-direction:reverse]"
+              >
+                <path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8m0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4z" />
+              </svg>
+            </span>
+          </button>
+        )}
+      </div>
+    );
+  }
 
   if (rankedVenues.length === 0) {
     return (

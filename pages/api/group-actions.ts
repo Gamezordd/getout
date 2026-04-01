@@ -159,13 +159,8 @@ export const groupActions = (
       userId: user.id,
       isOwner,
     });
-    if (shouldRecomputeSuggestions) {
-      await recomputeSuggestionsForGroup(payload.sessionId, group, {
-        rotateSuggestions: false,
-      });
-    } else {
-      await saveGroup(payload.sessionId, group);
-    }
+    group.suggestionsStatus = shouldRecomputeSuggestions ? "pending" : "ready";
+    await saveGroup(payload.sessionId, group);
     if (authenticatedUser) {
       await acceptInviteForSession({
         sessionId: payload.sessionId,

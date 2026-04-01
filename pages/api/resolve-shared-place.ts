@@ -1,9 +1,10 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import type { LatLng } from "../../lib/types";
+import type { LatLng, VenueCategory } from "../../lib/types";
 import {
   getClosingTimeLabel,
   getPriceLabel,
 } from "../../lib/placeVenueMetadata";
+import { resolveVenueCategoryFromGooglePlace } from "../../lib/placeCategory";
 
 type PlaceResult = {
   id: string;
@@ -13,6 +14,7 @@ type PlaceResult = {
   priceLabel?: string;
   closingTimeLabel?: string;
   photos?: string[];
+  venueCategory?: VenueCategory;
   location: LatLng;
 };
 
@@ -120,6 +122,7 @@ const mapPlaceToResult = async (apiKey: string, place: any) => {
     priceLabel: getPriceLabel(place.priceLevel),
     closingTimeLabel: getClosingTimeLabel(place.currentOpeningHours),
     photos: await resolvePhotoUrls(apiKey, place.photos),
+    venueCategory: resolveVenueCategoryFromGooglePlace(place),
     location: {
       lat: location.latitude,
       lng: location.longitude,
@@ -129,7 +132,7 @@ const mapPlaceToResult = async (apiKey: string, place: any) => {
 
 const fetchPlaceById = async (apiKey: string, placeId: string) => {
   const response = await fetch(
-    `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}?fields=id,displayName,formattedAddress,addressComponents,location,photos,priceLevel,currentOpeningHours&key=${encodeURIComponent(apiKey)}`,
+    `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}?fields=id,displayName,formattedAddress,addressComponents,location,photos,priceLevel,currentOpeningHours,primaryType,types&key=${encodeURIComponent(apiKey)}`,
   );
 
   if (!response.ok) {
@@ -147,7 +150,7 @@ const searchTextPlace = async (apiKey: string, query: string) => {
       "Content-Type": "application/json",
       "X-Goog-Api-Key": apiKey,
       "X-Goog-FieldMask":
-        "places.id,places.displayName,places.formattedAddress,places.addressComponents,places.location,places.photos,places.priceLevel,places.currentOpeningHours",
+        "places.id,places.displayName,places.formattedAddress,places.addressComponents,places.location,places.photos,places.priceLevel,places.currentOpeningHours,places.primaryType,places.types",
     },
     body: JSON.stringify({
       textQuery: query,

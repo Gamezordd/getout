@@ -24,6 +24,8 @@ type SuggestionsSnapshot = {
   seenVenueIds: string[];
 };
 
+type SuggestionsStatus = "idle" | "pending" | "generating" | "ready" | "error";
+
 type GroupPayload = {
   createdAt: string | null;
   users: User[];
@@ -36,6 +38,7 @@ type GroupPayload = {
   pushSubscriptions?: Record<string, PushSubscriptionJSON>;
   sessionMembers: SessionMember[];
   suggestions: SuggestionsSnapshot;
+  suggestionsStatus: SuggestionsStatus;
   venueCategory: VenueCategory | null;
   lockedVenue: LockedVenue | null;
 };
@@ -61,6 +64,7 @@ const createEmptyGroup = (): GroupPayload => ({
   pushSubscriptions: {},
   sessionMembers: [],
   suggestions: createEmptySuggestionsSnapshot(),
+  suggestionsStatus: "idle",
   venueCategory: null,
   lockedVenue: null,
 });
@@ -86,6 +90,15 @@ const hydrateGroup = async (sessionId: string, group: GroupPayload) => {
   if (!hydrated.pushSubscriptions) hydrated.pushSubscriptions = {};
   if (!Array.isArray(hydrated.sessionMembers)) hydrated.sessionMembers = [];
   if (typeof hydrated.createdAt !== "string") hydrated.createdAt = null;
+  if (
+    hydrated.suggestionsStatus !== "idle" &&
+    hydrated.suggestionsStatus !== "pending" &&
+    hydrated.suggestionsStatus !== "generating" &&
+    hydrated.suggestionsStatus !== "ready" &&
+    hydrated.suggestionsStatus !== "error"
+  ) {
+    hydrated.suggestionsStatus = "idle";
+  }
 
   const rawSuggestions = group.suggestions;
   hydrated.suggestions = {
@@ -159,4 +172,4 @@ const saveGroup = async (sessionId: string, group: GroupPayload) => {
 };
 
 export { createEmptySuggestionsSnapshot, createGroup, findGroup, saveGroup };
-export type { GroupPayload, SessionMember, SuggestionsSnapshot };
+export type { GroupPayload, SessionMember, SuggestionsSnapshot, SuggestionsStatus };

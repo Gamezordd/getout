@@ -1,4 +1,4 @@
-import type { LatLng } from "./types";
+import type { LatLng, VenueCategory } from "./types";
 
 export type AuthenticatedUser = {
   id: string;
@@ -73,6 +73,7 @@ export type CollectionListItem = {
   priceLabel?: string | null;
   closingTimeLabel?: string | null;
   photos?: string[];
+  venueCategory?: VenueCategory | null;
   location: LatLng;
   createdAt: string;
 };
