@@ -168,7 +168,7 @@ export default function LandingScreen({
                 ))}
               </div>
               <div className="text-[12px] text-[#5e5e74]">
-                <span className="font-medium text-white/70">2,400+</span> groups
+                <span className="font-medium text-white/70">10+</span> groups
                 decided this week
               </div>
             </div>
