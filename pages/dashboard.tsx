@@ -24,6 +24,8 @@ const getGreeting = () => {
   return "Good evening";
 };
 
+const HISTORY_SKELETON_COUNT = 4;
+
 function DashboardPage() {
   const router = useRouter();
   const { authStatus, authenticatedUser, isNative } = useAuth();
@@ -333,8 +335,51 @@ function DashboardPage() {
             {group.status === "picked" ? "Picked" : "Live"}
           </div>
         </div>
+        ) : null}
+      </button>
+    );
+
+  const renderGroupCardSkeleton = (compact = false, key?: string) => (
+    <div
+      key={key}
+      className={
+        compact
+          ? "mb-3 flex w-full items-center gap-3 border-b border-white/10 py-3 last:border-b-0"
+          : "mb-3 flex w-full overflow-hidden rounded-[18px] border border-white/10 bg-[#141418]"
+      }
+    >
+      <div
+        className={
+          compact
+            ? "h-11 w-11 shrink-0 rounded-xl bg-white/10"
+            : "h-20 w-20 shrink-0 bg-white/10"
+        }
+      />
+      <div className={compact ? "min-w-0 flex-1" : "min-w-0 flex-1 p-3"}>
+        <div className="h-4 w-32 rounded-full bg-white/12" />
+        <div className="mt-2 h-3 w-24 rounded-full bg-white/8" />
+        <div className={compact ? "mt-2 flex items-center gap-2" : "mt-3 flex items-center justify-between"}>
+          <div className="flex items-center gap-2">
+            <div className="flex">
+              {Array.from({ length: 3 }).map((_, index) => (
+                <div
+                  key={`${key ?? "group-card-skeleton"}-avatar-${index}`}
+                  className={`rounded-full border border-[#141418] bg-white/10 ${compact ? `h-4 w-4 ${index === 0 ? "" : "-ml-1"}` : `h-[18px] w-[18px] ${index === 0 ? "" : "-ml-[5px]"}`}`}
+                />
+              ))}
+            </div>
+            {compact ? <div className="h-3 w-16 rounded-full bg-white/8" /> : null}
+          </div>
+          {!compact ? <div className="h-6 w-16 rounded-md bg-white/10" /> : null}
+        </div>
+      </div>
+      {compact ? (
+        <div className="flex shrink-0 flex-col items-end gap-2">
+          <div className="h-3 w-12 rounded-full bg-white/8" />
+          <div className="h-5 w-12 rounded-md bg-white/10" />
+        </div>
       ) : null}
-    </button>
+    </div>
   );
 
   return (
@@ -429,16 +474,16 @@ function DashboardPage() {
                 See all →
               </button>
             </div>
-            <div className="px-5">
-              {loading ? (
-                <div className="rounded-[18px] border border-white/10 bg-[#141418] p-4 text-sm text-[#8b8b9c]">
-                  Loading recent groups...
-                </div>
-              ) : null}
-              {error ? (
-                <div className="rounded-[18px] border border-rose-500/20 bg-rose-500/10 p-4 text-sm text-rose-200">
-                  {error}
-                </div>
+              <div className="px-5">
+                {loading ? (
+                  Array.from({ length: 3 }).map((_, index) =>
+                    renderGroupCardSkeleton(true, `recent-skeleton-${index}`),
+                  )
+                ) : null}
+                {error ? (
+                  <div className="rounded-[18px] border border-rose-500/20 bg-rose-500/10 p-4 text-sm text-rose-200">
+                    {error}
+                  </div>
               ) : null}
               {!loading && !error && recentGroups.length === 0 ? (
                 <div className="rounded-[18px] border border-white/10 bg-[#141418] p-5 text-center">
@@ -466,13 +511,18 @@ function DashboardPage() {
                 </div>
               </div>
               {renderDashboardActions()}
-            </div>
-            <div className="px-5">
-              {!loading && recentGroups.length === 0 ? (
-                <div className="rounded-[18px] border border-white/10 bg-[#141418] p-6 text-center">
-                  <div className="text-4xl">🕘</div>
-                  <div className="mt-3 font-display text-lg font-bold tracking-[-0.02em] text-white">
-                    No session history yet
+              </div>
+              <div className="px-5">
+                {loading
+                  ? Array.from({ length: HISTORY_SKELETON_COUNT }).map((_, index) =>
+                      renderGroupCardSkeleton(false, `history-skeleton-${index}`),
+                    )
+                  : null}
+                {!loading && recentGroups.length === 0 ? (
+                  <div className="rounded-[18px] border border-white/10 bg-[#141418] p-6 text-center">
+                    <div className="text-4xl">🕘</div>
+                    <div className="mt-3 font-display text-lg font-bold tracking-[-0.02em] text-white">
+                      No session history yet
                   </div>
                   <div className="mt-2 text-sm text-[#5a5a70]">
                     Recent groups you belong to will show up here automatically.

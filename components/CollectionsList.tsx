@@ -27,6 +27,53 @@ const buildMapsUrl = (item: CollectionListItem) => {
 const formatRating = (rating?: number | null) =>
   typeof rating === "number" ? rating.toFixed(1) : null;
 
+function CollectionsCardSkeleton({ isEntry }: { isEntry: boolean }) {
+  return (
+    <div
+      className={
+        isEntry
+          ? "overflow-hidden rounded-[24px] border border-white/10 bg-[#141418]/90 backdrop-blur-sm"
+          : "overflow-hidden rounded-[20px] border border-white/10 bg-[#141418]"
+      }
+    >
+      <div className="relative h-[196px] overflow-hidden bg-[linear-gradient(135deg,#17171d,#20202a,#17171d)] animate-pulse">
+        <div className="absolute left-4 top-4 h-7 w-20 rounded-full bg-white/10" />
+        <div className="absolute right-4 top-4 h-7 w-20 rounded-full bg-white/10" />
+        <div className="absolute inset-x-0 bottom-0 px-4 pb-4 pt-10">
+          <div className="h-6 w-44 rounded-full bg-white/10" />
+          <div className="mt-3 flex gap-2">
+            <div className="h-6 w-16 rounded-full bg-white/10" />
+            <div className="h-3 w-24 rounded-full bg-white/10 self-center" />
+          </div>
+        </div>
+      </div>
+
+      <div className="flex gap-2 overflow-hidden px-4 pb-1 pt-3">
+        {Array.from({ length: 3 }).map((_, index) => (
+          <div
+            key={`collection-skeleton-thumb-${index}`}
+            className="h-14 w-20 shrink-0 rounded-2xl bg-[linear-gradient(135deg,#1b1b22,#262633,#1b1b22)] animate-pulse"
+          />
+        ))}
+      </div>
+
+      <div className="p-4">
+        <div className="h-4 w-3/4 rounded-full bg-white/10 animate-pulse" />
+        <div className="mt-3 flex flex-wrap gap-2">
+          <div className="h-6 w-20 rounded-full bg-white/10 animate-pulse" />
+          <div className="h-6 w-16 rounded-full bg-white/10 animate-pulse" />
+          <div className="h-6 w-24 rounded-full bg-white/10 animate-pulse" />
+        </div>
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <div className="h-[42px] rounded-full bg-white/10 animate-pulse" />
+          <div className="h-[42px] rounded-full bg-white/10 animate-pulse" />
+        </div>
+        <div className="mt-2 h-[42px] rounded-full bg-white/10 animate-pulse" />
+      </div>
+    </div>
+  );
+}
+
 export default function CollectionsList({
   collections,
   loading,
@@ -44,15 +91,12 @@ export default function CollectionsList({
   return (
     <div className="space-y-4">
       {loading ? (
-        <div
-          className={
-            isEntry
-              ? "rounded-[24px] border border-white/10 bg-[#141418]/90 p-6 text-center text-sm text-[#8b8b9c]"
-              : "rounded-[18px] border border-white/10 bg-[#141418] p-4 text-sm text-[#8b8b9c]"
-          }
-        >
-          Loading collections...
-        </div>
+        Array.from({ length: 3 }).map((_, index) => (
+          <CollectionsCardSkeleton
+            key={`collections-skeleton-${index}`}
+            isEntry={isEntry}
+          />
+        ))
       ) : null}
       {error ? (
         <div
