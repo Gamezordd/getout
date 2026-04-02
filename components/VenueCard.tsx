@@ -88,6 +88,7 @@ export default function VenueCard({
   const [loadedPhotos, setLoadedPhotos] = useState<Record<string, boolean>>({});
   const [isCardVisible, setIsCardVisible] = useState(false);
   const heroImageRef = useRef<HTMLImageElement | null>(null);
+  const thumbnailStripRef = useRef<HTMLDivElement | null>(null);
   const thumbnailImageRefs = useRef<Record<string, HTMLImageElement | null>>({});
   const thumbnailButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const photoSetKey = useMemo(() => photos.join("|"), [photos]);
@@ -193,11 +194,21 @@ export default function VenueCard({
 
   useEffect(() => {
     if (!activePhoto) return;
+    const thumbnailStrip = thumbnailStripRef.current;
     const activeThumbnail = thumbnailButtonRefs.current[activePhoto];
-    activeThumbnail?.scrollIntoView({
+    if (!thumbnailStrip || !activeThumbnail) return;
+
+    const targetLeft =
+      activeThumbnail.offsetLeft -
+      (thumbnailStrip.clientWidth - activeThumbnail.clientWidth) / 2;
+    const maxScrollLeft = Math.max(
+      0,
+      thumbnailStrip.scrollWidth - thumbnailStrip.clientWidth,
+    );
+
+    thumbnailStrip.scrollTo({
+      left: Math.min(Math.max(targetLeft, 0), maxScrollLeft),
       behavior: "smooth",
-      block: "nearest",
-      inline: "center",
     });
   }, [activePhoto]);
 
@@ -390,13 +401,16 @@ export default function VenueCard({
               </div>
             </div>
           </div>
-        )}
+          )}
 
-        {photos.length > 1 && (
-          <div className="flex gap-2 overflow-x-auto px-4 pb-1 pt-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {photos.map((photo, index) => {
-              const isActive = photo === activePhoto;
-              return (
+          {photos.length > 1 && (
+            <div
+              ref={thumbnailStripRef}
+              className="flex gap-2 overflow-x-auto px-4 pb-1 pt-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            >
+              {photos.map((photo, index) => {
+                const isActive = photo === activePhoto;
+                return (
                 <button
                   key={`${venue.id}-photo-${index}`}
                   type="button"

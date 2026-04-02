@@ -1,7 +1,7 @@
 import type { AppProps } from "next/app";
 import Head from "next/head";
 import { useRouter } from "next/router";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Toaster } from "sonner";
 import NativeBackNavigationManager from "../components/NativeBackNavigationManager";
 import UnreadInvitePrompt from "../components/UnreadInvitePrompt";
@@ -9,6 +9,7 @@ import { AuthProvider } from "../lib/auth/AuthProvider";
 import { initInstallPrompt } from "../lib/installPrompt";
 import {
   addNativeNotificationActionListener,
+  getNativeLaunchNotification,
   isNativeNotificationsSupported,
   type NativeNotificationPayload,
 } from "../lib/nativeNotifications";
@@ -31,6 +32,7 @@ const buildShareToGroupRoute = (sharedMapsUrl: string) =>
 
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter();
+  const handledNotificationRef = useRef<string | null>(null);
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "";
   const ogImage = siteUrl
     ? `${siteUrl}/icons/getout_icon_md.png`
@@ -154,9 +156,22 @@ export default function App({ Component, pageProps }: AppProps) {
       void router.push(route);
     };
 
+    const getNotificationKey = (payload: NativeNotificationPayload) =>
+      [
+        payload.route || "",
+        payload.sessionId || "",
+        payload.inviteId || "",
+      ].join("|");
+
     const handleNotificationAction = async (
       payload: NativeNotificationPayload,
     ) => {
+      const notificationKey = getNotificationKey(payload);
+      if (handledNotificationRef.current === notificationKey) {
+        return;
+      }
+      handledNotificationRef.current = notificationKey;
+
       if (!payload.sessionId || !payload.inviteId) {
         handleRoute(payload.route);
         return;
@@ -191,6 +206,13 @@ export default function App({ Component, pageProps }: AppProps) {
     };
 
     const init = async () => {
+      const launchNotification = await getNativeLaunchNotification().catch(
+        () => null,
+      );
+      if (launchNotification) {
+        await handleNotificationAction(launchNotification);
+      }
+
       listener = await addNativeNotificationActionListener((payload) => {
         void handleNotificationAction(payload);
       }).catch(() => undefined);

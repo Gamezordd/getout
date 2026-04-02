@@ -27,6 +27,9 @@ public class NativeNotificationsPlugin extends Plugin {
     private static final String EXTRA_ROUTE = "getout_route";
     private static final String EXTRA_SESSION_ID = "getout_session_id";
     private static final String EXTRA_INVITE_ID = "getout_invite_id";
+    private static final String EXTRA_ROUTE_FCM = "route";
+    private static final String EXTRA_SESSION_ID_FCM = "sessionId";
+    private static final String EXTRA_INVITE_ID_FCM = "inviteId";
 
     private static NativeNotificationsPlugin instance;
     private static JSObject pendingLaunchNotification;
@@ -118,13 +121,25 @@ public class NativeNotificationsPlugin extends Plugin {
 
         String route = extras.getString(EXTRA_ROUTE);
         if (route == null || route.isEmpty()) {
+            route = extras.getString(EXTRA_ROUTE_FCM);
+        }
+        if (route == null || route.isEmpty()) {
             return null;
         }
 
         JSObject result = new JSObject();
         result.put("route", route);
-        result.put("sessionId", extras.getString(EXTRA_SESSION_ID));
-        result.put("inviteId", extras.getString(EXTRA_INVITE_ID));
+        String sessionId = extras.getString(EXTRA_SESSION_ID);
+        if (sessionId == null || sessionId.isEmpty()) {
+            sessionId = extras.getString(EXTRA_SESSION_ID_FCM);
+        }
+        String inviteId = extras.getString(EXTRA_INVITE_ID);
+        if (inviteId == null || inviteId.isEmpty()) {
+            inviteId = extras.getString(EXTRA_INVITE_ID_FCM);
+        }
+
+        result.put("sessionId", sessionId);
+        result.put("inviteId", inviteId);
         return result;
     }
 
