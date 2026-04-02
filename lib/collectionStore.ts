@@ -230,6 +230,7 @@ export const saveCollectionPlaceForUser = async ({
             : null
         },
         ${place.venueCategory},
+        ${null},
         ${JSON.stringify(place.location)}::jsonb
       )
       ON CONFLICT (user_id, place_id) DO NOTHING
