@@ -39,8 +39,12 @@ export default function usePusher(
     });
 
     const refresh = async (data?: GroupUpdatedPayload) => {
-      await store.loadGroup();
-      await store.fetchSuggestions();
+      if (!store.isLoadingGroup) {
+        await store.loadGroup();
+      }
+      if (!store.isLoadingSuggestions) {
+        await store.fetchSuggestions();
+      }
       if (data?.reason === "join" && data.userId) {
         onJoin?.(data.userId);
       }

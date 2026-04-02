@@ -94,8 +94,11 @@ function HomePage() {
   });
 
   useEffect(() => {
+    if (store.identityResolved && store.currentUserId) {
+      return;
+    }
     store.loadGroup();
-  }, [store, store.sessionId]);
+  }, [store, store.currentUserId, store.identityResolved, store.sessionId]);
 
   useEffect(() => {
     if (pushInitRef.current) return;

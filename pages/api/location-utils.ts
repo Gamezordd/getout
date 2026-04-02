@@ -1,10 +1,14 @@
 import type { NextApiRequest } from "next";
 import type { LatLng } from "../../lib/types";
+import { redis } from "../../lib/redis";
 
 type ApproximateLocation = {
   location: LatLng;
   locationLabel?: string | null;
 };
+
+const APPROXIMATE_LOCATION_CACHE_TTL_SECONDS = 60 * 10;
+const APPROXIMATE_LOCATION_CACHE_PREFIX = "approx-location";
 
 const getAreaFromAddressComponents = (
   components?: Array<{
@@ -45,6 +49,37 @@ const getRequestIp = (req: NextApiRequest) => {
   return raw.replace("::ffff:", "").trim();
 };
 
+const getHeaderValue = (
+  header: string | string[] | undefined,
+): string | null => {
+  if (typeof header === "string" && header.trim()) return header.trim();
+  if (Array.isArray(header) && header[0]?.trim()) return header[0].trim();
+  return null;
+};
+
+const getApproximateLocationFromHeaders = (
+  req: NextApiRequest,
+): ApproximateLocation | null => {
+  const latitude = getHeaderValue(req.headers["x-vercel-ip-latitude"]);
+  const longitude = getHeaderValue(req.headers["x-vercel-ip-longitude"]);
+  const lat = latitude ? Number(latitude) : NaN;
+  const lng = longitude ? Number(longitude) : NaN;
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return null;
+  }
+
+  const locationLabel =
+    getHeaderValue(req.headers["x-vercel-ip-city"]) ||
+    getHeaderValue(req.headers["x-vercel-ip-country-region"]) ||
+    getHeaderValue(req.headers["x-vercel-ip-country"]) ||
+    null;
+
+  return {
+    location: { lat, lng },
+    locationLabel,
+  };
+};
+
 export const reverseGeocodeLocation = async (
   location: LatLng,
   apiKey: string,
@@ -77,7 +112,19 @@ export const reverseGeocodeLocation = async (
 export const resolveApproximateLocation = async (
   req: NextApiRequest,
 ): Promise<ApproximateLocation> => {
+  const headerLocation = getApproximateLocationFromHeaders(req);
+  if (headerLocation) {
+    return headerLocation;
+  }
+
   const ip = getRequestIp(req);
+  const cacheKey = ip
+    ? `${APPROXIMATE_LOCATION_CACHE_PREFIX}:${ip}`
+    : `${APPROXIMATE_LOCATION_CACHE_PREFIX}:unknown`;
+  const cached = await redis.get<ApproximateLocation>(cacheKey);
+  if (cached?.location) {
+    return cached;
+  }
   const endpoint = ip
     ? `http://ip-api.com/json/${encodeURIComponent(ip)}`
     : "http://ip-api.com/json/";
@@ -105,8 +152,12 @@ export const resolveApproximateLocation = async (
     (typeof data?.country === "string" && data.country.trim()) ||
     null;
 
-  return {
+  const resolved = {
     location: { lat, lng },
     locationLabel,
   };
+  await redis.set(cacheKey, resolved, {
+    ex: APPROXIMATE_LOCATION_CACHE_TTL_SECONDS,
+  });
+  return resolved;
 };

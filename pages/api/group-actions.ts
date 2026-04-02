@@ -37,14 +37,15 @@ export const groupActions = (
     const existingMember = group.sessionMembers.find(
       (member) => member.browserId === payload.browserId,
     );
-    const authenticatedUser = await getAuthenticatedUser(req);
+    const authenticatedUserPromise = getAuthenticatedUser(req);
 
     if (existingMember) {
+      const authenticatedUser = await authenticatedUserPromise;
       if (authenticatedUser?.id) {
-        await touchRecentGroupMembership({
+        void touchRecentGroupMembership({
           userId: authenticatedUser.id,
           sessionId: payload.sessionId,
-        });
+        }).catch(() => undefined);
       }
       return res
         .status(200)
@@ -52,6 +53,8 @@ export const groupActions = (
           buildGroupResponse(group, existingMember.userId, existingMember.isOwner),
         );
     }
+
+    const authenticatedUser = await authenticatedUserPromise;
 
     const trimmedName =
       payload.name?.trim() || authenticatedUser?.displayName?.trim() || "";
@@ -127,12 +130,6 @@ export const groupActions = (
         payload.locationLabel || group.defaultApproximateLocationLabel || null;
       resolvedLocationSource = "ip";
       shouldRecomputeSuggestions = isOwner;
-    } else if (!resolvedLocationLabel) {
-      const apiKey = process.env.GOOGLE_MAPS_API_KEY;
-      if (apiKey) {
-        const geocoded = await reverseGeocodeLocation(resolvedLocation, apiKey);
-        resolvedLocationLabel = geocoded.locationLabel || null;
-      }
     }
 
     if (!resolvedLocation) {
@@ -162,16 +159,36 @@ export const groupActions = (
     group.suggestionsStatus = shouldRecomputeSuggestions ? "pending" : "ready";
     await saveGroup(payload.sessionId, group);
     if (authenticatedUser) {
-      await acceptInviteForSession({
+      void acceptInviteForSession({
         sessionId: payload.sessionId,
         recipientUserId: authenticatedUser.id,
-      });
-      await touchRecentGroupMembership({
+      }).catch(() => undefined);
+      void touchRecentGroupMembership({
         userId: authenticatedUser.id,
         sessionId: payload.sessionId,
-      });
+      }).catch(() => undefined);
     }
-    await safeTrigger(channel, "group-updated", { reason: "join", userId: user.id });
+    if (resolvedLocation && !resolvedLocationLabel && resolvedLocationSource === "precise") {
+      const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+      if (apiKey) {
+        void reverseGeocodeLocation(resolvedLocation, apiKey)
+          .then(async (geocoded) => {
+            if (!geocoded.locationLabel) return;
+            const nextUserIndex = group.users.findIndex((item) => item.id === user.id);
+            if (nextUserIndex === -1) return;
+            group.users[nextUserIndex] = {
+              ...group.users[nextUserIndex],
+              locationLabel: geocoded.locationLabel || null,
+            };
+            await saveGroup(payload.sessionId, group);
+          })
+          .catch(() => undefined);
+      }
+    }
+    void safeTrigger(channel, "group-updated", {
+      reason: "join",
+      userId: user.id,
+    });
     return res.status(200).json(buildGroupResponse(group, user.id, isOwner));
   },
   setManualVenues: async (payload: SetManualVenuesRequest, group: GroupPayload) => {

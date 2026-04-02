@@ -160,6 +160,63 @@ function LandingPage() {
       }));
   }, [friends, inviteSearchValue]);
 
+  const sendSelectedInvites = async (sessionId: string) => {
+    const inviteResults = await Promise.allSettled(
+      selectedInvitees.map(async (invitee) => {
+        const response = await fetch("/api/invites", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            browserId: store.browserId,
+            recipientUserId: invitee.id,
+            sessionId,
+          }),
+        });
+        const payload = (await response.json().catch(() => ({}))) as {
+          message?: string;
+          notificationDelivered?: boolean;
+          notificationMessage?: string;
+        };
+        if (!response.ok) {
+          throw new Error(payload.message || "Unable to send invite.");
+        }
+        return {
+          notificationDelivered: payload.notificationDelivered !== false,
+          notificationMessage: payload.notificationMessage,
+        };
+      }),
+    );
+
+    const failedCount = inviteResults.filter(
+      (result) => result.status === "rejected",
+    ).length;
+    const sentCount = inviteResults.length - failedCount;
+    const undeliveredWarnings = inviteResults.flatMap((result) => {
+      if (result.status !== "fulfilled") {
+        return [];
+      }
+      return result.value.notificationDelivered ? [] : [result.value];
+    });
+    if (sentCount > 0) {
+      toast.success(
+        sentCount === 1 ? "1 invite sent." : `${sentCount} invites sent.`,
+      );
+    }
+    if (undeliveredWarnings.length > 0) {
+      toast.warning(
+        undeliveredWarnings[0]?.notificationMessage ||
+          "Some invites were saved, but push delivery did not complete.",
+      );
+    }
+    if (failedCount > 0) {
+      toast.error(
+        failedCount === 1
+          ? "1 invite could not be sent."
+          : `${failedCount} invites could not be sent.`,
+      );
+    }
+  };
+
   const handleCreate = async () => {
     if (isNative && authStatus !== "signed_in") {
       setError("Sign in with Google to create a group in the mobile app.");
@@ -177,62 +234,7 @@ function LandingPage() {
         closeVotingInHours,
       });
       if (isNative && authStatus === "signed_in" && selectedInvitees.length > 0) {
-        const inviteResults = await Promise.allSettled(
-          selectedInvitees.map(async (invitee) => {
-            const response = await fetch("/api/invites", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                browserId: store.browserId,
-                recipientUserId: invitee.id,
-                sessionId,
-              }),
-            });
-            const payload = (await response.json().catch(() => ({}))) as {
-              message?: string;
-              notificationDelivered?: boolean;
-              notificationMessage?: string;
-            };
-            if (!response.ok) {
-              throw new Error(payload.message || "Unable to send invite.");
-            }
-            return {
-              notificationDelivered: payload.notificationDelivered !== false,
-              notificationMessage: payload.notificationMessage,
-            };
-          }),
-        );
-
-        const failedCount = inviteResults.filter(
-          (result) => result.status === "rejected",
-        ).length;
-        const sentCount = inviteResults.length - failedCount;
-        const undeliveredWarnings = inviteResults.flatMap((result) => {
-          if (result.status !== "fulfilled") {
-            return [];
-          }
-          return result.value.notificationDelivered ? [] : [result.value];
-        });
-        if (sentCount > 0) {
-          toast.success(
-            sentCount === 1
-              ? "1 invite sent."
-              : `${sentCount} invites sent.`,
-          );
-        }
-        if (undeliveredWarnings.length > 0) {
-          toast.warning(
-            undeliveredWarnings[0]?.notificationMessage ||
-              "Some invites were saved, but push delivery did not complete.",
-          );
-        }
-        if (failedCount > 0) {
-          toast.error(
-            failedCount === 1
-              ? "1 invite could not be sent."
-              : `${failedCount} invites could not be sent.`,
-          );
-        }
+        void sendSelectedInvites(sessionId);
       }
       router.replace({ pathname: "/", query: { sessionId } });
     } catch (err: any) {

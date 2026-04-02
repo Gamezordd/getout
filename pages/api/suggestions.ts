@@ -42,10 +42,6 @@ import { ensureVotingDeadlineState } from "./venue-lock";
 
 type SuggestionsPayload = Omit<SuggestionsResponse, "votes">;
 
-type PlacePhoto = {
-  name?: string;
-};
-
 type RecomputeOptions = {
   rotateSuggestions: boolean;
   clearVotes?: boolean;
@@ -113,37 +109,6 @@ const getAreaFromAddressComponents = (components?: Array<{
   return undefined;
 };
 
-const getPhotoMediaUrl = async (
-  apiKey: string,
-  photoName: string,
-): Promise<string | null> => {
-  const response = await fetch(
-    `https://places.googleapis.com/v1/${photoName}/media?maxHeightPx=1200&skipHttpRedirect=true&key=${encodeURIComponent(apiKey)}`,
-  );
-
-  if (!response.ok) return null;
-
-  const data = await response.json().catch(() => null);
-  return typeof data?.photoUri === "string" ? data.photoUri : null;
-};
-
-const resolvePhotoUrls = async (
-  apiKey: string,
-  photos?: PlacePhoto[],
-): Promise<string[]> => {
-  if (!Array.isArray(photos) || photos.length === 0) return [];
-
-  const urls = await Promise.all(
-    photos
-      .map((photo) => photo.name)
-      .filter((name): name is string => Boolean(name))
-      .slice(0, 5)
-      .map((photoName) => getPhotoMediaUrl(apiKey, photoName)),
-  );
-
-  return urls.filter((url): url is string => Boolean(url));
-};
-
 const cloneEtaMatrix = (etaMatrix: EtaMatrix): EtaMatrix => {
   const next: EtaMatrix = {};
   Object.entries(etaMatrix || {}).forEach(([venueId, userMap]) => {
@@ -171,6 +136,8 @@ const COLLECTION_SUGGESTIONS_CACHE_PREFIX = "suggestions:collections";
 const GOOGLE_SUGGESTIONS_CACHE_PREFIX = "suggestions:google";
 const SUGGESTION_LOCK_PREFIX = "suggestions:lock";
 const SUGGESTION_LOCK_TTL_SECONDS = 45;
+const shouldValidateSuggestionPhotos =
+  process.env.ENABLE_SUGGESTION_PHOTO_VALIDATION === "true";
 
 const readRedisCache = async <T>(key: string) => redis.get<T>(key);
 
@@ -194,6 +161,7 @@ const buildGroupFingerprint = async (
   return {
     sessionId,
     options,
+    validateSuggestionPhotos: shouldValidateSuggestionPhotos,
     category: group.venueCategory || "bar",
     userLocations: group.users.map((user) => ({
       id: user.id,
@@ -267,6 +235,31 @@ const setSuggestionsStatus = async (
   await saveGroup(sessionId, group);
 };
 
+const queueInitialSuggestionsGeneration = (
+  sessionId: string,
+  group: GroupPayload,
+) => {
+  void (async () => {
+    const lockAcquired = await tryAcquireSuggestionLock(sessionId);
+    if (!lockAcquired) return;
+
+    try {
+      await setSuggestionsStatus(sessionId, group, "generating");
+      await recomputeSuggestionsForGroup(sessionId, group, {
+        rotateSuggestions: false,
+      });
+      const channel = `private-group-${sessionId}`;
+      await safeTrigger(channel, "group-updated", {
+        reason: "suggestions-ready",
+      });
+    } catch {
+      await setSuggestionsStatus(sessionId, group, "error");
+    } finally {
+      await releaseSuggestionLock(sessionId);
+    }
+  })();
+};
+
 const tryAcquireSuggestionLock = async (sessionId: string) => {
   const result = await redis.set(
     `${SUGGESTION_LOCK_PREFIX}:${sessionId}`,
@@ -304,7 +297,7 @@ const fetchTopPlaces = async (
           "Content-Type": "application/json",
           "X-Goog-Api-Key": apiKey,
           "X-Goog-FieldMask":
-            "places.id,places.displayName,places.formattedAddress,places.addressComponents,places.location,places.photos,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours",
+            "places.id,places.displayName,places.formattedAddress,places.addressComponents,places.location,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours",
         },
         body: JSON.stringify({
           includedTypes: [venueCategory],
@@ -328,8 +321,8 @@ const fetchTopPlaces = async (
     const data = await response.json();
     const places = Array.isArray(data.places) ? data.places : [];
 
-    const venues = (await Promise.all(
-      places.map(async (place: any) => {
+    const venues = places
+      .map((place: any) => {
         const location = place.location;
         if (!location) return null;
         return {
@@ -339,13 +332,12 @@ const fetchTopPlaces = async (
           area: getAreaFromAddressComponents(place.addressComponents),
           priceLabel: getPriceLabel(place.priceLevel),
           closingTimeLabel: getClosingTimeLabel(place.currentOpeningHours),
-          photos: await resolvePhotoUrls(apiKey, place.photos),
+          photos: [],
           location: { lat: location.latitude, lng: location.longitude },
           rating: place.rating || 0,
           userRatingCount: place.userRatingCount || 0,
         };
-      }),
-    ))
+      })
       .filter(Boolean)
       .filter(
         (venue: any) => venue.rating >= 4.2 && venue.userRatingCount >= 200,
@@ -359,6 +351,60 @@ const fetchTopPlaces = async (
     console.error("Error fetching places:", error);
     return { venues: [], nextPageToken: undefined };
   }
+};
+
+const getFirstPhotoName = async (
+  apiKey: string,
+  placeId: string,
+): Promise<string | null> => {
+  const response = await fetch(
+    `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}`,
+    {
+      headers: {
+        "X-Goog-Api-Key": apiKey,
+        "X-Goog-FieldMask": "photos",
+      },
+    },
+  );
+
+  if (!response.ok) return null;
+
+  const data = await response.json().catch(() => null);
+  const photoName = data?.photos?.[0]?.name;
+  return typeof photoName === "string" ? photoName : null;
+};
+
+const getPhotoMediaUrl = async (
+  apiKey: string,
+  photoName: string,
+): Promise<string | null> => {
+  const response = await fetch(
+    `https://places.googleapis.com/v1/${photoName}/media?maxHeightPx=1200&skipHttpRedirect=true&key=${encodeURIComponent(apiKey)}`,
+  );
+
+  if (!response.ok) return null;
+
+  const data = await response.json().catch(() => null);
+  return typeof data?.photoUri === "string" ? data.photoUri : null;
+};
+
+const enrichVenuePhotos = async (
+  apiKey: string,
+  venues: Venue[],
+): Promise<Venue[]> => {
+  const photoLookup = await Promise.all(
+    venues.map(async (venue) => {
+      if (venue.photos?.length) return venue.photos[0] || null;
+      const photoName = await getFirstPhotoName(apiKey, venue.id);
+      if (!photoName) return null;
+      return getPhotoMediaUrl(apiKey, photoName);
+    }),
+  );
+
+  return venues.map((venue, index) => ({
+    ...venue,
+    photos: photoLookup[index] ? [photoLookup[index] as string] : [],
+  }));
 };
 
 const fetchDriveTimesInternal = async (
@@ -705,15 +751,21 @@ export const recomputeSuggestionsForGroup = async (
     ...rankedCollectionCandidates,
     ...rankedGoogleCandidates,
   ].slice(0, TARGET_SUGGESTION_COUNT);
+  const enrichedSuggested = shouldValidateSuggestionPhotos
+    ? await enrichVenuePhotos(apiKey, rankedSuggested)
+    : rankedSuggested.map((venue) => ({
+        ...venue,
+        photos: venue.photos || [],
+      }));
 
-  rankedSuggested.forEach((venue) => seenVenueIds.add(venue.id));
+  enrichedSuggested.forEach((venue) => seenVenueIds.add(venue.id));
 
   return persistSuggestionsSnapshot(sessionId, group, {
-    suggestedVenues: rankedSuggested,
+    suggestedVenues: enrichedSuggested,
     etaMatrix,
     totalsByVenue,
     warning:
-      rankedSuggested.length === 0 && excludedVenueIds.size > 0
+      enrichedSuggested.length === 0 && excludedVenueIds.size > 0
         ? "No new suggestions available right now."
         : undefined,
     seenVenueIds: Array.from(seenVenueIds),
@@ -855,27 +907,14 @@ export default async function handler(
         reason: "suggestions-refreshed",
       });
     } else if (shouldGenerateInitialSuggestions) {
-      const lockAcquired = await tryAcquireSuggestionLock(sessionId);
-      if (!lockAcquired) {
-        group.suggestionsStatus = "generating";
-        payload = buildPayloadFromGroup(group);
-      } else {
-        await setSuggestionsStatus(sessionId, group, "generating");
-        try {
-          payload = await recomputeSuggestionsForGroup(sessionId, group, {
-            rotateSuggestions: false,
-          });
-          const channel = `private-group-${sessionId}`;
-          await safeTrigger(channel, "group-updated", {
-            reason: "suggestions-ready",
-          });
-        } catch (error) {
-          await setSuggestionsStatus(sessionId, group, "error");
-          throw error;
-        } finally {
-          await releaseSuggestionLock(sessionId);
-        }
+      const nextStatus =
+        group.suggestionsStatus === "pending" ? "pending" : "generating";
+      if (group.suggestionsStatus !== nextStatus) {
+        await setSuggestionsStatus(sessionId, group, nextStatus);
       }
+      group.suggestionsStatus = nextStatus;
+      payload = buildPayloadFromGroup(group);
+      queueInitialSuggestionsGeneration(sessionId, group);
     } else {
       payload = await hydrateSuggestionsFromGroup(sessionId, group);
     }
