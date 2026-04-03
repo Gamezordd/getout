@@ -136,8 +136,8 @@ const COLLECTION_SUGGESTIONS_CACHE_PREFIX = "suggestions:collections";
 const GOOGLE_SUGGESTIONS_CACHE_PREFIX = "suggestions:google";
 const SUGGESTION_LOCK_PREFIX = "suggestions:lock";
 const SUGGESTION_LOCK_TTL_SECONDS = 45;
-const shouldValidateSuggestionPhotos =
-  process.env.ENABLE_SUGGESTION_PHOTO_VALIDATION === "true";
+const shouldEnrichSuggestionPhotos =
+  process.env.ENABLE_SUGGESTION_PHOTO_ENRICHMENT === "true";
 
 const readRedisCache = async <T>(key: string) => redis.get<T>(key);
 
@@ -161,7 +161,7 @@ const buildGroupFingerprint = async (
   return {
     sessionId,
     options,
-    validateSuggestionPhotos: shouldValidateSuggestionPhotos,
+    enrichSuggestionPhotos: shouldEnrichSuggestionPhotos,
     category: group.venueCategory || "bar",
     userLocations: group.users.map((user) => ({
       id: user.id,
@@ -751,7 +751,7 @@ export const recomputeSuggestionsForGroup = async (
     ...rankedCollectionCandidates,
     ...rankedGoogleCandidates,
   ].slice(0, TARGET_SUGGESTION_COUNT);
-  const enrichedSuggested = shouldValidateSuggestionPhotos
+  const enrichedSuggested = shouldEnrichSuggestionPhotos
     ? await enrichVenuePhotos(apiKey, rankedSuggested)
     : rankedSuggested.map((venue) => ({
         ...venue,
