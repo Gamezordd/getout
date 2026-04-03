@@ -41,6 +41,51 @@
           ]
         }
       }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:634206206798:android:a874904c36f7bf2484fc1f",
+        "android_client_info": {
+          "package_name": "com.getout.fast"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "634206206798-1ne682ueo7pkkcvr3j0hc7acerfse56q.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.getout.fast",
+            "certificate_hash": "38fad2e6944c1fb2991017cf2b72f87b2188d781"
+          }
+        },
+        {
+          "client_id": "634206206798-dtfjv9e4849r2ua3trnrlt8n7pk60uav.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.getout.fast",
+            "certificate_hash": "84cb38a936a7d56b2f99051aeffc978dd84e36a8"
+          }
+        },
+        {
+          "client_id": "634206206798-08baqd5av9hjb9mn67chll8hglgvuupi.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAgw6lRVzHTGpBiQuFcDv36CiQwgZEs_RQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "634206206798-08baqd5av9hjb9mn67chll8hglgvuupi.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
     }
   ],
   "configuration_version": "1"

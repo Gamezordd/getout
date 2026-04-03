@@ -16,7 +16,7 @@ android {
     namespace = "com.getout.app"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.getout.app"
+        applicationId "com.getout.fast"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
