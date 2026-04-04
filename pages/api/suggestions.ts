@@ -182,6 +182,8 @@ const SUGGESTION_LOCK_PREFIX = "suggestions:lock";
 const SUGGESTION_LOCK_TTL_SECONDS = 45;
 const shouldEnrichSuggestionPhotos =
   process.env.ENABLE_SUGGESTION_PHOTO_ENRICHMENT === "true";
+const SUGGESTION_PHOTO_LIMIT = 6;
+const SUGGESTION_PHOTO_CACHE_VERSION = 2;
 
 const readRedisCache = async <T>(key: string) => redis.get<T>(key);
 
@@ -206,6 +208,8 @@ const buildGroupFingerprint = async (
     sessionId,
     options,
     enrichSuggestionPhotos: shouldEnrichSuggestionPhotos,
+    suggestionPhotoLimit: SUGGESTION_PHOTO_LIMIT,
+    suggestionPhotoCacheVersion: SUGGESTION_PHOTO_CACHE_VERSION,
     category: group.venueCategory || "bar",
     userLocations: group.users.map((user) => ({
       id: user.id,
@@ -341,7 +345,7 @@ const fetchTopPlaces = async (
           "Content-Type": "application/json",
           "X-Goog-Api-Key": apiKey,
           "X-Goog-FieldMask":
-            "places.id,places.displayName,places.formattedAddress,places.addressComponents,places.location,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours",
+            "places.id,places.displayName,places.formattedAddress,places.addressComponents,places.location,places.photos,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours",
         },
         body: JSON.stringify({
           includedTypes: [venueCategory],
@@ -365,23 +369,31 @@ const fetchTopPlaces = async (
     const data = await response.json();
     const places = Array.isArray(data.places) ? data.places : [];
 
-    const venues = places
-      .map((place: any) => {
-        const location = place.location;
-        if (!location) return null;
-        return {
-          id: place.id,
-          name: place.displayName?.text || "Unknown place",
-          address: place.formattedAddress,
-          area: getAreaFromAddressComponents(place.addressComponents),
-          priceLabel: getPriceLabel(place.priceLevel),
-          closingTimeLabel: getClosingTimeLabel(place.currentOpeningHours),
-          photos: [],
-          location: { lat: location.latitude, lng: location.longitude },
-          rating: place.rating || 0,
-          userRatingCount: place.userRatingCount || 0,
-        };
-      })
+    const venues = (
+      await Promise.all(
+        places.map(async (place: any) => {
+          const location = place.location;
+          if (!location) return null;
+
+          const photos = shouldEnrichSuggestionPhotos
+            ? await resolvePhotoUrls(apiKey, place.photos)
+            : [];
+
+          return {
+            id: place.id,
+            name: place.displayName?.text || "Unknown place",
+            address: place.formattedAddress,
+            area: getAreaFromAddressComponents(place.addressComponents),
+            priceLabel: getPriceLabel(place.priceLevel),
+            closingTimeLabel: getClosingTimeLabel(place.currentOpeningHours),
+            photos,
+            location: { lat: location.latitude, lng: location.longitude },
+            rating: place.rating || 0,
+            userRatingCount: place.userRatingCount || 0,
+          };
+        }),
+      )
+    )
       .filter(Boolean)
       .filter(
         (venue: any) => venue.rating >= 4.2 && venue.userRatingCount >= 200,
@@ -397,25 +409,8 @@ const fetchTopPlaces = async (
   }
 };
 
-const getFirstPhotoName = async (
-  apiKey: string,
-  placeId: string,
-): Promise<string | null> => {
-  const response = await fetch(
-    `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}`,
-    {
-      headers: {
-        "X-Goog-Api-Key": apiKey,
-        "X-Goog-FieldMask": "photos",
-      },
-    },
-  );
-
-  if (!response.ok) return null;
-
-  const data = await response.json().catch(() => null);
-  const photoName = data?.photos?.[0]?.name;
-  return typeof photoName === "string" ? photoName : null;
+type PlacePhoto = {
+  name?: string;
 };
 
 const getPhotoMediaUrl = async (
@@ -432,23 +427,21 @@ const getPhotoMediaUrl = async (
   return typeof data?.photoUri === "string" ? data.photoUri : null;
 };
 
-const enrichVenuePhotos = async (
+const resolvePhotoUrls = async (
   apiKey: string,
-  venues: Venue[],
-): Promise<Venue[]> => {
-  const photoLookup = await Promise.all(
-    venues.map(async (venue) => {
-      if (venue.photos?.length) return venue.photos[0] || null;
-      const photoName = await getFirstPhotoName(apiKey, venue.id);
-      if (!photoName) return null;
-      return getPhotoMediaUrl(apiKey, photoName);
-    }),
+  photos?: PlacePhoto[],
+): Promise<string[]> => {
+  if (!Array.isArray(photos) || photos.length === 0) return [];
+
+  const urls = await Promise.all(
+    photos
+      .map((photo) => photo.name)
+      .filter((name): name is string => Boolean(name))
+      .slice(0, SUGGESTION_PHOTO_LIMIT)
+      .map((photoName) => getPhotoMediaUrl(apiKey, photoName)),
   );
 
-  return venues.map((venue, index) => ({
-    ...venue,
-    photos: photoLookup[index] ? [photoLookup[index] as string] : [],
-  }));
+  return urls.filter((url): url is string => Boolean(url));
 };
 
 const fetchDriveTimesInternal = async (
@@ -604,6 +597,9 @@ const getGoogleCandidates = async (params: {
     locationSeed: params.cacheLocationSeed,
     venueCategory: params.venueCategory,
     excludedVenueIds: Array.from(params.excludedVenueIds).sort(),
+    enrichSuggestionPhotos: shouldEnrichSuggestionPhotos,
+    suggestionPhotoLimit: SUGGESTION_PHOTO_LIMIT,
+    suggestionPhotoCacheVersion: SUGGESTION_PHOTO_CACHE_VERSION,
   });
   const redisKey = buildRedisKey(GOOGLE_SUGGESTIONS_CACHE_PREFIX, fingerprint);
   const cached = await readRedisCache<SuggestionsCandidateCacheEntry>(redisKey);
@@ -802,12 +798,10 @@ export const recomputeSuggestionsForGroup = async (
     ...rankedCollectionCandidates,
     ...rankedGoogleCandidates,
   ].slice(0, TARGET_SUGGESTION_COUNT);
-  const enrichedSuggested = shouldEnrichSuggestionPhotos
-    ? await enrichVenuePhotos(apiKey, rankedSuggested)
-    : rankedSuggested.map((venue) => ({
-        ...venue,
-        photos: venue.photos || [],
-      }));
+  const enrichedSuggested = rankedSuggested.map((venue) => ({
+    ...venue,
+    photos: venue.photos || [],
+  }));
 
   enrichedSuggested.forEach((venue) => seenVenueIds.add(venue.id));
 
