@@ -109,6 +109,50 @@ const getAreaFromAddressComponents = (components?: Array<{
   return undefined;
 };
 
+const normalizeCityLabel = (value?: string | null) =>
+  value?.trim().toLowerCase().replace(/\s+/g, " ") || null;
+
+const PRECISE_CENTROID_CACHE_CELL_KM = 3;
+const KM_PER_LATITUDE_DEGREE = 111.32;
+const MIN_LONGITUDE_SCALE = 0.2;
+
+const toBucketIndex = (value: number, step: number) =>
+  Math.round(value / step);
+
+const buildGoogleCacheLocationSeed = (
+  group: GroupPayload,
+  centroid: LatLng,
+) => {
+  const ipLabels = group.users
+    .map((user) =>
+      user.locationSource === "ip" ? normalizeCityLabel(user.locationLabel) : null,
+    )
+    .filter((value): value is string => Boolean(value));
+
+  if (ipLabels.length === group.users.length && ipLabels.length > 0) {
+    return {
+      strategy: "city-labels",
+      labels: [...new Set(ipLabels)].sort(),
+    } as const;
+  }
+
+  const latitudeStep = PRECISE_CENTROID_CACHE_CELL_KM / KM_PER_LATITUDE_DEGREE;
+  const longitudeScale = Math.max(
+    MIN_LONGITUDE_SCALE,
+    Math.abs(Math.cos((centroid.lat * Math.PI) / 180)),
+  );
+  const longitudeStep =
+    PRECISE_CENTROID_CACHE_CELL_KM /
+    (KM_PER_LATITUDE_DEGREE * longitudeScale);
+
+  return {
+    strategy: "centroid-grid",
+    cellSizeKm: PRECISE_CENTROID_CACHE_CELL_KM,
+    latBucket: toBucketIndex(centroid.lat, latitudeStep),
+    lngBucket: toBucketIndex(centroid.lng, longitudeStep),
+  } as const;
+};
+
 const cloneEtaMatrix = (etaMatrix: EtaMatrix): EtaMatrix => {
   const next: EtaMatrix = {};
   Object.entries(etaMatrix || {}).forEach(([venueId, userMap]) => {
@@ -541,18 +585,23 @@ const getCollectionCandidates = async (params: {
 };
 
 const getGoogleCandidates = async (params: {
-  centroid: LatLng;
   apiKey: string;
+  cacheLocationSeed:
+    | { strategy: "city-labels"; labels: string[] }
+    | {
+        strategy: "centroid-grid";
+        cellSizeKm: number;
+        latBucket: number;
+        lngBucket: number;
+      };
+  centroid: LatLng;
   venueCategory: VenueCategory;
   excludedVenueIds: Set<string>;
   limit: number;
   isRelevantPlace: (name: string) => boolean;
 }) => {
   const fingerprint = buildCacheKey({
-    centroid: {
-      lat: Number(params.centroid.lat.toFixed(4)),
-      lng: Number(params.centroid.lng.toFixed(4)),
-    },
+    locationSeed: params.cacheLocationSeed,
     venueCategory: params.venueCategory,
     excludedVenueIds: Array.from(params.excludedVenueIds).sort(),
   });
@@ -672,6 +721,7 @@ export const recomputeSuggestionsForGroup = async (
   }
 
   const centroid = computeCentroid(group.users.map((user) => user.location));
+  const googleCacheLocationSeed = buildGoogleCacheLocationSeed(group, centroid);
   const category = group.venueCategory || "bar";
   const negativeKeywords = NEGATIVE_KEYWORDS_BY_CATEGORY[category] || [];
   const isRelevantPlace = (name: string) => {
@@ -696,6 +746,7 @@ export const recomputeSuggestionsForGroup = async (
   collectionCandidates.forEach((venue) => excludedVenueIds.add(venue.id));
 
   const googleCandidates = await getGoogleCandidates({
+    cacheLocationSeed: googleCacheLocationSeed,
     centroid,
     apiKey,
     venueCategory: category,
