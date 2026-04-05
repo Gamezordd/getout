@@ -15,8 +15,8 @@ import {
 } from "../lib/nativeNotifications";
 import {
   clearLastSessionId,
+  extractGoogleMapsShareUrl,
   getLastSessionId,
-  isGoogleMapsShareUrl,
   registerNativeShareListener,
   setLastSessionId,
 } from "../lib/nativeShare";
@@ -105,12 +105,13 @@ function AppShell({ Component, pageProps }: AppProps) {
     const initNativeShare = async () => {
       cleanup = await registerNativeShareListener(
         async ({ text: sharedText, target }) => {
-          if (!isGoogleMapsShareUrl(sharedText)) return;
+          const sharedMapsUrl = extractGoogleMapsShareUrl(sharedText);
+          if (!sharedMapsUrl) return;
           if (target === "collection") {
             await router.push({
               pathname: "/collections",
               query: {
-                sharedMapsUrl: sharedText,
+                sharedMapsUrl,
               },
             });
             return;
@@ -119,7 +120,7 @@ function AppShell({ Component, pageProps }: AppProps) {
           const sessionId = await resolveShareSessionId();
 
           if (!sessionId) {
-            await router.push(buildShareToGroupRoute(sharedText));
+            await router.push(buildShareToGroupRoute(sharedMapsUrl));
             return;
           }
 
@@ -127,7 +128,7 @@ function AppShell({ Component, pageProps }: AppProps) {
             pathname: "/add-venue",
             query: {
               sessionId,
-              sharedMapsUrl: sharedText,
+              sharedMapsUrl,
             },
           });
         },

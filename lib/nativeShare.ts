@@ -29,22 +29,50 @@ export const LAST_SESSION_ID_KEY = "getout-last-session-id";
 
 export const isNativeApp = () => Capacitor.isNativePlatform();
 
-export const isGoogleMapsShareUrl = (value: string) => {
+const GOOGLE_MAPS_HOST_MATCHERS = [
+  "maps.app.goo.gl",
+  "goo.gl",
+  "maps.google.com",
+] as const;
+
+const isGoogleMapsHost = (host: string) =>
+  GOOGLE_MAPS_HOST_MATCHERS.includes(host as (typeof GOOGLE_MAPS_HOST_MATCHERS)[number]) ||
+  host.endsWith("google.com") ||
+  host.endsWith("google.co.in") ||
+  host.endsWith("google.co.uk");
+
+export const extractGoogleMapsShareUrl = (value: string) => {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
   try {
-    const parsed = new URL(value.trim());
+    const parsed = new URL(trimmed);
     const host = parsed.hostname.toLowerCase();
-    return (
-      host === "maps.app.goo.gl" ||
-      host === "goo.gl" ||
-      host.endsWith("google.com") ||
-      host.endsWith("google.co.in") ||
-      host.endsWith("google.co.uk") ||
-      host === "maps.google.com"
-    );
+    if (isGoogleMapsHost(host)) {
+      return parsed.toString();
+    }
   } catch {
-    return false;
+    // Fall through to URL extraction from arbitrary shared text.
   }
+
+  const matches = trimmed.match(/https?:\/\/[^\s]+/gi) || [];
+  for (const candidate of matches) {
+    try {
+      const parsed = new URL(candidate);
+      const host = parsed.hostname.toLowerCase();
+      if (isGoogleMapsHost(host)) {
+        return parsed.toString();
+      }
+    } catch {
+      // Ignore malformed candidates and continue scanning.
+    }
+  }
+
+  return null;
 };
+
+export const isGoogleMapsShareUrl = (value: string) =>
+  Boolean(extractGoogleMapsShareUrl(value));
 
 export const getLastSessionId = () => {
   if (typeof window === "undefined") return null;
@@ -77,7 +105,8 @@ export const registerNativeShareListener = async (
     const nextTarget =
       pending?.target === "collection" ? "collection" : "group_venue";
     if (!nextText) return;
-    await onShareIntent({ text: nextText, target: nextTarget });
+    const extractedUrl = extractGoogleMapsShareUrl(nextText) || nextText;
+    await onShareIntent({ text: extractedUrl, target: nextTarget });
     await ShareIntent.clearPendingShare().catch(() => undefined);
   };
 
@@ -89,7 +118,8 @@ export const registerNativeShareListener = async (
       const nextText = text?.trim();
       const nextTarget = target === "collection" ? "collection" : "group_venue";
       if (!nextText) return;
-      await onShareIntent({ text: nextText, target: nextTarget });
+      const extractedUrl = extractGoogleMapsShareUrl(nextText) || nextText;
+      await onShareIntent({ text: extractedUrl, target: nextTarget });
       await ShareIntent.clearPendingShare().catch(() => undefined);
     },
   );
