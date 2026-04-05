@@ -740,6 +740,8 @@ export const recomputeSuggestionsForGroup = async (
     excludedVenueIds,
   });
 
+  console.log(`Found ${collectionCandidates.length} collection candidates for group ${sessionId}.`);
+
   collectionCandidates.forEach((venue) => excludedVenueIds.add(venue.id));
 
   const googleCandidates = await getGoogleCandidates({
@@ -751,6 +753,8 @@ export const recomputeSuggestionsForGroup = async (
     limit: TARGET_SUGGESTION_COUNT,
     isRelevantPlace,
   });
+
+  console.log(`Found ${googleCandidates.length} Google candidates for group ${sessionId}.`);
 
   const candidates = dedupeVenues([
     ...collectionCandidates,
@@ -783,6 +787,8 @@ export const recomputeSuggestionsForGroup = async (
     combinedDestinations,
     rows,
   );
+
+  console.log(`Computed ETA matrix for group ${sessionId}.`);
 
   const rankedCollectionCandidates = scoreVenues(
     collectionCandidates,
