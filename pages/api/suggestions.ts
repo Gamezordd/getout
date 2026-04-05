@@ -262,6 +262,7 @@ const persistSuggestionsSnapshot = async (
   group.suggestionsStatus = status;
   group.venues = group.suggestions.suggestedVenues;
   await saveGroup(sessionId, group);
+  console.log("saved group", group);
   return refreshSuggestionsCache(sessionId, group, {
     rotateSuggestions: false,
   });
