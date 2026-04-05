@@ -754,7 +754,6 @@ export const recomputeSuggestionsForGroup = async (
     isRelevantPlace,
   });
 
-  console.log(`Found ${googleCandidates.length} Google candidates for group ${sessionId}.`);
 
   const candidates = dedupeVenues([
     ...collectionCandidates,
@@ -777,11 +776,15 @@ export const recomputeSuggestionsForGroup = async (
     }, "ready");
   }
 
+  console.log(`Fetching drive times for ${combinedDestinations.length} venues and ${group.users.length} users in group ${sessionId}.`);
+
   const rows = await fetchDriveTimes(
     apiKey,
     group.users.map((user) => user.location),
     combinedDestinations.map((venue) => venue.location),
   );
+
+  console.log(`Drive times fetched for group ${sessionId}. Processing suggestions...`);
   const { etaMatrix, totalsByVenue } = buildEtaData(
     group.users,
     combinedDestinations,
