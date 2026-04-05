@@ -297,6 +297,7 @@ const queueInitialSuggestionsGeneration = (
         rotateSuggestions: false,
       });
       const channel = `private-group-${sessionId}`;
+      console.log(`Initial suggestions generation completed for group ${sessionId}, broadcasting update.`);
       await safeTrigger(channel, "group-updated", {
         reason: "suggestions-ready",
       });
@@ -959,6 +960,7 @@ export default async function handler(
       }
       group.suggestionsStatus = nextStatus;
       payload = buildPayloadFromGroup(group);
+      console.log(`Queueing initial suggestions generation for group ${sessionId} with status ${group.suggestionsStatus}`);
       queueInitialSuggestionsGeneration(sessionId, group);
     } else {
       payload = await hydrateSuggestionsFromGroup(sessionId, group);
