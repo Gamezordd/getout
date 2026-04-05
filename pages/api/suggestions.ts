@@ -555,6 +555,7 @@ const getCollectionCandidates = async (params: {
         userIds: params.userIds,
         venueCategory: params.venueCategory,
       });
+      console.log("Fetched collections for users", params.userIds, "found", collections.length, "items.");
       const mappedVenues = dedupeVenues(
         collections.map<Venue>((item) => ({
           id: item.placeId,
@@ -576,6 +577,7 @@ const getCollectionCandidates = async (params: {
         })),
       );
       await writeRedisCache(redisKey, { venues: mappedVenues } satisfies SuggestionsCandidateCacheEntry);
+      console.log(`Cached ${mappedVenues.length} collection candidates for users ${params.userIds}.`);
       return mappedVenues.filter((venue) => !params.excludedVenueIds.has(venue.id));
   } catch (error) {
     console.error("Error fetching collection versions:", error);
