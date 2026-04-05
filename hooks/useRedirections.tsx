@@ -6,10 +6,12 @@ import { useAuth } from "../lib/auth/AuthProvider";
 export default function useRedirections() {
   const store = useAppStore();
   const router = useRouter();
-  const { authStatus, isNative, startupResolved } = useAuth();
+  const { authStatus, hasPendingLaunchNotification, isNative, startupResolved } =
+    useAuth();
   useEffect(() => {
     if (!router.isReady) return;
     if (!startupResolved) return;
+    if (hasPendingLaunchNotification) return;
 
     const sessionId =
       typeof router.query.sessionId === "string"
@@ -36,7 +38,16 @@ export default function useRedirections() {
     }
 
     store.setSession(sessionId, router.pathname);
-  }, [authStatus, isNative, router.isReady, router.pathname, router.query.sessionId, startupResolved, store]);
+  }, [
+    authStatus,
+    hasPendingLaunchNotification,
+    isNative,
+    router.isReady,
+    router.pathname,
+    router.query.sessionId,
+    startupResolved,
+    store,
+  ]);
 
   useEffect(() => {
     if (!router.isReady || !store.sessionId || store.isLoadingGroup) return;

@@ -5,7 +5,7 @@ import { useEffect, useRef } from "react";
 import { Toaster } from "sonner";
 import NativeBackNavigationManager from "../components/NativeBackNavigationManager";
 import UnreadInvitePrompt from "../components/UnreadInvitePrompt";
-import { AuthProvider } from "../lib/auth/AuthProvider";
+import { AuthProvider, useAuth } from "../lib/auth/AuthProvider";
 import { initInstallPrompt } from "../lib/installPrompt";
 import {
   addNativeNotificationActionListener,
@@ -30,8 +30,15 @@ const buildJoinRoute = (sessionId: string) =>
 const buildShareToGroupRoute = (sharedMapsUrl: string) =>
   `/share-to-group?sharedMapsUrl=${encodeURIComponent(sharedMapsUrl)}`;
 
-export default function App({ Component, pageProps }: AppProps) {
+function AppShell({ Component, pageProps }: AppProps) {
   const router = useRouter();
+  const {
+    authStatus,
+    clearPendingLaunchNotification,
+    isNative,
+    loadSession,
+    startupResolved,
+  } = useAuth();
   const handledNotificationRef = useRef<string | null>(null);
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "";
   const ogImage = siteUrl
@@ -98,32 +105,33 @@ export default function App({ Component, pageProps }: AppProps) {
     const initNativeShare = async () => {
       cleanup = await registerNativeShareListener(
         async ({ text: sharedText, target }) => {
-        if (!isGoogleMapsShareUrl(sharedText)) return;
-        if (target === "collection") {
+          if (!isGoogleMapsShareUrl(sharedText)) return;
+          if (target === "collection") {
+            await router.push({
+              pathname: "/collections",
+              query: {
+                sharedMapsUrl: sharedText,
+              },
+            });
+            return;
+          }
+
+          const sessionId = await resolveShareSessionId();
+
+          if (!sessionId) {
+            await router.push(buildShareToGroupRoute(sharedText));
+            return;
+          }
+
           await router.push({
-            pathname: "/collections",
+            pathname: "/add-venue",
             query: {
+              sessionId,
               sharedMapsUrl: sharedText,
             },
           });
-          return;
-        }
-
-        const sessionId = await resolveShareSessionId();
-
-        if (!sessionId) {
-          await router.push(buildShareToGroupRoute(sharedText));
-          return;
-        }
-
-        await router.push({
-          pathname: "/add-venue",
-          query: {
-            sessionId,
-            sharedMapsUrl: sharedText,
-          },
-        });
-      });
+        },
+      );
     };
 
     void initNativeShare();
@@ -134,6 +142,7 @@ export default function App({ Component, pageProps }: AppProps) {
   }, [router]);
 
   useEffect(() => {
+    if (!startupResolved) return;
     if (!isNativeNotificationsSupported()) return;
 
     let listener:
@@ -163,6 +172,13 @@ export default function App({ Component, pageProps }: AppProps) {
         payload.inviteId || "",
       ].join("|");
 
+    const refreshNativeSession = async () => {
+      if (!isNative || authStatus === "unknown") {
+        return null;
+      }
+      return loadSession().catch(() => null);
+    };
+
     const handleNotificationAction = async (
       payload: NativeNotificationPayload,
     ) => {
@@ -172,8 +188,17 @@ export default function App({ Component, pageProps }: AppProps) {
       }
       handledNotificationRef.current = notificationKey;
 
+      const refreshedUser = await refreshNativeSession();
+
       if (!payload.sessionId || !payload.inviteId) {
-        handleRoute(payload.route);
+        if (payload.sessionId && isNative && !refreshedUser) {
+          navigateToLogin(payload.sessionId);
+          return;
+        }
+        handleRoute(
+          payload.route ||
+            (payload.sessionId ? buildJoinRoute(payload.sessionId) : undefined),
+        );
         return;
       }
 
@@ -182,7 +207,14 @@ export default function App({ Component, pageProps }: AppProps) {
           sessionId: payload.sessionId,
           inviteId: payload.inviteId,
         });
-        const response = await fetch(`/api/invites/resolve-route?${params}`);
+        let response = await fetch(`/api/invites/resolve-route?${params}`);
+
+        if (response.status === 401 && isNative) {
+          const recoveredUser = await refreshNativeSession();
+          if (recoveredUser) {
+            response = await fetch(`/api/invites/resolve-route?${params}`);
+          }
+        }
 
         if (response.status === 401) {
           navigateToLogin(payload.sessionId);
@@ -209,8 +241,12 @@ export default function App({ Component, pageProps }: AppProps) {
       const launchNotification = await getNativeLaunchNotification().catch(
         () => null,
       );
+
       if (launchNotification) {
         await handleNotificationAction(launchNotification);
+        clearPendingLaunchNotification();
+      } else {
+        clearPendingLaunchNotification();
       }
 
       listener = await addNativeNotificationActionListener((payload) => {
@@ -223,15 +259,22 @@ export default function App({ Component, pageProps }: AppProps) {
     return () => {
       void listener?.remove();
     };
-  }, [router, router.query.sessionId]);
+  }, [
+    authStatus,
+    clearPendingLaunchNotification,
+    isNative,
+    loadSession,
+    router,
+    startupResolved,
+  ]);
 
   return (
-    <AuthProvider>
+    <>
       <NativeBackNavigationManager />
       <UnreadInvitePrompt />
       <AppStoreProvider>
         <Head>
-          <title>GetOut — Pick a place in minutes</title>
+          <title>GetOut - Pick a place in minutes</title>
 
           <meta
             name="description"
@@ -252,7 +295,6 @@ export default function App({ Component, pageProps }: AppProps) {
           <link rel="icon" href="/icons/getout_icon.png" />
           <link rel="apple-touch-icon" href="/icons/getout_icon_md.png" />
 
-          {/* Open Graph (WhatsApp, Facebook, etc.) */}
           <meta property="og:title" content="Pick a place in minutes" />
           <meta
             property="og:description"
@@ -264,7 +306,6 @@ export default function App({ Component, pageProps }: AppProps) {
           <meta property="og:image:width" content="512" />
           <meta property="og:image:height" content="512" />
 
-          {/* Twitter */}
           <meta name="twitter:card" content="summary_large_image" />
           <meta name="twitter:title" content="Pick a place in minutes" />
           <meta
@@ -292,6 +333,14 @@ export default function App({ Component, pageProps }: AppProps) {
           }}
         />
       </AppStoreProvider>
+    </>
+  );
+}
+
+export default function App(props: AppProps) {
+  return (
+    <AuthProvider>
+      <AppShell {...props} />
     </AuthProvider>
   );
 }

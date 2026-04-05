@@ -9,6 +9,7 @@ import {
 } from "react";
 import { useRouter } from "next/router";
 import type { AuthenticatedUser, AuthStatus } from "../authTypes";
+import useForegroundResume from "../../hooks/useForegroundResume";
 import {
   registerUserPushSubscription,
   unregisterUserPushSubscription,
@@ -18,17 +19,22 @@ import {
   signInWithNativeGoogle,
   signOutOfNativeGoogle,
 } from "../nativeGoogleAuth";
-import { addNativeTokenRefreshListener } from "../nativeNotifications";
+import {
+  addNativeTokenRefreshListener,
+  peekNativeLaunchNotification,
+} from "../nativeNotifications";
 
 type AuthContextValue = {
   authStatus: AuthStatus;
   authenticatedUser: AuthenticatedUser | null;
   isNative: boolean;
   startupResolved: boolean;
+  hasPendingLaunchNotification: boolean;
   loadSession: () => Promise<AuthenticatedUser | null>;
   signIn: () => Promise<AuthenticatedUser>;
   signOut: () => Promise<void>;
   updateDisplayName: (displayName: string) => Promise<AuthenticatedUser>;
+  clearPendingLaunchNotification: () => void;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -43,39 +49,72 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [authStatus, setAuthStatus] = useState<AuthStatus>("unknown");
   const [authenticatedUser, setAuthenticatedUser] =
     useState<AuthenticatedUser | null>(null);
+  const [hasPendingLaunchNotification, setHasPendingLaunchNotification] =
+    useState(false);
   const startupRouteNormalizedRef = useRef(false);
+  const loadSessionPromiseRef = useRef<Promise<AuthenticatedUser | null> | null>(
+    null,
+  );
+  const signInPromiseRef = useRef<Promise<AuthenticatedUser> | null>(null);
 
   const loadSession = async () => {
-    if (!isNativePlatform()) {
-      setAuthStatus("signed_out");
-      setAuthenticatedUser(null);
-      return null;
+    if (loadSessionPromiseRef.current) {
+      return loadSessionPromiseRef.current;
     }
 
-    const response = await fetch("/api/auth/session", {
-      headers: {
-        "x-capacitor-platform": MOBILE_PLATFORM_HEADER,
-      },
-    });
-    if (!response.ok) {
-      setAuthenticatedUser(null);
-      setAuthStatus("signed_out");
-      return null;
+    const task = (async () => {
+      if (!isNativePlatform()) {
+        setAuthStatus("signed_out");
+        setAuthenticatedUser(null);
+        return null;
+      }
+
+      const response = await fetch("/api/auth/session", {
+        headers: {
+          "x-capacitor-platform": MOBILE_PLATFORM_HEADER,
+        },
+      }).catch(() => null);
+
+      if (!response?.ok) {
+        setAuthenticatedUser(null);
+        setAuthStatus("signed_out");
+        return null;
+      }
+
+      const payload = (await response.json().catch(() => ({}))) as {
+        user?: AuthenticatedUser | null;
+      };
+      const user = payload.user || null;
+      setAuthenticatedUser(user);
+      setAuthStatus(user ? "signed_in" : "signed_out");
+      return user;
+    })();
+
+    loadSessionPromiseRef.current = task;
+
+    if (!isNativePlatform()) {
+      return task.finally(() => {
+        loadSessionPromiseRef.current = null;
+      });
     }
-    const payload = (await response.json().catch(() => ({}))) as {
-      user?: AuthenticatedUser | null;
-    };
-    const user = payload.user || null;
-    setAuthenticatedUser(user);
-    setAuthStatus(user ? "signed_in" : "signed_out");
-    return user;
+
+    try {
+      return await task;
+    } finally {
+      loadSessionPromiseRef.current = null;
+    }
   };
 
   useEffect(() => {
     const native = isNativePlatform();
     setIsNative(native);
     if (native) {
-      void loadSession().finally(() => setStartupResolved(true));
+      void (async () => {
+        const pendingLaunchNotification =
+          await peekNativeLaunchNotification().catch(() => null);
+        setHasPendingLaunchNotification(Boolean(pendingLaunchNotification));
+        await loadSession().catch(() => null);
+      })().finally(() => setStartupResolved(true));
       return;
     }
     setAuthStatus("signed_out");
@@ -102,6 +141,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     startupRouteNormalizedRef.current = true;
 
+    if (hasPendingLaunchNotification) {
+      return;
+    }
+
     if (!isEntryRoute || sessionId || typeof window === "undefined") {
       return;
     }
@@ -114,7 +157,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (authStatus === "signed_out" && router.pathname !== "/login") {
       window.location.replace("/login?redirect=/dashboard");
     }
-  }, [authStatus, isNative, router.isReady, router.pathname, router.query.sessionId, startupResolved]);
+  }, [
+    authStatus,
+    hasPendingLaunchNotification,
+    isNative,
+    router.isReady,
+    router.pathname,
+    router.query.sessionId,
+    startupResolved,
+  ]);
 
   useEffect(() => {
     if (!authenticatedUser) return;
@@ -152,28 +203,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [authenticatedUser?.id, isNative]);
 
+  useForegroundResume(() => {
+    if (!isNativePlatform()) return;
+    if (!startupResolved) return;
+    void loadSession().catch(() => undefined);
+  });
+
   const signIn = async () => {
-    setAuthStatus("signing_in");
-    const nativeResult = await signInWithNativeGoogle();
-    const response = await fetch("/api/auth/mobile/google", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-capacitor-platform": MOBILE_PLATFORM_HEADER,
-      },
-      body: JSON.stringify({ idToken: nativeResult.idToken }),
-    });
-    const payload = (await response.json().catch(() => ({}))) as {
-      user?: AuthenticatedUser;
-      message?: string;
-    };
-    if (!response.ok || !payload.user) {
-      setAuthStatus("signed_out");
-      throw new Error(payload.message || "Unable to sign in.");
+    if (signInPromiseRef.current) {
+      return signInPromiseRef.current;
     }
-    setAuthenticatedUser(payload.user);
-    setAuthStatus("signed_in");
-    return payload.user;
+
+    setAuthStatus("signing_in");
+    const task = (async () => {
+      try {
+        const nativeResult = await signInWithNativeGoogle();
+        if (!nativeResult.authenticated || !nativeResult.user) {
+          setAuthStatus("signed_out");
+          throw new Error("Unable to sign in.");
+        }
+        setAuthenticatedUser(nativeResult.user);
+        setAuthStatus("signed_in");
+        return nativeResult.user;
+      } catch (error) {
+        setAuthStatus("signed_out");
+        throw error;
+      }
+    })();
+
+    signInPromiseRef.current = task;
+
+    try {
+      return await task;
+    } finally {
+      signInPromiseRef.current = null;
+    }
   };
 
   const signOut = async () => {
@@ -216,12 +280,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       authenticatedUser,
       isNative,
       startupResolved,
+      hasPendingLaunchNotification,
       loadSession,
       signIn,
       signOut,
       updateDisplayName,
+      clearPendingLaunchNotification: () => setHasPendingLaunchNotification(false),
     }),
-    [authStatus, authenticatedUser, isNative, startupResolved],
+    [
+      authStatus,
+      authenticatedUser,
+      hasPendingLaunchNotification,
+      isNative,
+      startupResolved,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

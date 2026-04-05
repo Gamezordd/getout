@@ -77,7 +77,7 @@ export default function VenueCard({
   onSelect,
   onVote,
 }: Props) {
-  const photos = Array.isArray(venue.photos) ? venue.photos.slice(0, 5) : [];
+  const photos = Array.isArray(venue.photos) ? venue.photos.slice(0, 6) : [];
   const firstPhoto = photos[0] || null;
   const cardRef = useRef<HTMLElement | null>(null);
   const [activePhoto, setActivePhoto] = useState<string | null>(firstPhoto);

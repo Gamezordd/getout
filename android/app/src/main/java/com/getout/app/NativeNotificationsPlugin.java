@@ -33,6 +33,7 @@ public class NativeNotificationsPlugin extends Plugin {
 
     private static NativeNotificationsPlugin instance;
     private static JSObject pendingLaunchNotification;
+    private static JSObject launchNotificationSnapshot;
 
     @Override
     public void load() {
@@ -99,14 +100,25 @@ public class NativeNotificationsPlugin extends Plugin {
 
     @PluginMethod
     public void getLaunchNotification(PluginCall call) {
-        if (pendingLaunchNotification == null) {
+        if (launchNotificationSnapshot == null) {
             call.resolve();
             return;
         }
 
-        JSObject result = pendingLaunchNotification;
+        JSObject result = launchNotificationSnapshot;
+        launchNotificationSnapshot = null;
         pendingLaunchNotification = null;
         call.resolve(result);
+    }
+
+    @PluginMethod
+    public void peekLaunchNotification(PluginCall call) {
+        if (launchNotificationSnapshot == null) {
+            call.resolve();
+            return;
+        }
+
+        call.resolve(launchNotificationSnapshot);
     }
 
     private static JSObject buildNotificationPayload(Intent intent) {
@@ -148,6 +160,8 @@ public class NativeNotificationsPlugin extends Plugin {
         if (payload == null) {
             return;
         }
+
+        launchNotificationSnapshot = payload;
 
         if (instance != null) {
             instance.notifyListeners("notificationAction", payload, true);

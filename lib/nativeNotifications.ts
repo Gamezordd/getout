@@ -11,6 +11,7 @@ type NativeNotificationsPlugin = {
   getToken: () => Promise<{ token: string | null }>;
   unregisterToken: () => Promise<void>;
   getLaunchNotification: () => Promise<NativeNotificationPayload | null>;
+  peekLaunchNotification: () => Promise<NativeNotificationPayload | null>;
   addListener: (
     eventName: "tokenRefresh" | "notificationAction",
     listener: (payload: any) => void,
@@ -34,6 +35,9 @@ export const unregisterNativeNotificationToken = async () =>
 
 export const getNativeLaunchNotification = async () =>
   NativeNotifications.getLaunchNotification();
+
+export const peekNativeLaunchNotification = async () =>
+  NativeNotifications.peekLaunchNotification();
 
 export const addNativeTokenRefreshListener = async (
   listener: (payload: { token?: string | null }) => void,
