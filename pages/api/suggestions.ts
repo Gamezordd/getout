@@ -530,53 +530,56 @@ const getCollectionCandidates = async (params: {
   venueCategory: VenueCategory;
   excludedVenueIds: Set<string>;
 }) => {
-  const collectionVersions = await getCollectionVersionTokens(params.userIds);
-  const fingerprint = buildCacheKey({
-    userIds: [...params.userIds].sort(),
-    venueCategory: params.venueCategory,
-    versions: collectionVersions,
-  });
-  const redisKey = buildRedisKey(COLLECTION_SUGGESTIONS_CACHE_PREFIX, fingerprint);
-  const cached = await readRedisCache<SuggestionsCandidateCacheEntry>(redisKey);
-  const venues = cached?.venues || [];
+  try {
+    const collectionVersions = await getCollectionVersionTokens(params.userIds);
+      const fingerprint = buildCacheKey({
+        userIds: [...params.userIds].sort(),
+        venueCategory: params.venueCategory,
+        versions: collectionVersions,
+      });
+      const redisKey = buildRedisKey(COLLECTION_SUGGESTIONS_CACHE_PREFIX, fingerprint);
+      const cached = await readRedisCache<SuggestionsCandidateCacheEntry>(redisKey);
+      const venues = cached?.venues || [];
 
-  if (cached?.venues) {
-    return dedupeVenues(
-      cached.venues
-        .filter((venue) => !params.excludedVenueIds.has(venue.id))
-        .map((venue) => ({
-          ...venue,
-          source: "collection" as const,
+      if (cached?.venues) {
+        return dedupeVenues(
+          cached.venues
+            .filter((venue) => !params.excludedVenueIds.has(venue.id))
+            .map((venue) => ({
+              ...venue,
+              source: "collection" as const,
+            })),
+        );
+      }
+      const collections = await listCollectionsForUsers({
+        userIds: params.userIds,
+        venueCategory: params.venueCategory,
+      });
+      const mappedVenues = dedupeVenues(
+        collections.map<Venue>((item) => ({
+          id: item.placeId,
+          name: item.name,
+          address: item.address || undefined,
+          area: item.area || undefined,
+          priceLabel: item.priceLabel || undefined,
+          closingTimeLabel: item.closingTimeLabel || undefined,
+          photos: item.photos || [],
+          rating:
+            typeof item.rating === "number" ? item.rating : undefined,
+          userRatingCount:
+            typeof item.userRatingCount === "number"
+              ? item.userRatingCount
+              : undefined,
+          venueCategory: item.venueCategory || undefined,
+          location: item.location,
+          source: "collection",
         })),
-    );
+      );
+      await writeRedisCache(redisKey, { venues: mappedVenues } satisfies SuggestionsCandidateCacheEntry);
+      return mappedVenues.filter((venue) => !params.excludedVenueIds.has(venue.id));
+  } catch (error) {
+    console.error("Error fetching collection versions:", error);
   }
-
-  const collections = await listCollectionsForUsers({
-    userIds: params.userIds,
-    venueCategory: params.venueCategory,
-  });
-  const mappedVenues = dedupeVenues(
-    collections.map<Venue>((item) => ({
-      id: item.placeId,
-      name: item.name,
-      address: item.address || undefined,
-      area: item.area || undefined,
-      priceLabel: item.priceLabel || undefined,
-      closingTimeLabel: item.closingTimeLabel || undefined,
-      photos: item.photos || [],
-      rating:
-        typeof item.rating === "number" ? item.rating : undefined,
-      userRatingCount:
-        typeof item.userRatingCount === "number"
-          ? item.userRatingCount
-          : undefined,
-      venueCategory: item.venueCategory || undefined,
-      location: item.location,
-      source: "collection",
-    })),
-  );
-  await writeRedisCache(redisKey, { venues: mappedVenues } satisfies SuggestionsCandidateCacheEntry);
-  return mappedVenues.filter((venue) => !params.excludedVenueIds.has(venue.id));
 };
 
 const getGoogleCandidates = async (params: {
@@ -739,7 +742,7 @@ export const recomputeSuggestionsForGroup = async (
     userIds: collectionUserIds,
     venueCategory: category,
     excludedVenueIds,
-  });
+  }) ?? [];
 
   console.log(`Found ${collectionCandidates.length} collection candidates for group ${sessionId}.`);
 
