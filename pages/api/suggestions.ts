@@ -262,7 +262,6 @@ const persistSuggestionsSnapshot = async (
   group.suggestionsStatus = status;
   group.venues = group.suggestions.suggestedVenues;
   await saveGroup(sessionId, group);
-  console.log("saved group", group);
   return refreshSuggestionsCache(sessionId, group, {
     rotateSuggestions: false,
   });
@@ -529,7 +528,6 @@ const getCollectionCandidates = async (params: {
         userIds: params.userIds,
         venueCategory: params.venueCategory,
       });
-      console.log("Fetched collections for users", params.userIds, "found", collections.length, "items.");
       const mappedVenues = dedupeVenues(
         collections.map<Venue>((item) => ({
           id: item.placeId,
@@ -551,7 +549,6 @@ const getCollectionCandidates = async (params: {
         })),
       );
       await writeRedisCache(redisKey, { venues: mappedVenues } satisfies SuggestionsCandidateCacheEntry);
-      console.log(`Cached ${mappedVenues.length} collection candidates for users ${params.userIds}.`);
       return mappedVenues.filter((venue) => !params.excludedVenueIds.has(venue.id));
   } catch (error) {
     console.error("Error fetching collection versions:", error);
@@ -721,8 +718,6 @@ export const recomputeSuggestionsForGroup = async (
     excludedVenueIds,
   }) ?? [];
 
-  console.log(`Found ${collectionCandidates.length} collection candidates for group ${sessionId}.`);
-
   collectionCandidates.forEach((venue) => excludedVenueIds.add(venue.id));
 
   const googleCandidates = await getGoogleCandidates({
@@ -757,22 +752,17 @@ export const recomputeSuggestionsForGroup = async (
     }, "ready");
   }
 
-  console.log(`Fetching drive times for ${combinedDestinations.length} venues and ${group.users.length} users in group ${sessionId}.`);
-
   const rows = await fetchDriveTimes(
     apiKey,
     group.users.map((user) => user.location),
     combinedDestinations.map((venue) => venue.location),
   );
 
-  console.log(`Drive times fetched for group ${sessionId}. Processing suggestions...`);
   const { etaMatrix, totalsByVenue } = buildEtaData(
     group.users,
     combinedDestinations,
     rows,
   );
-
-  console.log(`Computed ETA matrix for group ${sessionId}.`);
 
   const rankedCollectionCandidates = scoreVenues(
     collectionCandidates,
