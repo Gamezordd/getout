@@ -290,7 +290,10 @@ const queueInitialSuggestionsGeneration = (
 ) => {
   void (async () => {
     const lockAcquired = await tryAcquireSuggestionLock(sessionId);
-    if (!lockAcquired) return;
+    if (!lockAcquired){
+      console.log(`Initial suggestions generation already in progress for group ${sessionId}, skipping.`);
+      return;
+    }
 
     try {
       await setSuggestionsStatus(sessionId, group, "generating");
@@ -702,7 +705,8 @@ export const recomputeSuggestionsForGroup = async (
   group: GroupPayload,
   options: RecomputeOptions,
 ) => {
-  const seenVenueIds = new Set(group.suggestions.seenVenueIds || []);
+  try {
+      const seenVenueIds = new Set(group.suggestions.seenVenueIds || []);
   if (options.clearVotes) {
     group.votes = {};
   }
@@ -831,6 +835,16 @@ export const recomputeSuggestionsForGroup = async (
         : undefined,
     seenVenueIds: Array.from(seenVenueIds),
   }, "ready");
+  } catch (error) {
+    console.error(`Error occurred while generating suggestions for group ${sessionId}:`, error);
+    return persistSuggestionsSnapshot(sessionId, group, {
+      suggestedVenues: [],
+      etaMatrix: {},
+      totalsByVenue: {},
+      warning: "Error occurred while generating suggestions.",
+      seenVenueIds: [],
+    }, "error");
+  }
 };
 
 export const syncManualVenueMetricsForGroup = async (
