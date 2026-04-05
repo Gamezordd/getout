@@ -284,35 +284,6 @@ const setSuggestionsStatus = async (
   await saveGroup(sessionId, group);
 };
 
-const queueInitialSuggestionsGeneration = (
-  sessionId: string,
-  group: GroupPayload,
-) => {
-  void (async () => {
-    const lockAcquired = await tryAcquireSuggestionLock(sessionId);
-    if (!lockAcquired){
-      console.log(`Initial suggestions generation already in progress for group ${sessionId}, skipping.`);
-      return;
-    }
-
-    try {
-      await setSuggestionsStatus(sessionId, group, "generating");
-      await recomputeSuggestionsForGroup(sessionId, group, {
-        rotateSuggestions: false,
-      });
-      const channel = `private-group-${sessionId}`;
-      console.log(`Initial suggestions generation completed for group ${sessionId}, broadcasting update.`);
-      await safeTrigger(channel, "group-updated", {
-        reason: "suggestions-ready",
-      });
-    } catch {
-      await setSuggestionsStatus(sessionId, group, "error");
-    } finally {
-      await releaseSuggestionLock(sessionId);
-    }
-  })();
-};
-
 const tryAcquireSuggestionLock = async (sessionId: string) => {
   const result = await redis.set(
     `${SUGGESTION_LOCK_PREFIX}:${sessionId}`,
@@ -982,15 +953,30 @@ export default async function handler(
         reason: "suggestions-refreshed",
       });
     } else if (shouldGenerateInitialSuggestions) {
-      const nextStatus =
-        group.suggestionsStatus === "pending" ? "pending" : "generating";
-      if (group.suggestionsStatus !== nextStatus) {
-        await setSuggestionsStatus(sessionId, group, nextStatus);
+      if (group.suggestionsStatus !== "generating") {
+        await setSuggestionsStatus(sessionId, group, "generating");
       }
-      group.suggestionsStatus = nextStatus;
-      payload = buildPayloadFromGroup(group);
-      console.log(`Queueing initial suggestions generation for group ${sessionId} with status ${group.suggestionsStatus}`);
-      queueInitialSuggestionsGeneration(sessionId, group);
+      group.suggestionsStatus = "generating";
+
+      const lockAcquired = await tryAcquireSuggestionLock(sessionId);
+      if (!lockAcquired) {
+        payload = buildPayloadFromGroup(group);
+      } else {
+        try {
+          payload = await recomputeSuggestionsForGroup(sessionId, group, {
+            rotateSuggestions: false,
+          });
+          const channel = `private-group-${sessionId}`;
+          await safeTrigger(channel, "group-updated", {
+            reason: "suggestions-ready",
+          });
+        } catch (error) {
+          await setSuggestionsStatus(sessionId, group, "error");
+          throw error;
+        } finally {
+          await releaseSuggestionLock(sessionId);
+        }
+      }
     } else {
       payload = await hydrateSuggestionsFromGroup(sessionId, group);
     }
