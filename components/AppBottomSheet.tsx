@@ -1,0 +1,83 @@
+import type { ReactNode } from "react";
+import { Sheet } from "react-modal-sheet";
+
+type AppBottomSheetProps = {
+  isOpen: boolean;
+  onClose: () => void;
+  title: string;
+  subtitle?: string;
+  children: ReactNode;
+  footer?: ReactNode;
+};
+
+export default function AppBottomSheet({
+  isOpen,
+  onClose,
+  title,
+  subtitle,
+  children,
+  footer,
+}: AppBottomSheetProps) {
+  return (
+    <Sheet
+      isOpen={isOpen}
+      onClose={onClose}
+      snapPoints={[0.5, 0]}
+      initialSnap={0}
+      rootId="__next"
+      dragCloseThreshold={0.35}
+      dragVelocityThreshold={450}
+    >
+      <Sheet.Backdrop
+        className="!bg-black/60 !backdrop-blur-[2px]"
+        onTap={onClose}
+      />
+      <Sheet.Container className="!bg-[#141418] !rounded-t-[24px] !shadow-[0_-24px_70px_rgba(0,0,0,0.55)]">
+        <Sheet.Header className="px-5 pb-4 pt-3">
+          <div className="mx-auto h-1 w-9 rounded-full bg-[#252530]" />
+          <div className="mt-4 flex items-start justify-between gap-4">
+            <div>
+              <div className="font-display text-[22px] font-extrabold tracking-[-0.04em] text-white">
+                {title}
+              </div>
+              {subtitle ? (
+                <div className="mt-1 text-sm text-[#8b8b9c]">{subtitle}</div>
+              ) : null}
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full border border-white/10 bg-[#1c1c22] text-[#5a5a70]"
+              aria-label="Close sheet"
+            >
+              <svg
+                viewBox="0 0 16 16"
+                fill="none"
+                aria-hidden="true"
+                className="h-4 w-4"
+              >
+                <path
+                  d="M4 4l8 8M12 4 4 12"
+                  stroke="currentColor"
+                  strokeWidth="1.7"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </button>
+          </div>
+        </Sheet.Header>
+        <Sheet.Content className="flex h-full flex-col">
+          <Sheet.Scroller
+            draggableAt="top"
+            className="min-h-0 flex-1 overflow-y-auto px-5 pb-5 pt-0"
+          >
+            {children}
+          </Sheet.Scroller>
+          {footer ? (
+            <div className="bg-[#141418] px-5 pb-[34px] pt-1">{footer}</div>
+          ) : null}
+        </Sheet.Content>
+      </Sheet.Container>
+    </Sheet>
+  );
+}

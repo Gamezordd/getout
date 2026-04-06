@@ -1,14 +1,18 @@
-import { observer } from "mobx-react-lite";
+﻿import { observer } from "mobx-react-lite";
 import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
+import AppBottomSheet from "../components/AppBottomSheet";
 import CollectionsList from "../components/CollectionsList";
+import CreateGroupFields from "../components/CreateGroupFields";
 import FriendsManager from "../components/FriendsManager";
+import { useCreateGroupFlow } from "../hooks/useCreateGroupFlow";
 import type {
   CollectionListItem,
   InviteListItem,
   RecentGroupSummary,
 } from "../lib/authTypes";
 import { useAuth } from "../lib/auth/AuthProvider";
+import type { VenueCategory } from "../lib/types";
 
 const quickActions = [
   { label: "Bars", emoji: "🍸", category: "bar", sub: "Most popular" },
@@ -25,6 +29,52 @@ const getGreeting = () => {
 };
 
 const HISTORY_SKELETON_COUNT = 4;
+
+function DashboardCreateSheet({
+  initialCategory,
+  onClose,
+}: {
+  initialCategory: VenueCategory;
+  onClose: () => void;
+}) {
+  const createFlow = useCreateGroupFlow({
+    initialCategory,
+  });
+
+  return (
+    <AppBottomSheet
+      isOpen
+      onClose={onClose}
+      title="New group"
+      subtitle="30 seconds · link ready instantly"
+      footer={
+        <button
+          type="button"
+          onClick={createFlow.handleCreate}
+          className="flex w-full items-center justify-center gap-2 rounded-[16px] bg-[#00e5a0] px-4 py-4 font-display text-base font-extrabold tracking-[0.01em] text-black transition active:scale-[0.98]"
+        >
+          <svg
+            viewBox="0 0 16 16"
+            fill="none"
+            aria-hidden="true"
+            className="h-4 w-4"
+          >
+            <path
+              d="M3 8l4 4 6-7"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          {createFlow.submitting ? "Creating group..." : "Start Picking"}
+        </button>
+      }
+    >
+      <CreateGroupFields flow={createFlow} variant="sheet" />
+    </AppBottomSheet>
+  );
+}
 
 function DashboardPage() {
   const router = useRouter();
@@ -44,6 +94,9 @@ function DashboardPage() {
     "home" | "friends" | "collections" | "history"
   >("home");
   const [joinValue, setJoinValue] = useState("");
+  const [isCreateSheetOpen, setIsCreateSheetOpen] = useState(false);
+  const [createSheetCategory, setCreateSheetCategory] =
+    useState<VenueCategory>("bar");
 
   useEffect(() => {
     if (!router.isReady) return;
@@ -140,10 +193,18 @@ function DashboardPage() {
   );
 
   const openCreate = (category?: string) => {
-    void router.push({
-      pathname: "/landing",
-      query: category ? { category } : undefined,
-    });
+    if (
+      category === "bar" ||
+      category === "restaurant" ||
+      category === "cafe" ||
+      category === "night_club" ||
+      category === "brewery"
+    ) {
+      setCreateSheetCategory(category);
+    } else {
+      setCreateSheetCategory("bar");
+    }
+    setIsCreateSheetOpen(true);
   };
 
   const openJoin = () => {
@@ -638,10 +699,19 @@ function DashboardPage() {
             </span>
           </button>
         </div>
+
+        {isCreateSheetOpen ? (
+          <DashboardCreateSheet
+            initialCategory={createSheetCategory}
+            onClose={() => setIsCreateSheetOpen(false)}
+          />
+        ) : null}
       </div>
     </main>
   );
 }
 
 export default observer(DashboardPage);
+
+
 
