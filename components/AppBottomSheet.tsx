@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { Sheet } from "react-modal-sheet";
 
 type AppBottomSheetProps = {
@@ -18,20 +18,40 @@ export default function AppBottomSheet({
   children,
   footer,
 }: AppBottomSheetProps) {
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const { body, documentElement } = document;
+    const previousBodyOverflow = body.style.overflow;
+    const previousBodyTouchAction = body.style.touchAction;
+    const previousHtmlOverflow = documentElement.style.overflow;
+    const previousHtmlOverscroll = documentElement.style.overscrollBehavior;
+
+    body.style.overflow = "hidden";
+    body.style.touchAction = "none";
+    documentElement.style.overflow = "hidden";
+    documentElement.style.overscrollBehavior = "none";
+
+    return () => {
+      body.style.overflow = previousBodyOverflow;
+      body.style.touchAction = previousBodyTouchAction;
+      documentElement.style.overflow = previousHtmlOverflow;
+      documentElement.style.overscrollBehavior = previousHtmlOverscroll;
+    };
+  }, [isOpen]);
+
   return (
     <Sheet
       isOpen={isOpen}
       onClose={onClose}
       snapPoints={[0.5, 0]}
       initialSnap={0}
-      rootId="__next"
+      disableScrollLocking
       dragCloseThreshold={0.35}
       dragVelocityThreshold={450}
+      tweenConfig={{ ease: "easeOut", duration: 0.16 }}
     >
-      <Sheet.Backdrop
-        className="!bg-black/60 !backdrop-blur-[2px]"
-        onTap={onClose}
-      />
+      <Sheet.Backdrop className="!bg-black/55" onTap={onClose} />
       <Sheet.Container className="!bg-[#141418] !rounded-t-[24px] !shadow-[0_-24px_70px_rgba(0,0,0,0.55)]">
         <Sheet.Header className="px-5 pb-4 pt-3">
           <div className="mx-auto h-1 w-9 rounded-full bg-[#252530]" />
@@ -67,12 +87,9 @@ export default function AppBottomSheet({
           </div>
         </Sheet.Header>
         <Sheet.Content className="flex h-full flex-col">
-          <Sheet.Scroller
-            draggableAt="top"
-            className="min-h-0 flex-1 overflow-y-auto px-5 pb-5 pt-0"
-          >
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-5 pt-0">
             {children}
-          </Sheet.Scroller>
+          </div>
           {footer ? (
             <div className="bg-[#141418] px-5 pb-[34px] pt-1">{footer}</div>
           ) : null}
