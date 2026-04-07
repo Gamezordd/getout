@@ -1,7 +1,6 @@
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import { observer } from "mobx-react-lite";
-import FriendsManager from "../components/FriendsManager";
 import { EntryHeader, EntryShell } from "../components/entry/EntryFlow";
 import { useAuth } from "../lib/auth/AuthProvider";
 import {
@@ -115,7 +114,6 @@ function ProfilePage() {
                 </button>
               </div>
             </div>
-            <FriendsManager cardClassName="rounded-2xl border border-white/10 bg-[#0a0a0d] p-4" />
             <button
               type="button"
               onClick={async () => {
