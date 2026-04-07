@@ -25,6 +25,81 @@ import {
   reverseGeocodeLocation,
 } from "./location-utils";
 
+type PlacePhoto = {
+  name?: string;
+};
+
+const MANUAL_VENUE_PHOTO_LIMIT = 5;
+
+const getPhotoMediaUrl = async (
+  apiKey: string,
+  photoName: string,
+): Promise<string | null> => {
+  const response = await fetch(
+    `https://places.googleapis.com/v1/${photoName}/media?maxHeightPx=1200&skipHttpRedirect=true&key=${encodeURIComponent(apiKey)}`,
+  );
+
+  if (!response.ok) return null;
+
+  const data = await response.json().catch(() => null);
+  return typeof data?.photoUri === "string" ? data.photoUri : null;
+};
+
+const resolvePhotoUrls = async (
+  apiKey: string,
+  photos?: PlacePhoto[],
+): Promise<string[]> => {
+  if (!Array.isArray(photos) || photos.length === 0) return [];
+
+  const urls = await Promise.all(
+    photos
+      .map((photo) => photo.name)
+      .filter((name): name is string => Boolean(name))
+      .slice(0, MANUAL_VENUE_PHOTO_LIMIT)
+      .map((photoName) => getPhotoMediaUrl(apiKey, photoName)),
+  );
+
+  return urls.filter((url): url is string => Boolean(url));
+};
+
+const hydrateManualVenuePhotos = async (venue: Venue): Promise<Venue> => {
+  if (Array.isArray(venue.photos) && venue.photos.length > 0) {
+    return venue;
+  }
+
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+  if (!apiKey || !venue.id || venue.id.startsWith("geo-")) {
+    return {
+      ...venue,
+      photos: venue.photos || [],
+    };
+  }
+
+  try {
+    const response = await fetch(
+      `https://places.googleapis.com/v1/places/${encodeURIComponent(venue.id)}?fields=photos&key=${encodeURIComponent(apiKey)}`,
+    );
+    if (!response.ok) {
+      return {
+        ...venue,
+        photos: venue.photos || [],
+      };
+    }
+
+    const place = await response.json().catch(() => null);
+    const photos = await resolvePhotoUrls(apiKey, place?.photos);
+    return {
+      ...venue,
+      photos,
+    };
+  } catch {
+    return {
+      ...venue,
+      photos: venue.photos || [],
+    };
+  }
+};
+
 export const groupActions = (
   req: NextApiRequest,
   res: NextApiResponse,
@@ -192,7 +267,9 @@ export const groupActions = (
     return res.status(200).json(buildGroupResponse(group, user.id, isOwner));
   },
   setManualVenues: async (payload: SetManualVenuesRequest, group: GroupPayload) => {
-    group.manualVenues = payload.venues || [];
+    group.manualVenues = await Promise.all(
+      (payload.venues || []).map((venue) => hydrateManualVenuePhotos(venue)),
+    );
     await syncManualVenueMetricsForGroup(
       payload.sessionId,
       group,
@@ -211,8 +288,9 @@ export const groupActions = (
     };
     const exists = group.manualVenues.find((venue) => venue.id === payload.venue.id);
     if (!exists) {
-      group.manualVenues.push(normalizedVenue);
-      await syncManualVenueMetricsForGroup(payload.sessionId, group, [normalizedVenue]);
+      const hydratedVenue = await hydrateManualVenuePhotos(normalizedVenue);
+      group.manualVenues.push(hydratedVenue);
+      await syncManualVenueMetricsForGroup(payload.sessionId, group, [hydratedVenue]);
       await safeTrigger(channel, "group-updated", { reason: "manual-venues" });
     }
     return res.status(200).json(buildGroupResponse(group));

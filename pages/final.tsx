@@ -130,11 +130,6 @@ function FinalPage() {
   }, [sessionId, store]);
 
   useEffect(() => {
-    if (!store.sessionId || store.users.length === 0) return;
-    store.fetchSuggestions();
-  }, [store, store.sessionId, store.users.length]);
-
-  useEffect(() => {
     if (!router.isReady || !store.sessionId || store.isLoadingGroup) return;
     if (store.lockedVenue) return;
 

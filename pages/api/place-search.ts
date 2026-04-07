@@ -30,9 +30,13 @@ type AddressComponent = {
   types?: string[];
 };
 
-type PlacePhoto = {
-  name?: string;
+type SearchCacheEntry = {
+  expiresAt: number;
+  results: PlaceResult[];
 };
+
+const PLACE_SEARCH_CACHE_TTL_MS = 30 * 1000;
+const placeSearchCache = new Map<string, SearchCacheEntry>();
 
 const getAreaFromAddressComponents = (
   components?: AddressComponent[],
@@ -56,37 +60,6 @@ const getAreaFromAddressComponents = (
   return undefined;
 };
 
-const getPhotoMediaUrl = async (
-  apiKey: string,
-  photoName: string,
-): Promise<string | null> => {
-  const response = await fetch(
-    `https://places.googleapis.com/v1/${photoName}/media?maxHeightPx=1200&skipHttpRedirect=true&key=${encodeURIComponent(apiKey)}`,
-  );
-
-  if (!response.ok) return null;
-
-  const data = await response.json().catch(() => null);
-  return typeof data?.photoUri === "string" ? data.photoUri : null;
-};
-
-const resolvePhotoUrls = async (
-  apiKey: string,
-  photos?: PlacePhoto[],
-): Promise<string[]> => {
-  if (!Array.isArray(photos) || photos.length === 0) return [];
-
-  const urls = await Promise.all(
-    photos
-      .map((photo) => photo.name)
-      .filter((name): name is string => Boolean(name))
-      .slice(0, 5)
-      .map((photoName) => getPhotoMediaUrl(apiKey, photoName)),
-  );
-
-  return urls.filter((url): url is string => Boolean(url));
-};
-
 const searchTextPlaces = async (
   apiKey: string,
   query: string,
@@ -108,7 +81,7 @@ const searchTextPlaces = async (
         "Content-Type": "application/json",
         "X-Goog-Api-Key": apiKey,
         "X-Goog-FieldMask":
-          "places.id,places.displayName,places.formattedAddress,places.addressComponents,places.location,places.photos,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours,places.primaryType,places.types",
+          "places.id,places.displayName,places.formattedAddress,places.addressComponents,places.location,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours,places.primaryType,places.types",
       },
       body: JSON.stringify({
         textQuery: query,
@@ -125,32 +98,30 @@ const searchTextPlaces = async (
   const data = await response.json();
   const places = Array.isArray(data.places) ? data.places : [];
 
-  const results = await Promise.all(
-    places.map(async (place: any) => {
-      const location = place.location;
-      if (!location) return null;
-      return {
-        id: place.id,
-        name:
-          place.displayName?.text || place.formattedAddress || "Unknown place",
-        address: place.formattedAddress || undefined,
-        area: getAreaFromAddressComponents(place.addressComponents),
-        priceLabel: getPriceLabel(place.priceLevel),
-        closingTimeLabel: getClosingTimeLabel(place.currentOpeningHours),
-        photos: await resolvePhotoUrls(apiKey, place.photos),
-        rating: typeof place.rating === "number" ? place.rating : undefined,
-        userRatingCount:
-          typeof place.userRatingCount === "number"
-            ? place.userRatingCount
-            : undefined,
-        venueCategory: resolveVenueCategoryFromGooglePlace(place),
-        location: {
-          lat: location.latitude,
-          lng: location.longitude,
-        },
-      };
-    }),
-  );
+  const results = places.map((place: any) => {
+    const location = place.location;
+    if (!location) return null;
+    return {
+      id: place.id,
+      name:
+        place.displayName?.text || place.formattedAddress || "Unknown place",
+      address: place.formattedAddress || undefined,
+      area: getAreaFromAddressComponents(place.addressComponents),
+      priceLabel: getPriceLabel(place.priceLevel),
+      closingTimeLabel: getClosingTimeLabel(place.currentOpeningHours),
+      photos: [],
+      rating: typeof place.rating === "number" ? place.rating : undefined,
+      userRatingCount:
+        typeof place.userRatingCount === "number"
+          ? place.userRatingCount
+          : undefined,
+      venueCategory: resolveVenueCategoryFromGooglePlace(place),
+      location: {
+        lat: location.latitude,
+        lng: location.longitude,
+      },
+    };
+  });
 
   return results.filter(Boolean) as PlaceResult[];
 };
@@ -238,13 +209,31 @@ export default async function handler(
       ? radiusKmRaw
       : 25;
     const bias = hasBias ? { lat, lng, radiusKm } : undefined;
+    const cacheKey = JSON.stringify({
+      query: query.toLowerCase(),
+      lat: bias?.lat ?? null,
+      lng: bias?.lng ?? null,
+      radiusKm: bias?.radiusKm ?? null,
+    });
+    const cached = placeSearchCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      return res.status(200).json({ results: cached.results });
+    }
 
     const places = await searchTextPlaces(apiKey, query, bias);
     if (places.length > 0) {
+      placeSearchCache.set(cacheKey, {
+        expiresAt: Date.now() + PLACE_SEARCH_CACHE_TTL_MS,
+        results: places,
+      });
       return res.status(200).json({ results: places });
     }
 
     const geocoded = await geocodeAddress(apiKey, query, bias);
+    placeSearchCache.set(cacheKey, {
+      expiresAt: Date.now() + PLACE_SEARCH_CACHE_TTL_MS,
+      results: geocoded,
+    });
     return res.status(200).json({ results: geocoded });
   } catch {
     return res

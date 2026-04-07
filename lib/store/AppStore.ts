@@ -89,9 +89,34 @@ export class AppStore {
   mapError: string | null = null;
   isLoadingGroup = false;
   isLoadingSuggestions = false;
+  _activeSuggestionsRequestKey: string | null = null;
+  _activeSuggestionsPromise: Promise<void> | null = null;
 
   constructor() {
-    makeAutoObservable(this, {}, { autoBind: true });
+    makeAutoObservable(
+      this,
+      {
+        _activeSuggestionsRequestKey: false,
+        _activeSuggestionsPromise: false,
+      },
+      { autoBind: true },
+    );
+  }
+
+  private buildSuggestionsRequestKey(refresh = false) {
+    return JSON.stringify({
+      sessionId: this.sessionId,
+      refresh,
+      browserId: refresh ? this.browserId : null,
+      lockedVenueId: this.lockedVenue?.id || null,
+      venueCategory: this.venueCategory,
+      userLocations: this.users.map((user) => ({
+        id: user.id,
+        lat: Number(user.location.lat.toFixed(5)),
+        lng: Number(user.location.lng.toFixed(5)),
+      })),
+      manualVenueIds: this.manualVenues.map((venue) => venue.id).sort(),
+    });
   }
 
   get currentUser() {
@@ -284,66 +309,90 @@ export class AppStore {
       this.suggestionsStatus = "idle";
       return;
     }
-
-    try {
-      this.isLoadingSuggestions = true;
-      this.etaError = null;
-      this.suggestionWarning = null;
-      const params = new URLSearchParams({ sessionId: this.sessionId });
-      if (options?.refresh) {
-        params.set("refresh", "1");
-        if (this.browserId) {
-          params.set("browserId", this.browserId);
-        }
-      }
-      const response = await fetch(`/api/suggestions?${params.toString()}`);
-      if (!response.ok) {
-        const payload = await response.json().catch(() => ({}));
-        throw new Error(payload.message || "Unable to fetch suggestions.");
-      }
-      const data = (await response.json()) as SuggestionsPayload;
-      const mergedVenueState = mergeVenues(
-        data.suggestedVenues || [],
-        this.manualVenues,
-      );
-      runInAction(() => {
-        this.venues = mergedVenueState.mergedVenues;
-        this.suggestedVenues = data.suggestedVenues || [];
-        this.totalsByVenue = data.totalsByVenue || {};
-        this.etaMatrix = data.etaMatrix || {};
-        this.reconcileVotes(data.votes || {});
-        this.votingClosesAt = data.votingClosesAt || null;
-        this.suggestionWarning = data.warning || null;
-        this.suggestionsStatus = data.suggestionsStatus || "ready";
-        this.isLoadingSuggestions = false;
-        const hasSelected =
-          this.selectedVenueId &&
-          this.venues.find((venue) => venue.id === this.selectedVenueId);
-        if (!hasSelected) {
-          const ranked = this.venues
-            .map((venue) => ({
-              id: venue.id,
-              total: this.totalsByVenue?.[venue.id],
-            }))
-            .filter((item) => typeof item.total === "number") as Array<{
-            id: string;
-            total: number;
-          }>;
-          ranked.sort((a, b) => a.total - b.total);
-          this.selectedVenueId =
-            ranked[0]?.id ||
-            this.venues[0]?.id ||
-            this.suggestedVenues[0]?.id ||
-            null;
-        }
-      });
-    } catch (err: any) {
-      runInAction(() => {
-        this.etaError = err.message || "Unable to calculate ETAs.";
-        this.suggestionsStatus = "error";
-        this.isLoadingSuggestions = false;
-      });
+    if (this.lockedVenue && !options?.refresh) {
+      return;
     }
+
+    const requestKey = this.buildSuggestionsRequestKey(Boolean(options?.refresh));
+    if (
+      this._activeSuggestionsPromise &&
+      this._activeSuggestionsRequestKey === requestKey
+    ) {
+      return this._activeSuggestionsPromise;
+    }
+
+    const requestPromise = (async () => {
+      try {
+        this.isLoadingSuggestions = true;
+        this.etaError = null;
+        this.suggestionWarning = null;
+        const params = new URLSearchParams({ sessionId: this.sessionId! });
+        if (options?.refresh) {
+          params.set("refresh", "1");
+          if (this.browserId) {
+            params.set("browserId", this.browserId);
+          }
+        }
+        const response = await fetch(`/api/suggestions?${params.toString()}`);
+        if (!response.ok) {
+          const payload = await response.json().catch(() => ({}));
+          throw new Error(payload.message || "Unable to fetch suggestions.");
+        }
+        const data = (await response.json()) as SuggestionsPayload;
+        const mergedVenueState = mergeVenues(
+          data.suggestedVenues || [],
+          this.manualVenues,
+        );
+        runInAction(() => {
+          this.venues = mergedVenueState.mergedVenues;
+          this.suggestedVenues = data.suggestedVenues || [];
+          this.totalsByVenue = data.totalsByVenue || {};
+          this.etaMatrix = data.etaMatrix || {};
+          this.reconcileVotes(data.votes || {});
+          this.votingClosesAt = data.votingClosesAt || null;
+          this.suggestionWarning = data.warning || null;
+          this.suggestionsStatus = data.suggestionsStatus || "ready";
+          this.isLoadingSuggestions = false;
+          const hasSelected =
+            this.selectedVenueId &&
+            this.venues.find((venue) => venue.id === this.selectedVenueId);
+          if (!hasSelected) {
+            const ranked = this.venues
+              .map((venue) => ({
+                id: venue.id,
+                total: this.totalsByVenue?.[venue.id],
+              }))
+              .filter((item) => typeof item.total === "number") as Array<{
+              id: string;
+              total: number;
+            }>;
+            ranked.sort((a, b) => a.total - b.total);
+            this.selectedVenueId =
+              ranked[0]?.id ||
+              this.venues[0]?.id ||
+              this.suggestedVenues[0]?.id ||
+              null;
+          }
+        });
+      } catch (err: any) {
+        runInAction(() => {
+          this.etaError = err.message || "Unable to calculate ETAs.";
+          this.suggestionsStatus = "error";
+          this.isLoadingSuggestions = false;
+        });
+      } finally {
+        runInAction(() => {
+          if (this._activeSuggestionsRequestKey === requestKey) {
+            this._activeSuggestionsRequestKey = null;
+            this._activeSuggestionsPromise = null;
+          }
+        });
+      }
+    })();
+
+    this._activeSuggestionsRequestKey = requestKey;
+    this._activeSuggestionsPromise = requestPromise;
+    return requestPromise;
   }
 
   refreshSuggestions() {

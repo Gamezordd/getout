@@ -31,10 +31,6 @@ type AddressComponent = {
   types?: string[];
 };
 
-type PlacePhoto = {
-  name?: string;
-};
-
 const GOOGLE_MAPS_HOSTS = new Set([
   "maps.app.goo.gl",
   "goo.gl",
@@ -81,38 +77,7 @@ const getAreaFromAddressComponents = (
   return undefined;
 };
 
-const getPhotoMediaUrl = async (
-  apiKey: string,
-  photoName: string,
-): Promise<string | null> => {
-  const response = await fetch(
-    `https://places.googleapis.com/v1/${photoName}/media?maxHeightPx=1200&skipHttpRedirect=true&key=${encodeURIComponent(apiKey)}`,
-  );
-
-  if (!response.ok) return null;
-
-  const data = await response.json().catch(() => null);
-  return typeof data?.photoUri === "string" ? data.photoUri : null;
-};
-
-const resolvePhotoUrls = async (
-  apiKey: string,
-  photos?: PlacePhoto[],
-): Promise<string[]> => {
-  if (!Array.isArray(photos) || photos.length === 0) return [];
-
-  const urls = await Promise.all(
-    photos
-      .map((photo) => photo.name)
-      .filter((name): name is string => Boolean(name))
-      .slice(0, 5)
-      .map((photoName) => getPhotoMediaUrl(apiKey, photoName)),
-  );
-
-  return urls.filter((url): url is string => Boolean(url));
-};
-
-const mapPlaceToResult = async (apiKey: string, place: any) => {
+const mapPlaceToResult = async (_apiKey: string, place: any) => {
   const location = place.location;
   if (!location) return null;
 
@@ -123,7 +88,7 @@ const mapPlaceToResult = async (apiKey: string, place: any) => {
     area: getAreaFromAddressComponents(place.addressComponents),
     priceLabel: getPriceLabel(place.priceLevel),
     closingTimeLabel: getClosingTimeLabel(place.currentOpeningHours),
-    photos: await resolvePhotoUrls(apiKey, place.photos),
+    photos: [],
     rating: typeof place.rating === "number" ? place.rating : undefined,
     userRatingCount:
       typeof place.userRatingCount === "number"
@@ -139,7 +104,7 @@ const mapPlaceToResult = async (apiKey: string, place: any) => {
 
 const fetchPlaceById = async (apiKey: string, placeId: string) => {
   const response = await fetch(
-    `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}?fields=id,displayName,formattedAddress,addressComponents,location,photos,rating,userRatingCount,priceLevel,currentOpeningHours,primaryType,types&key=${encodeURIComponent(apiKey)}`,
+    `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}?fields=id,displayName,formattedAddress,addressComponents,location,rating,userRatingCount,priceLevel,currentOpeningHours,primaryType,types&key=${encodeURIComponent(apiKey)}`,
   );
 
   if (!response.ok) {
@@ -157,7 +122,7 @@ const searchTextPlace = async (apiKey: string, query: string) => {
       "Content-Type": "application/json",
       "X-Goog-Api-Key": apiKey,
       "X-Goog-FieldMask":
-        "places.id,places.displayName,places.formattedAddress,places.addressComponents,places.location,places.photos,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours,places.primaryType,places.types",
+        "places.id,places.displayName,places.formattedAddress,places.addressComponents,places.location,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours,places.primaryType,places.types",
     },
     body: JSON.stringify({
       textQuery: query,

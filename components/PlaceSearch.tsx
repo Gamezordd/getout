@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
 import type { LatLng, VenueCategory } from "../lib/types";
 
 export type PlaceResult = {
@@ -40,6 +40,9 @@ export default function PlaceSearch({
   const [results, setResults] = useState<PlaceResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const resultCacheRef = useRef<Map<string, { expiresAt: number; results: PlaceResult[] }>>(
+    new Map(),
+  );
   const selectedDisplay = selectedPlace ? selectedPlace.name : "";
   const isDark = variant === "dark";
 
@@ -61,6 +64,12 @@ export default function PlaceSearch({
       setError(null);
       return;
     }
+    if (query.trim().length < 2) {
+      setResults([]);
+      setError(null);
+      setLoading(false);
+      return;
+    }
 
     const controller = new AbortController();
     const run = async () => {
@@ -77,8 +86,17 @@ export default function PlaceSearch({
             params.set("radiusKm", String(locationBias.radiusKm));
           }
         }
-        const url = `/api/place-search?${params.toString()}`;
-        const response = await fetch(url, { signal: controller.signal });
+        const cacheKey = params.toString();
+        const cached = resultCacheRef.current.get(cacheKey);
+        if (cached && cached.expiresAt > Date.now()) {
+          setResults(resultFilter ? cached.results.filter(resultFilter) : cached.results);
+          setLoading(false);
+          return;
+        }
+
+        const response = await fetch(`/api/place-search?${cacheKey}`, {
+          signal: controller.signal,
+        });
         if (!response.ok) {
           throw new Error("Search failed. Please try again.");
         }
@@ -87,6 +105,10 @@ export default function PlaceSearch({
         const places: PlaceResult[] = Array.isArray(data.results)
           ? data.results
           : [];
+        resultCacheRef.current.set(cacheKey, {
+          expiresAt: Date.now() + 30_000,
+          results: places,
+        });
         setResults(resultFilter ? places.filter(resultFilter) : places);
       } catch (err: any) {
         if (err.name !== "AbortError") {
@@ -97,12 +119,12 @@ export default function PlaceSearch({
       }
     };
 
-    const debounce = setTimeout(run, 300);
+    const debounce = setTimeout(run, 400);
     return () => {
       controller.abort();
       clearTimeout(debounce);
     };
-  }, [query, resultFilter, selectedPlace, selectedDisplay]);
+  }, [locationBias, query, resultFilter, selectedPlace, selectedDisplay]);
 
   return (
     <div className="space-y-2">
@@ -140,7 +162,7 @@ export default function PlaceSearch({
       {selectedPlace && query.trim() === selectedDisplay && selectedPlace.address ? (
         <p className={isDark ? "text-xs text-[#64647a]" : "text-xs text-slate-500"}>{selectedPlace.address}</p>
       ) : null}
-      {loading && <p className={isDark ? "text-sm text-[#64647a]" : "text-base text-slate-500"}>Searching…</p>}
+      {loading && <p className={isDark ? "text-sm text-[#64647a]" : "text-base text-slate-500"}>Searching...</p>}
       {error && <p className={isDark ? "text-sm text-rose-300" : "text-base text-red-600"}>{error}</p>}
       {!selectedPlace || query.trim() !== selectedDisplay ? (
         <div className="space-y-2">
@@ -149,10 +171,10 @@ export default function PlaceSearch({
               key={place.id}
               type="button"
               onClick={() => {
-              onSelect(place);
-              setQuery(clearOnSelect ? "" : place.name);
-              setResults([]);
-            }}
+                onSelect(place);
+                setQuery(clearOnSelect ? "" : place.name);
+                setResults([]);
+              }}
               className={`w-full rounded-2xl border px-4 py-3 text-left text-base ${isDark ? "border-white/10 bg-[#1c1c22] hover:border-white/20" : "border-slate-200 bg-white shadow-sm hover:border-slate-300"}`}
             >
               <p className={isDark ? "font-semibold text-white" : "font-semibold text-ink"}>{place.name}</p>
