@@ -22,6 +22,7 @@ import Dialog from "../components/Dialog";
 import {
   getPreciseLocationBannerDismissed,
   refreshCachedPreciseLocation,
+  setAutoPreciseLocationEnabled,
   setPreciseLocationBannerDismissed,
 } from "../lib/nativePreciseLocation";
 import { getUserActivityLabel } from "../lib/userDisplay";
@@ -139,6 +140,7 @@ function HomePage() {
     if (!currentUserId || isDetectingPreciseLocation) return;
     setIsDetectingPreciseLocation(true);
     store.setMapError(null);
+    setAutoPreciseLocationEnabled(true);
     try {
       const locationResult = await refreshCachedPreciseLocation({
         isNative,
