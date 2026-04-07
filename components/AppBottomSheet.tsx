@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Sheet } from "react-modal-sheet";
 
 type AppBottomSheetProps = {
@@ -18,6 +18,20 @@ export default function AppBottomSheet({
   children,
   footer,
 }: AppBottomSheetProps) {
+  const [initialSnapRatio, setInitialSnapRatio] = useState(0.5);
+
+  useEffect(() => {
+    const updateSnapRatio = () => {
+      const isCompactViewport =
+        window.innerWidth <= 390 || window.innerHeight <= 760;
+      setInitialSnapRatio(isCompactViewport ? 0.6 : 0.5);
+    };
+
+    updateSnapRatio();
+    window.addEventListener("resize", updateSnapRatio);
+    return () => window.removeEventListener("resize", updateSnapRatio);
+  }, []);
+
   useEffect(() => {
     if (!isOpen) return;
 
@@ -44,7 +58,7 @@ export default function AppBottomSheet({
     <Sheet
       isOpen={isOpen}
       onClose={onClose}
-      snapPoints={[0.5, 0]}
+      snapPoints={[initialSnapRatio, 0]}
       initialSnap={0}
       disableScrollLocking
       dragCloseThreshold={0.35}
