@@ -71,11 +71,11 @@ export default function AppBottomSheet({
           <div className="mx-auto h-1 w-9 rounded-full bg-[#252530]" />
           <div className="mt-4 flex items-start justify-between gap-4">
             <div>
-              <div className="font-display text-[22px] font-extrabold tracking-[-0.04em] text-white">
+              <div className="font-display text-[24px] font-extrabold tracking-[-0.04em] text-white">
                 {title}
               </div>
               {subtitle ? (
-                <div className="mt-1 text-sm text-[#8b8b9c]">{subtitle}</div>
+                <div className="mt-1 text-[14px] text-[#8b8b9c]">{subtitle}</div>
               ) : null}
             </div>
             <button

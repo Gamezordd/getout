@@ -1,4 +1,4 @@
-import { observer } from "mobx-react-lite";
+﻿import { observer } from "mobx-react-lite";
 import { useRouter } from "next/router";
 import { useEffect, useMemo } from "react";
 import useInstallPrompt from "../hooks/useInstallPrompt";
@@ -184,9 +184,10 @@ function FinalPage() {
   }, [lockedVenue, venueDetails?.address]);
 
   const heroImage = venueDetails?.photos?.[0];
-  const venueTypeParts = [venueDetails?.area, store.venueCategory?.replace("_", " ")].filter(
-    Boolean,
-  );
+  const venueTypeParts = [
+    venueDetails?.area,
+    store.venueCategory?.replace("_", " "),
+  ].filter(Boolean);
   const ratingCount = formatRatingCount(venueDetails?.userRatingCount);
   const burstConfetti = useMemo(() => buildConfettiParticles(46, "burst"), []);
   const ambientConfetti = useMemo(() => buildConfettiParticles(22, "ambient"), []);
@@ -196,10 +197,10 @@ function FinalPage() {
       <main className="flex min-h-screen items-center justify-center bg-[#0a0a0d] px-6 text-[#f0f0f5]">
         <div className="w-full max-w-[430px] rounded-[28px] border border-white/10 bg-[#141418] px-6 py-8 text-center">
           <div className="mx-auto h-10 w-10 animate-spin rounded-full border-2 border-[#00e5a0]/30 border-t-[#00e5a0]" />
-          <p className="mt-4 font-display text-xl font-bold tracking-[-0.03em]">
+          <p className="mt-4 font-display text-[22px] font-bold tracking-[-0.03em]">
             Loading final plan
           </p>
-          <p className="mt-2 text-sm text-[#8d8da2]">
+          <p className="mt-2 text-[15px] text-[#8d8da2]">
             Pulling the locked venue and latest group activity.
           </p>
         </div>
@@ -240,7 +241,7 @@ function FinalPage() {
                   </svg>
                 </button>
               ) : null}
-              <div className="font-display text-[21px] font-extrabold tracking-[-0.04em]">
+              <div className="font-display text-[22px] font-extrabold tracking-[-0.04em]">
                 Get<span className="text-[#00e5a0]">Out</span>
               </div>
             </div>
@@ -322,21 +323,21 @@ function FinalPage() {
             ))}
           </div>
 
-          <div className="absolute left-1/2 top-4 flex -translate-x-1/2 items-center gap-2 rounded-full border border-[#00e5a0]/35 bg-black/50 px-4 py-1.5 text-[12px] font-semibold tracking-[0.02em] text-[#00e5a0] backdrop-blur-xl">
+          <div className="absolute left-1/2 top-4 flex -translate-x-1/2 items-center gap-2 rounded-full border border-[#00e5a0]/35 bg-black/50 px-4 py-1.5 text-[13px] font-semibold tracking-[0.02em] text-[#00e5a0] backdrop-blur-xl">
             <span className="text-sm">🔒</span>
             <span>Venue locked</span>
             <span className="h-1.5 w-1.5 rounded-full bg-[#00e5a0] animate-pulse" />
           </div>
 
-          <div className="absolute right-4 top-4 rounded-full border border-white/10 bg-black/50 px-3 py-1 text-[11px] text-white/70 backdrop-blur-xl">
+          <div className="absolute right-4 top-4 rounded-full border border-white/10 bg-black/50 px-3 py-1 text-[12px] text-white/70 backdrop-blur-xl">
             <span className="font-bold text-[#00e5a0]">{uniqueVoterCount}</span> / {store.users.length} voted
           </div>
 
           <div className="absolute inset-x-0 bottom-0 px-4 pb-6">
-            <p className="font-display text-[34px] font-extrabold tracking-[-0.05em] text-white drop-shadow-[0_2px_20px_rgba(0,0,0,0.8)]">
+            <p className="font-display text-[32px] font-extrabold tracking-[-0.05em] text-white drop-shadow-[0_2px_20px_rgba(0,0,0,0.8)]">
               {lockedVenue.name}
             </p>
-            <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-white/70">
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-[15px] text-white/70">
               {venueTypeParts.length > 0 && <span>{venueTypeParts.join(" · ")}</span>}
               {venueTypeParts.length > 0 && venueDetails?.rating && (
                 <span className="h-1 w-1 rounded-full bg-white/30" />
@@ -345,7 +346,7 @@ function FinalPage() {
                 <span className="font-semibold text-[#ffbe3d]">
                   ★ {venueDetails.rating.toFixed(1)}
                   {ratingCount ? (
-                    <span className="ml-1 text-xs font-normal text-white/45">({ratingCount})</span>
+                    <span className="ml-1 text-[12px] font-normal text-white/45">({ratingCount})</span>
                   ) : null}
                 </span>
               )}
@@ -355,17 +356,17 @@ function FinalPage() {
 
         <div className="flex-1 px-4 pb-10">
           <section className="pt-5">
-            <p className="font-display text-[24px] font-extrabold tracking-[-0.04em]">
+            <p className="font-display text-[22px] font-extrabold tracking-[-0.04em]">
               <span className="text-[#00e5a0]">GetOut</span> confirmed 🎉
             </p>
-            <p className="mt-2 text-sm leading-6 text-[#8d8da2]">
+            <p className="mt-2 text-[15px] leading-6 text-[#8d8da2]">
               Voting ended · {lockedVenue.name} won with {formatVotes(totalVotes)}.
               See you there.
             </p>
           </section>
 
           <section className="mt-4 rounded-[20px] border border-white/10 bg-[#141418] px-4 py-4">
-            <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[#64647a]">
+            <p className="text-[12px] font-medium uppercase tracking-[0.12em] text-[#64647a]">
               The group
             </p>
             <div className="mt-3 space-y-3">
@@ -402,11 +403,11 @@ function FinalPage() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <p className="truncate text-sm font-semibold text-[#f0f0f5]">
+                        <p className="truncate text-[15px] font-semibold text-[#f0f0f5]">
                           {user.name}
                         </p>
                         {subLabel ? (
-                          <span className="text-[11px] text-[#64647a]">{subLabel}</span>
+                          <span className="text-[12px] text-[#64647a]">{subLabel}</span>
                         ) : null}
                       </div>
                       {hasEta && (
@@ -418,7 +419,7 @@ function FinalPage() {
                             />
                           </div>
                           <span
-                            className="min-w-10 text-right font-display text-[11px] font-bold tracking-[-0.02em]"
+                            className="min-w-10 text-right font-display text-[12px] font-bold tracking-[-0.02em]"
                             style={{ color: accent }}
                           >
                             {`${Math.round(eta)}m`}
@@ -441,10 +442,10 @@ function FinalPage() {
 
           <section className="mt-3 overflow-hidden rounded-[20px] border border-white/10 bg-[#141418]">
             <div className="px-4 py-4">
-              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[#64647a]">
+              <p className="text-[12px] font-medium uppercase tracking-[0.12em] text-[#64647a]">
                 Address
               </p>
-              <p className="mt-2 text-sm leading-6 text-[#d0d0db]">
+              <p className="mt-2 text-[15px] leading-6 text-[#d0d0db]">
                 {lockedVenue.address || venueDetails?.address || "Address unavailable"}
               </p>
             </div>
@@ -452,7 +453,7 @@ function FinalPage() {
               href={`https://www.google.com/maps/search/?api=1&query=${mapsQuery}`}
               target="_blank"
               rel="noreferrer"
-              className="flex items-center justify-center gap-2 bg-[#00e5a0] px-4 py-4 font-display text-sm font-bold text-black"
+              className="flex items-center justify-center gap-2 bg-[#00e5a0] px-4 py-4 font-display text-[15px] font-bold text-black"
             >
               <span aria-hidden="true">📍</span>
               <span>Open in Google Maps</span>
@@ -468,8 +469,8 @@ function FinalPage() {
               className="rounded-[18px] border border-white/10 bg-[#141418] px-4 py-4 text-center"
             >
               <p className="text-2xl leading-none">📲</p>
-              <p className="mt-2 text-sm font-semibold text-[#f0f0f5]">Share to group</p>
-              <p className="mt-1 text-xs text-[#64647a]">WhatsApp · Telegram</p>
+              <p className="mt-2 text-[15px] font-semibold text-[#f0f0f5]">Share to group</p>
+              <p className="mt-1 text-[12px] text-[#64647a]">WhatsApp · Telegram</p>
             </button>
             <button
               type="button"
@@ -479,8 +480,8 @@ function FinalPage() {
               className="rounded-[18px] border border-white/10 bg-[#141418] px-4 py-4 text-center"
             >
               <p className="text-2xl leading-none">📌</p>
-              <p className="mt-2 text-sm font-semibold text-[#f0f0f5]">Add to homescreen</p>
-              <p className="mt-1 text-xs text-[#64647a]">Quick access</p>
+              <p className="mt-2 text-[15px] font-semibold text-[#f0f0f5]">Add to homescreen</p>
+              <p className="mt-1 text-[12px] text-[#64647a]">Quick access</p>
             </button>
             <button
               type="button"
@@ -490,8 +491,8 @@ function FinalPage() {
               className="rounded-[18px] border border-white/10 bg-[#141418] px-4 py-4 text-center"
             >
               <p className="text-2xl leading-none">🔗</p>
-              <p className="mt-2 text-sm font-semibold text-[#f0f0f5]">Copy link</p>
-              <p className="mt-1 text-xs text-[#64647a]">Share this GetOut</p>
+              <p className="mt-2 text-[15px] font-semibold text-[#f0f0f5]">Copy link</p>
+              <p className="mt-1 text-[12px] text-[#64647a]">Share this GetOut</p>
             </button>
             <a
               href="/create"
@@ -500,15 +501,15 @@ function FinalPage() {
               className="rounded-[18px] border border-white/10 bg-[#141418] px-4 py-4 text-center"
             >
               <p className="text-2xl leading-none">✨</p>
-              <p className="mt-2 text-sm font-semibold text-[#f0f0f5]">Create new group</p>
-              <p className="mt-1 text-xs text-[#64647a]">Start again</p>
+              <p className="mt-2 text-[15px] font-semibold text-[#f0f0f5]">Create new group</p>
+              <p className="mt-1 text-[12px] text-[#64647a]">Start again</p>
             </a>
           </section>
 
           <hr className="mt-4 border-[#64647a]" />
 
           <section className="mt-5 text-center">
-            <p className="text-xs text-[#64647a]">Hope you have a wonderful time ❤️</p>
+            <p className="text-[12px] text-[#64647a]">Hope you have a wonderful time ❤️</p>
           </section>
         </div>
       </div>

@@ -74,7 +74,7 @@ export const Header = observer(function Header({
               </svg>
             </button>
           ) : null}
-          <h1 className="font-display text-xl font-extrabold tracking-[-0.04em] text-[#f0f0f5]">
+          <h1 className="font-display text-[22px] font-extrabold tracking-[-0.04em] text-[#f0f0f5]">
             Get<span className="text-[#00e5a0]">Out</span>
           </h1>
         </div>
@@ -83,7 +83,7 @@ export const Header = observer(function Header({
             <button
               type="button"
               onClick={onInviteClick}
-              className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-[#1c1c22] px-3 py-1.5 text-[11px] font-semibold text-[#f0f0f5]"
+              className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-[#1c1c22] px-3 py-1.5 text-[12px] font-semibold text-[#f0f0f5]"
             >
               <svg
                 viewBox="0 0 24 24"
@@ -100,7 +100,7 @@ export const Header = observer(function Header({
             <button
               type="button"
               onClick={handleAddVenue}
-              className="inline-flex items-center gap-1.5 rounded-full bg-[#00e5a0] px-3 py-1.5 text-[11px] font-bold text-black"
+              className="inline-flex items-center gap-1.5 rounded-full bg-[#00e5a0] px-3 py-1.5 text-[12px] font-bold text-black"
               aria-label="Add venue"
             >
               <svg

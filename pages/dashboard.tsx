@@ -51,7 +51,7 @@ function DashboardCreateSheet({
         <button
           type="button"
           onClick={createFlow.handleCreate}
-          className="flex w-full items-center justify-center gap-2 rounded-[16px] bg-[#00e5a0] px-4 py-4 font-display text-base font-extrabold tracking-[0.01em] text-black transition active:scale-[0.98]"
+          className="flex w-full items-center justify-center gap-2 rounded-[16px] bg-[#00e5a0] px-4 py-4 font-display text-[15px] font-extrabold tracking-[0.01em] text-black transition active:scale-[0.98]"
         >
           <svg
             viewBox="0 0 16 16"
@@ -450,8 +450,8 @@ function DashboardPage() {
           <div className={`absolute inset-0 overflow-y-auto pb-5 transition ${activeTab === "home" ? "opacity-100" : "pointer-events-none opacity-0"}`}>
             <div className="flex items-start justify-between px-5 pb-4 pt-1">
               <div>
-                <div className="text-[13px] text-[#5a5a70]">{getGreeting()} 👋</div>
-                <div className="font-display text-[28px] font-extrabold tracking-[-0.04em] text-white">
+                <div className="text-[14px] text-[#5a5a70]">{getGreeting()} 👋</div>
+                <div className="font-display text-[26px] font-extrabold tracking-[-0.04em] text-white">
                   Get<span className="text-[#00e5a0]">Out</span>
                 </div>
               </div>
@@ -469,22 +469,22 @@ function DashboardPage() {
                 </svg>
               </div>
               <div className="flex-1">
-                <div className="font-display text-[15px] font-bold tracking-[-0.02em] text-white">
+                <div className="font-display text-[16px] font-bold tracking-[-0.02em] text-white">
                   Create a group
                 </div>
-                <div className="mt-1 text-xs text-[#5a5a70]">
+                <div className="mt-1 text-[13px] text-[#5a5a70]">
                   Pick a spot together · share link instantly
                 </div>
               </div>
             </button>
 
             <div className="px-5 pb-3">
-              <div className="font-display text-base font-bold tracking-[-0.02em] text-white">
+              <div className="font-display text-[17px] font-bold tracking-[-0.02em] text-white">
                 Join a group
               </div>
             </div>
             <div className="mx-5 rounded-[18px] border border-white/10 bg-[#141418] p-4">
-              <div className="mb-[10px] text-[11px] font-semibold uppercase tracking-[0.06em] text-[#5a5a70]">
+              <div className="mb-[10px] text-[12px] font-semibold uppercase tracking-[0.05em] text-[#5a5a70]">
                 Have an invite link?
               </div>
               <div className="flex items-center gap-2">
@@ -497,7 +497,7 @@ function DashboardPage() {
                 <button
                   type="button"
                   onClick={openJoin}
-                  className="rounded-xl border border-white/10 bg-[#1c1c22] px-4 py-3 font-display text-[13px] font-bold text-[#8b8b9c]"
+                  className="rounded-xl border border-white/10 bg-[#1c1c22] px-4 py-3 font-display text-[14px] font-bold text-[#8b8b9c]"
                 >
                   Join →
                 </button>
@@ -505,7 +505,7 @@ function DashboardPage() {
             </div>
 
             <div className="flex items-center justify-between px-5 pb-3 pt-6">
-              <div className="font-display text-base font-bold tracking-[-0.02em] text-white">
+              <div className="font-display text-[17px] font-bold tracking-[-0.02em] text-white">
                 Quick start
               </div>
               <button type="button" onClick={() => openCreate()} className="text-xs font-medium text-[#00e5a0]">
@@ -521,14 +521,14 @@ function DashboardPage() {
                   className={`min-w-[86px] flex-1 rounded-[14px] border px-[10px] py-[14px] text-center ${index === 0 ? "border-[#00e5a038] bg-[linear-gradient(145deg,#0f1f18,#141418)]" : "border-white/10 bg-[#141418]"}`}
                 >
                   <div className="text-[22px]">{item.emoji}</div>
-                  <div className="mt-1 font-display text-xs font-bold text-white">{item.label}</div>
-                  <div className="mt-1 text-[10px] text-[#5a5a70]">{item.sub}</div>
+                  <div className="mt-1 font-display text-[13px] font-bold text-white">{item.label}</div>
+                  <div className="mt-1 text-[11px] text-[#5a5a70]">{item.sub}</div>
                 </button>
               ))}
             </div>
 
             <div className="flex items-center justify-between px-5 pb-3">
-              <div className="font-display text-base font-bold tracking-[-0.02em] text-white">
+              <div className="font-display text-[17px] font-bold tracking-[-0.02em] text-white">
                 Recent
               </div>
               <button type="button" onClick={() => setActiveTab("history")} className="text-xs font-medium text-[#00e5a0]">
@@ -567,7 +567,7 @@ function DashboardPage() {
                 <div className="font-display text-2xl font-extrabold tracking-[-0.04em] text-white">
                   History
                 </div>
-                <div className="mt-1 text-[13px] text-[#5a5a70]">
+                <div className="mt-1 text-[14px] text-[#5a5a70]">
                   Your last 48 hours of GetOut sessions
                 </div>
               </div>
@@ -600,7 +600,7 @@ function DashboardPage() {
                 <div className="font-display text-2xl font-extrabold tracking-[-0.04em] text-white">
                   Friends
                 </div>
-                <div className="mt-1 text-[13px] text-[#5a5a70]">
+                <div className="mt-1 text-[14px] text-[#5a5a70]">
                   Keep your invite list ready for the next group you create
                 </div>
               </div>
@@ -617,7 +617,7 @@ function DashboardPage() {
                 <div className="font-display text-2xl font-extrabold tracking-[-0.04em] text-white">
                   Collections
                 </div>
-                <div className="mt-1 text-[13px] text-[#5a5a70]">
+                <div className="mt-1 text-[14px] text-[#5a5a70]">
                   Your saved spots, ready for the next plan
                 </div>
               </div>
@@ -650,7 +650,7 @@ function DashboardPage() {
                 opacity={activeTab === "home" ? "1" : "0.45"}
               />
             </svg>
-            <span className={`text-[10px] font-semibold ${activeTab === "home" ? "text-[#00e5a0]" : "text-[#5a5a70]"}`}>
+            <span className={`text-[11px] font-semibold ${activeTab === "home" ? "text-[#00e5a0]" : "text-[#5a5a70]"}`}>
               Home
             </span>
           </button>
@@ -665,7 +665,7 @@ function DashboardPage() {
                 opacity={activeTab === "friends" ? "1" : "0.45"}
               />
             </svg>
-            <span className={`text-[10px] font-semibold ${activeTab === "friends" ? "text-[#00e5a0]" : "text-[#5a5a70]"}`}>
+            <span className={`text-[11px] font-semibold ${activeTab === "friends" ? "text-[#00e5a0]" : "text-[#5a5a70]"}`}>
               Friends
             </span>
           </button>
@@ -685,7 +685,7 @@ function DashboardPage() {
                 opacity={activeTab === "collections" ? "1" : "0.45"}
               />
             </svg>
-            <span className={`text-[10px] font-semibold ${activeTab === "collections" ? "text-[#00e5a0]" : "text-[#5a5a70]"}`}>
+            <span className={`text-[11px] font-semibold ${activeTab === "collections" ? "text-[#00e5a0]" : "text-[#5a5a70]"}`}>
               Collections
             </span>
           </button>
@@ -694,7 +694,7 @@ function DashboardPage() {
               <circle cx="12" cy="12" r="9" stroke={activeTab === "history" ? "#00e5a0" : "#5a5a70"} strokeWidth="1.8" opacity={activeTab === "history" ? "1" : "0.45"} />
               <path d="M12 7v5l3 3" stroke={activeTab === "history" ? "#00e5a0" : "#5a5a70"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" opacity={activeTab === "history" ? "1" : "0.45"} />
             </svg>
-            <span className={`text-[10px] font-semibold ${activeTab === "history" ? "text-[#00e5a0]" : "text-[#5a5a70]"}`}>
+            <span className={`text-[11px] font-semibold ${activeTab === "history" ? "text-[#00e5a0]" : "text-[#5a5a70]"}`}>
               History
             </span>
           </button>

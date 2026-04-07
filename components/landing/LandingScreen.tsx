@@ -108,7 +108,7 @@ export default function LandingScreen({
                     </svg>
                   </button>
                 ) : null}
-                <div className="font-display text-[22px] font-extrabold tracking-[-0.03em] text-white">
+                <div className="font-display text-[21px] font-extrabold tracking-[-0.03em] text-white">
                   Get<span className="text-[#00e5a0]">Out</span>
                 </div>
               </div>
@@ -139,10 +139,10 @@ export default function LandingScreen({
             </div>
             <div className="overflow-auto min-h-0 mt-8">
             <div className="animate-[fadeUp_0.45s_ease_0.25s_both] pb-1">
-              <div className="mb-[10px] font-display text-[10px] font-bold uppercase tracking-[0.2em] text-[#00e5a0]">
+              <div className="mb-[10px] font-display text-[11px] font-bold uppercase tracking-[0.18em] text-[#00e5a0]">
                 For going out
               </div>
-              <h1 className="font-display text-[36px] font-extrabold leading-[1] tracking-[-0.06em] text-white">
+              <h1 className="font-display text-[34px] font-extrabold leading-[0.98] tracking-[-0.055em] text-white">
                 Pick a spot
                 <br />
                 <span className="text-[#00e5a0]">together</span>
@@ -150,7 +150,7 @@ export default function LandingScreen({
                 <br />
                 fast.
               </h1>
-              <p className="mt-[10px] max-w-[280px] text-[13px] leading-[1.5] text-white/50">
+              <p className="mt-[10px] max-w-[280px] text-[14px] leading-[1.55] text-white/50">
                 Stop the group-chat spiral. GetOut finds venues that work for
                 everyone&apos;s location.
               </p>
@@ -167,7 +167,7 @@ export default function LandingScreen({
                   </div>
                 ))}
               </div>
-              <div className="text-[12px] text-[#5e5e74]">
+              <div className="text-[13px] text-[#5e5e74]">
                 <span className="font-medium text-white/70">10+</span> groups
                 decided this week
               </div>
@@ -183,7 +183,7 @@ export default function LandingScreen({
           <button
             type="button"
             onClick={onCreate}
-            className="mt-4 flex w-full shrink-0 items-center justify-center gap-2 rounded-2xl bg-[#00e5a0] px-4 py-[15px] font-display text-base font-bold tracking-[0.01em] text-black transition active:scale-[0.98]"
+            className="mt-4 flex w-full shrink-0 items-center justify-center gap-2 rounded-2xl bg-[#00e5a0] px-4 py-[15px] font-display text-[15px] font-bold tracking-[0.01em] text-black transition active:scale-[0.98]"
           >
             <svg
               viewBox="0 0 16 16"
@@ -200,7 +200,7 @@ export default function LandingScreen({
             </svg>
             {createButtonLabel}
           </button>
-          <div className="mt-[10px] shrink-0 text-center text-[12.5px] text-[#5e5e74]">
+          <div className="mt-[10px] shrink-0 text-center text-[13px] text-[#5e5e74]">
             Have a link?{" "}
             <span className="font-medium text-[#00e5a0]">
               Open it to join -&gt;

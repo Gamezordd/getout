@@ -35,7 +35,7 @@ export default function CreateGroupFields({
   return (
     <>
       <div className={className}>
-        <div className="text-[10.5px] font-bold uppercase tracking-[0.07em] text-[#5e5e74]">
+        <div className="text-[11.5px] font-bold uppercase tracking-[0.06em] text-[#5e5e74]">
           Looking for
         </div>
         <div
@@ -48,7 +48,7 @@ export default function CreateGroupFields({
                 key={option.value}
                 type="button"
                 onClick={() => setCategory(option.value)}
-                className={`flex flex-col items-center justify-center gap-1 rounded-xl border-[1.5px] px-2 py-3 text-center transition active:scale-[0.95] ${
+                className={`flex flex-col items-center justify-center gap-1.5 rounded-xl border-[1.5px] px-2 py-3 text-center transition active:scale-[0.95] ${
                   isSelected
                     ? "border-[#00e5a0] bg-[rgba(0,229,160,0.11)]"
                     : isSheetVariant
@@ -56,9 +56,9 @@ export default function CreateGroupFields({
                       : "border-white/10 bg-[#141418]"
                 }`}
               >
-                <span className="text-[19px] leading-none">{option.emoji}</span>
+                <span className="text-[21px] leading-none">{option.emoji}</span>
                 <span
-                  className={`text-[11.5px] font-semibold ${
+                  className={`text-[12.5px] font-semibold ${
                     isSelected ? "text-[#00e5a0]" : "text-[#5e5e74]"
                   }`}
                 >
@@ -81,10 +81,10 @@ export default function CreateGroupFields({
               }
             >
               <div className="min-w-0">
-                <div className="text-[10.5px] font-bold uppercase tracking-[0.07em] text-[#5e5e74]">
+                <div className="text-[11.5px] font-bold uppercase tracking-[0.06em] text-[#5e5e74]">
                   Invite people
                 </div>
-                <div className="mt-1 truncate text-[13px] font-semibold text-white">
+                <div className="mt-1 truncate text-[14px] font-semibold text-white">
                   {friendsLoading
                     ? "Loading contacts..."
                     : selectedInvitees.length > 0
@@ -116,7 +116,7 @@ export default function CreateGroupFields({
               )}
             </button>
             {!isSheetVariant ? (
-              <p className="mt-2 text-[11px] leading-4 text-[#5e5e74]">
+              <p className="mt-2 text-[12px] leading-5 text-[#5e5e74]">
                 Pick friends before creating the group. Invites are sent right after
                 creation.
               </p>
@@ -125,10 +125,10 @@ export default function CreateGroupFields({
         ) : null}
 
         {error ? (
-          <p className="mt-3 text-[12px] leading-4 text-rose-300">{error}</p>
+          <p className="mt-3 text-[13px] leading-5 text-rose-300">{error}</p>
         ) : null}
         {!isSheetVariant ? (
-          <p className="mt-3 text-[11px] leading-4 text-[#5e5e74]">
+          <p className="mt-3 text-[12px] leading-5 text-[#5e5e74]">
             {isNative
               ? "Your Google profile name is used automatically for mobile-created groups."
               : "We'll start with an approximate location, then ask for precise access inside the group."}
