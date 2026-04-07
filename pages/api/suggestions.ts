@@ -42,6 +42,14 @@ import { ensureVotingDeadlineState } from "./venue-lock";
 
 type SuggestionsPayload = Omit<SuggestionsResponse, "votes">;
 
+type PlacePhoto = {
+  name?: string;
+};
+
+type GoogleCandidateVenue = Venue & {
+  placePhotos?: PlacePhoto[];
+};
+
 type RecomputeOptions = {
   rotateSuggestions: boolean;
   clearVotes?: boolean;
@@ -345,34 +353,29 @@ const fetchTopPlaces = async (
     const places = Array.isArray(data.places) ? data.places : [];
 
     const venues = (
-      await Promise.all(
-        places.map(async (place: any) => {
-          const location = place.location;
-          if (!location) return null;
+      places.map((place: any) => {
+        const location = place.location;
+        if (!location) return null;
 
-          const photos = shouldEnrichSuggestionPhotos
-            ? await resolvePhotoUrls(apiKey, place.photos)
-            : [];
-
-          return {
-            id: place.id,
-            name: place.displayName?.text || "Unknown place",
-            address: place.formattedAddress,
-            area: getAreaFromAddressComponents(place.addressComponents),
-            priceLabel: getPriceLabel(place.priceLevel),
-            closingTimeLabel: getClosingTimeLabel(place.currentOpeningHours),
-            photos,
-            location: { lat: location.latitude, lng: location.longitude },
-            rating: place.rating || 0,
-            userRatingCount: place.userRatingCount || 0,
-          };
-        }),
-      )
+        return {
+          id: place.id,
+          name: place.displayName?.text || "Unknown place",
+          address: place.formattedAddress,
+          area: getAreaFromAddressComponents(place.addressComponents),
+          priceLabel: getPriceLabel(place.priceLevel),
+          closingTimeLabel: getClosingTimeLabel(place.currentOpeningHours),
+          photos: [],
+          placePhotos: Array.isArray(place.photos) ? place.photos : [],
+          location: { lat: location.latitude, lng: location.longitude },
+          rating: place.rating || 0,
+          userRatingCount: place.userRatingCount || 0,
+        };
+      })
     )
       .filter(Boolean)
       .filter(
         (venue: any) => venue.rating >= 4.2 && venue.userRatingCount >= 200,
-      ) as Array<Venue & { rating: number; userRatingCount: number }>;
+      ) as Array<GoogleCandidateVenue & { rating: number; userRatingCount: number }>;
 
     return {
       venues,
@@ -382,10 +385,6 @@ const fetchTopPlaces = async (
     console.error("Error fetching places:", error);
     return { venues: [], nextPageToken: undefined };
   }
-};
-
-type PlacePhoto = {
-  name?: string;
 };
 
 const getPhotoMediaUrl = async (
@@ -417,6 +416,25 @@ const resolvePhotoUrls = async (
   );
 
   return urls.filter((url): url is string => Boolean(url));
+};
+
+const enrichFinalGoogleSuggestionPhotos = async (
+  apiKey: string,
+  venues: GoogleCandidateVenue[],
+) => {
+  if (!shouldEnrichSuggestionPhotos) {
+    return venues.map(({ placePhotos: _placePhotos, ...venue }) => ({
+      ...venue,
+      photos: venue.photos || [],
+    }));
+  }
+
+  return Promise.all(
+    venues.map(async ({ placePhotos, ...venue }) => ({
+      ...venue,
+      photos: await resolvePhotoUrls(apiKey, placePhotos),
+    })),
+  );
 };
 
 const fetchDriveTimesInternal = async (
@@ -475,8 +493,8 @@ const fetchDriveTimes = async (
   return driveTimesMatrix;
 };
 
-const scoreVenues = (
-  venues: Venue[],
+const scoreVenues = <TVenue extends Venue>(
+  venues: TVenue[],
   totalsByVenue: TotalsByVenue,
   userCount: number,
 ) =>
@@ -496,7 +514,7 @@ const scoreVenues = (
       const scoreA = avgMinutesA > 0 ? confidenceA / avgMinutesA : confidenceA;
       const scoreB = avgMinutesB > 0 ? confidenceB / avgMinutesB : confidenceB;
       return scoreB - scoreA;
-    });
+    }) as Array<{ venue: TVenue; totalMinutes: number; rating: number; userRatingCount: number }>;
 
 const getCollectionCandidates = async (params: {
   userIds: string[];
@@ -575,8 +593,6 @@ const getGoogleCandidates = async (params: {
     locationSeed: params.cacheLocationSeed,
     venueCategory: params.venueCategory,
     excludedVenueIds: Array.from(params.excludedVenueIds).sort(),
-    enrichSuggestionPhotos: shouldEnrichSuggestionPhotos,
-    suggestionPhotoLimit: SUGGESTION_PHOTO_LIMIT,
     suggestionPhotoCacheVersion: SUGGESTION_PHOTO_CACHE_VERSION,
   });
   const redisKey = buildRedisKey(GOOGLE_SUGGESTIONS_CACHE_PREFIX, fingerprint);
@@ -588,7 +604,7 @@ const getGoogleCandidates = async (params: {
     }));
   }
 
-  const candidates: Venue[] = [];
+  const candidates: GoogleCandidateVenue[] = [];
   let attempts = 0;
   let radiusIndex = 0;
   let pageToken: string | undefined;
@@ -779,10 +795,39 @@ export const recomputeSuggestionsForGroup = async (
     ...rankedCollectionCandidates,
     ...rankedGoogleCandidates,
   ].slice(0, TARGET_SUGGESTION_COUNT);
-  const enrichedSuggested = rankedSuggested.map((venue) => ({
-    ...venue,
-    photos: venue.photos || [],
-  }));
+  const finalGoogleSuggestions = rankedSuggested.filter(
+    (venue): venue is GoogleCandidateVenue => venue.source === "google",
+  );
+  const enrichedGoogleSuggestions = await enrichFinalGoogleSuggestionPhotos(
+    apiKey,
+    finalGoogleSuggestions,
+  );
+  const enrichedSuggested = rankedSuggested.map((venue) => {
+    if (venue.source !== "google") {
+      return {
+        ...venue,
+        photos: venue.photos || [],
+      };
+    }
+    return (
+      enrichedGoogleSuggestions.find(
+        (enrichedVenue) => enrichedVenue.id === venue.id,
+      ) || {
+        id: venue.id,
+        name: venue.name,
+        address: venue.address,
+        area: venue.area,
+        priceLabel: venue.priceLabel,
+        closingTimeLabel: venue.closingTimeLabel,
+        location: venue.location,
+        rating: venue.rating,
+        userRatingCount: venue.userRatingCount,
+        addedByUserId: venue.addedByUserId,
+        source: venue.source,
+        photos: [],
+      }
+    );
+  });
 
   enrichedSuggested.forEach((venue) => seenVenueIds.add(venue.id));
 

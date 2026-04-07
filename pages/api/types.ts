@@ -28,7 +28,13 @@ export type CacheEntry = {
 };
 
 export type SuggestionsCandidateCacheEntry = {
-  venues: Venue[];
+  venues: Array<
+    Venue & {
+      placePhotos?: Array<{
+        name?: string;
+      }>;
+    }
+  >;
 };
 
 export interface DistanceMatrixElement {
