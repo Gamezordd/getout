@@ -1,4 +1,4 @@
-﻿@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Syne:wght@600;700;800&display=swap");
+﻿@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -19,7 +19,7 @@
 }
 
 body {
-  font-family: "DM Sans", sans-serif;
+  font-family: "Plus Jakarta Sans", sans-serif;
   background:
     radial-gradient(circle at top, rgba(0, 229, 160, 0.09), transparent 22%),
     var(--getout-bg);
@@ -39,7 +39,7 @@ button {
 }
 
 .font-display {
-  font-family: "Syne", sans-serif;
+  font-family: "Plus Jakarta Sans", sans-serif;
 }
 
 @keyframes getoutTicker {
@@ -147,3 +147,4 @@ button {
     left: 160%;
   }
 }
+
