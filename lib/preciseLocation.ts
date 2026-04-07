@@ -15,6 +15,10 @@ type LocationFailure = {
 
 const NATIVE_TIMEOUT_MS = 10000;
 
+type PreciseLocationOptions = {
+  promptIfNeeded?: boolean;
+};
+
 const isPermissionDeniedError = (message: string) => {
   const normalized = message.toLowerCase();
   return (
@@ -46,6 +50,14 @@ const mapNativeLocationError = (error: unknown) => {
 };
 
 export const getPreciseLocation = async (isNative: boolean): Promise<LocationSuccess | LocationFailure> => {
+  return getPreciseLocationWithOptions(isNative, {});
+};
+
+export const getPreciseLocationWithOptions = async (
+  isNative: boolean,
+  options: PreciseLocationOptions = {},
+): Promise<LocationSuccess | LocationFailure> => {
+  const promptIfNeeded = options.promptIfNeeded ?? true;
   if (typeof window === "undefined") {
     return { ok: false, message: "Location services are not supported." };
   }
@@ -58,6 +70,9 @@ export const getPreciseLocation = async (isNative: boolean): Promise<LocationSuc
         permissions.coarseLocation === "granted";
 
       if (!granted) {
+        if (!promptIfNeeded) {
+          return { ok: false, message: "Location permission denied." };
+        }
         const requested = await Geolocation.requestPermissions();
         const requestGranted =
           requested.location === "granted" ||
@@ -85,6 +100,24 @@ export const getPreciseLocation = async (isNative: boolean): Promise<LocationSuc
 
   if (!("geolocation" in navigator)) {
     return { ok: false, message: "Location services are not supported." };
+  }
+
+  if (!promptIfNeeded) {
+    const permissionsApi = navigator.permissions;
+    if (permissionsApi?.query) {
+      try {
+        const status = await permissionsApi.query({
+          name: "geolocation",
+        } as PermissionDescriptor);
+        if (status.state !== "granted") {
+          return { ok: false, message: "Location permission denied." };
+        }
+      } catch {
+        return { ok: false, message: "Location permission denied." };
+      }
+    } else {
+      return { ok: false, message: "Location permission denied." };
+    }
   }
 
   return new Promise<LocationSuccess | LocationFailure>((resolve) => {

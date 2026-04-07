@@ -19,12 +19,16 @@ import VotingCountdown from "../components/VotingCountdown";
 import { registerPushSubscription } from "../lib/pushClient";
 import { formatCompactCount } from "../lib/formatCount";
 import Dialog from "../components/Dialog";
+import {
+  getPreciseLocationBannerDismissed,
+  refreshCachedPreciseLocation,
+  setPreciseLocationBannerDismissed,
+} from "../lib/nativePreciseLocation";
 import { getUserActivityLabel } from "../lib/userDisplay";
-import { getPreciseLocation } from "../lib/preciseLocation";
 
 function HomePage() {
   const store = useAppStore();
-  const { authStatus, authenticatedUser, isNative, startupResolved } = useAuth();
+  const { authenticatedUser, isNative, startupResolved } = useAuth();
   const router = useRouter();
   const [showFinalizeDialog, setShowFinalizeDialog] = useState(false);
   const [showInviteDialog, setShowInviteDialog] = useState(false);
@@ -39,19 +43,13 @@ function HomePage() {
     useState(false);
   const pushInitRef = useRef(false);
 
-  const preciseBannerKey = store.sessionId
-    ? `getout-precise-location-dismissed:${store.sessionId}`
-    : null;
   const namePromptKey = store.sessionId
     ? `getout-name-prompt-dismissed:${store.sessionId}`
     : null;
 
   useEffect(() => {
-    if (typeof window === "undefined" || !preciseBannerKey) return;
-    setDismissedPreciseBanner(
-      window.sessionStorage.getItem(preciseBannerKey) === "1",
-    );
-  }, [preciseBannerKey]);
+    setDismissedPreciseBanner(getPreciseLocationBannerDismissed());
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined" || !namePromptKey) return;
@@ -142,27 +140,17 @@ function HomePage() {
     setIsDetectingPreciseLocation(true);
     store.setMapError(null);
     try {
-      const locationResult = await getPreciseLocation(isNative);
+      const locationResult = await refreshCachedPreciseLocation({
+        isNative,
+        promptIfNeeded: true,
+      });
       if (!locationResult.ok) {
         store.setMapError(locationResult.message);
         return;
       }
 
-      const params = new URLSearchParams({
-        lat: String(locationResult.location.lat),
-        lng: String(locationResult.location.lng),
-      });
-      const response = await fetch(`/api/reverse-geocode?${params}`);
-      if (!response.ok) {
-        const payload = await response.json().catch(() => ({}));
-        throw new Error(payload.message || "Unable to detect address.");
-      }
-      const data = (await response.json()) as { result?: { location: { lat: number; lng: number }; area?: string; name?: string } };
-      if (!data.result) {
-        throw new Error("Unable to detect address.");
-      }
-      await store.updateUserLocation(currentUserId, data.result.location, {
-        locationLabel: data.result.area || data.result.name || null,
+      await store.updateUserLocation(currentUserId, locationResult.cachedLocation.location, {
+        locationLabel: locationResult.cachedLocation.locationLabel,
         locationSource: "precise",
       });
       await store.fetchSuggestions();
@@ -174,11 +162,9 @@ function HomePage() {
   }, [isDetectingPreciseLocation, isNative, store]);
 
   const handleDenyPreciseLocation = useCallback(() => {
-    if (typeof window !== "undefined" && preciseBannerKey) {
-      window.sessionStorage.setItem(preciseBannerKey, "1");
-    }
+    setPreciseLocationBannerDismissed(true);
     setDismissedPreciseBanner(true);
-  }, [preciseBannerKey]);
+  }, []);
 
   const handleSaveName = useCallback(async () => {
     const trimmed = pendingName.trim();

@@ -3,6 +3,7 @@ import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
 import { EntryHeader, EntryShell } from "../components/entry/EntryFlow";
 import { useAuth } from "../lib/auth/AuthProvider";
+import { getPreciseJoinLocation } from "../lib/nativePreciseLocation";
 import { useAppStore } from "../lib/store/AppStoreProvider";
 
 function JoinPage() {
@@ -47,11 +48,21 @@ function JoinPage() {
       try {
         setSubmitting(true);
         setError(null);
+        const preciseLocation =
+          isNative && authStatus === "signed_in"
+            ? await getPreciseJoinLocation({
+                isNative,
+                promptIfNeeded: false,
+              })
+            : null;
         await store.joinGroup({
           name: isNative ? authenticatedUser?.displayName : undefined,
+          location: preciseLocation?.location,
+          locationLabel: preciseLocation?.locationLabel || undefined,
+          locationSource: preciseLocation ? "precise" : undefined,
         });
         if (!cancelled) {
-          if(!store.lockedVenue){
+          if (!store.lockedVenue) {
             return router.replace({ pathname: "/", query: { sessionId } });
           }
           return router.replace(
@@ -73,7 +84,7 @@ function JoinPage() {
       }
     };
 
-    run();
+    void run();
     return () => {
       cancelled = true;
     };
@@ -96,7 +107,7 @@ function JoinPage() {
     <EntryShell>
       <EntryHeader
         title="Joining group"
-        subtitle="We’re placing you using your approximate location first."
+        subtitle="We’re placing you and checking for your latest saved location."
         onBack={() => router.push("/landing")}
       />
       <div className="rounded-[24px] border border-white/10 bg-[#141418]/90 p-5 text-center backdrop-blur-sm">
@@ -105,7 +116,8 @@ function JoinPage() {
           {submitting ? "Getting you in..." : "Almost there"}
         </p>
         <p className="mt-2 text-sm text-[#8b8b9c]">
-          We&apos;ll ask for precise location after you enter the group so suggestions get closer to you.
+          If your device location is already available, we&apos;ll use it
+          automatically.
         </p>
         {error ? <p className="mt-4 text-sm text-rose-300">{error}</p> : null}
       </div>

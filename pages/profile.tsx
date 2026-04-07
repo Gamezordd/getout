@@ -4,6 +4,10 @@ import { observer } from "mobx-react-lite";
 import FriendsManager from "../components/FriendsManager";
 import { EntryHeader, EntryShell } from "../components/entry/EntryFlow";
 import { useAuth } from "../lib/auth/AuthProvider";
+import {
+  getAutoPreciseLocationEnabled,
+  setAutoPreciseLocationEnabled,
+} from "../lib/nativePreciseLocation";
 
 function ProfilePage() {
   const router = useRouter();
@@ -12,12 +16,18 @@ function ProfilePage() {
   const [displayName, setDisplayName] = useState(
     authenticatedUser?.displayName || "",
   );
+  const [autoPreciseLocationEnabled, setAutoPreciseLocationEnabledState] =
+    useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setDisplayName(authenticatedUser?.displayName || "");
   }, [authenticatedUser?.displayName]);
+
+  useEffect(() => {
+    setAutoPreciseLocationEnabledState(getAutoPreciseLocationEnabled());
+  }, []);
 
   if (!isNative) {
     return null;
@@ -71,6 +81,40 @@ function ProfilePage() {
             >
               {saving ? "Saving..." : "Save display name"}
             </button>
+            <div className="rounded-2xl border border-white/10 bg-[#0a0a0d] p-4">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm font-semibold text-white">
+                    Use device location automatically
+                  </p>
+                  <p className="mt-1 text-sm text-[#8b8b9c]">
+                    Request and refresh your location on the dashboard, then use it
+                    for new groups and joins.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={autoPreciseLocationEnabled}
+                  onClick={() => {
+                    const nextValue = !autoPreciseLocationEnabled;
+                    setAutoPreciseLocationEnabled(nextValue);
+                    setAutoPreciseLocationEnabledState(nextValue);
+                  }}
+                  className={`relative mt-1 h-7 w-12 shrink-0 rounded-full border transition ${
+                    autoPreciseLocationEnabled
+                      ? "border-[#00e5a0] bg-[#00e5a0]"
+                      : "border-white/10 bg-[#1f1f25]"
+                  }`}
+                >
+                  <span
+                    className={`absolute top-[2px] h-5 w-5 rounded-full bg-black transition ${
+                      autoPreciseLocationEnabled ? "left-[25px]" : "left-[2px]"
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
             <FriendsManager cardClassName="rounded-2xl border border-white/10 bg-[#0a0a0d] p-4" />
             <button
               type="button"

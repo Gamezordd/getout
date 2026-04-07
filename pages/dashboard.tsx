@@ -1,10 +1,11 @@
 ﻿import { observer } from "mobx-react-lite";
 import { useRouter } from "next/router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import AppBottomSheet from "../components/AppBottomSheet";
 import CollectionsList from "../components/CollectionsList";
 import CreateGroupFields from "../components/CreateGroupFields";
 import FriendsManager from "../components/FriendsManager";
+import useForegroundResume from "../hooks/useForegroundResume";
 import { useCreateGroupFlow } from "../hooks/useCreateGroupFlow";
 import type {
   CollectionListItem,
@@ -12,6 +13,12 @@ import type {
   RecentGroupSummary,
 } from "../lib/authTypes";
 import { useAuth } from "../lib/auth/AuthProvider";
+import {
+  clearCachedPreciseLocation,
+  getAutoPreciseLocationEnabled,
+  refreshCachedPreciseLocation,
+  setPreciseLocationBannerDismissed,
+} from "../lib/nativePreciseLocation";
 import type { VenueCategory } from "../lib/types";
 
 const quickActions = [
@@ -97,6 +104,28 @@ function DashboardPage() {
   const [isCreateSheetOpen, setIsCreateSheetOpen] = useState(false);
   const [createSheetCategory, setCreateSheetCategory] =
     useState<VenueCategory>("bar");
+  const autoLocationInFlightRef = useRef(false);
+
+  const maybeRefreshPreciseLocation = async () => {
+    if (!isNative || authStatus !== "signed_in") return;
+    if (!getAutoPreciseLocationEnabled()) return;
+    if (autoLocationInFlightRef.current) return;
+    autoLocationInFlightRef.current = true;
+    try {
+      const result = await refreshCachedPreciseLocation({
+        isNative: true,
+        promptIfNeeded: false,
+      });
+      if (!result.ok && result.message === "Location permission denied.") {
+        clearCachedPreciseLocation();
+        setPreciseLocationBannerDismissed(false);
+      }
+    } catch {
+      // Ignore dashboard auto-location failures.
+    } finally {
+      autoLocationInFlightRef.current = false;
+    }
+  };
 
   useEffect(() => {
     if (!router.isReady) return;
@@ -182,6 +211,15 @@ function DashboardPage() {
 
     void load();
   }, [authStatus, isNative, router, router.isReady]);
+
+  useEffect(() => {
+    if (!router.isReady) return;
+    void maybeRefreshPreciseLocation();
+  }, [authStatus, isNative, router.isReady]);
+
+  useForegroundResume(() => {
+    void maybeRefreshPreciseLocation();
+  });
 
   const avatarLabel = useMemo(
     () => authenticatedUser?.displayName?.trim().charAt(0).toUpperCase() || "G",

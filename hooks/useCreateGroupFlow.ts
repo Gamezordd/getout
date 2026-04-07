@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/router";
 import { toast } from "sonner";
 import { useAuth } from "../lib/auth/AuthProvider";
+import { getPreciseJoinLocation } from "../lib/nativePreciseLocation";
 import type { FriendSummary } from "../lib/authTypes";
 import { useAppStore } from "../lib/store/AppStoreProvider";
 import type { VenueCategory } from "../lib/types";
@@ -205,9 +206,19 @@ export function useCreateGroupFlow({
       setSubmitting(true);
       setError(null);
       store.setSession(sessionId, "/");
+      const preciseLocation =
+        isNative && authStatus === "signed_in"
+          ? await getPreciseJoinLocation({
+              isNative,
+              promptIfNeeded: false,
+            })
+          : null;
       await store.joinGroup({
         createIfMissing: true,
         name: isNative ? authenticatedUser?.displayName : undefined,
+        location: preciseLocation?.location,
+        locationLabel: preciseLocation?.locationLabel || undefined,
+        locationSource: preciseLocation ? "precise" : undefined,
         venueCategory: category,
         closeVotingInHours,
       });
