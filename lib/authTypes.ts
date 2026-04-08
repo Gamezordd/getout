@@ -64,6 +64,27 @@ export type RecentGroupSummary = {
   venueCategory?: string | null;
 };
 
+export type PickAgainInviteeSummary = {
+  id: string;
+  email: string;
+  displayName: string;
+  avatarUrl?: string | null;
+};
+
+export type PickAgainGroupSummary = {
+  sessionId: string;
+  createdAt: string;
+  memberCount: number;
+  venueCategory?: VenueCategory | null;
+  members: Array<{
+    id: string;
+    label: string;
+    avatarUrl?: string | null;
+    authenticatedUserId?: string;
+  }>;
+  invitees: PickAgainInviteeSummary[];
+};
+
 export type CollectionListItem = {
   id: string;
   placeId: string;

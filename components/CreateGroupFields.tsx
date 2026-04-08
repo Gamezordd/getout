@@ -14,6 +14,7 @@ export default function CreateGroupFields({
   variant = "default",
 }: CreateGroupFieldsProps) {
   const {
+    additionalSelectedInvitees,
     authStatus,
     category,
     emailLookupLoading,
@@ -161,6 +162,43 @@ export default function CreateGroupFields({
                 No matching friends yet. Try an exact app-user email.
               </p>
             ) : null}
+            {additionalSelectedInvitees.map((result) => {
+              const isSelected = selectedInvitees.some(
+                (entry) => entry.id === result.id,
+              );
+              return (
+                <button
+                  key={result.id}
+                  type="button"
+                  onClick={() =>
+                    setSelectedInvitees((current) =>
+                      isSelected
+                        ? current.filter((entry) => entry.id !== result.id)
+                        : [...current, result],
+                    )
+                  }
+                  className={`w-full rounded-2xl border px-4 py-3 text-left ${
+                    isSelected
+                      ? "border-emerald-500 bg-emerald-50"
+                      : "border-slate-200 bg-white"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-slate-900">
+                        {result.displayName}
+                      </p>
+                      <p className="truncate text-xs text-slate-500">
+                        {result.email}
+                      </p>
+                    </div>
+                    <span className="rounded-full border border-slate-200 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                      {result.isFriend ? "Friend" : "App user"}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
             {filteredFriendResults.map((result) => {
               const isSelected = selectedInvitees.some(
                 (entry) => entry.id === result.id,

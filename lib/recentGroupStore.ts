@@ -1,8 +1,14 @@
-import type { RecentGroupSummary } from "./authTypes";
+import type {
+  PickAgainGroupSummary,
+  RecentGroupSummary,
+} from "./authTypes";
 import { findGroup } from "./groupStore";
+import { getUsersByIds } from "./serverAuth";
 import { ensureAuthSchema, getSql } from "./serverAuth";
 
 const RECENT_WINDOW_HOURS = 48;
+const PICK_AGAIN_WINDOW_DAYS = 30;
+const PICK_AGAIN_LIMIT = 6;
 
 type MembershipRow = {
   session_id: string;
@@ -132,4 +138,99 @@ export const listRecentGroupsForUser = async (
   );
 
   return groups.filter(isRecentGroupSummary);
+};
+
+const isPickAgainGroupSummary = (
+  group: PickAgainGroupSummary | null,
+): group is PickAgainGroupSummary => group !== null;
+
+export const listPickAgainGroupsForUser = async (
+  userId: string,
+): Promise<PickAgainGroupSummary[]> => {
+  await ensureRecentGroupSchema();
+  const sql = getSql();
+  const rows = (await sql`
+    SELECT session_id
+    FROM user_group_memberships
+    WHERE user_id = ${userId}
+    ORDER BY joined_at DESC
+  `) as Array<{ session_id: string }>;
+
+  const uniqueSessionIds = Array.from(
+    new Set(rows.map((row) => row.session_id).filter(Boolean)),
+  );
+  const cutoffTime = Date.now() - PICK_AGAIN_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+
+  const groups: Array<PickAgainGroupSummary | null> = await Promise.all(
+    uniqueSessionIds.map(async (sessionId) => {
+      const group = await findGroup(sessionId);
+      if (!group || !group.createdAt) {
+        return null;
+      }
+
+      const createdAtMs = new Date(group.createdAt).getTime();
+      if (!Number.isFinite(createdAtMs) || createdAtMs < cutoffTime) {
+        return null;
+      }
+
+      if (group.users.length <= 1) {
+        return null;
+      }
+
+      const organizer =
+        group.users.find((user) => user.isOrganizer) || group.users[0] || null;
+      if (!organizer?.authenticatedUserId || organizer.authenticatedUserId !== userId) {
+        return null;
+      }
+
+      const inviteeIds = Array.from(
+        new Set(
+          group.users
+            .map((user) => user.authenticatedUserId)
+            .filter(
+              (authenticatedUserId): authenticatedUserId is string =>
+                Boolean(authenticatedUserId) && authenticatedUserId !== userId,
+            ),
+        ),
+      );
+
+      const inviteeUsers = await getUsersByIds(inviteeIds);
+      const inviteeById = new Map(
+        inviteeUsers.map((invitee) => [invitee.id, invitee] as const),
+      );
+
+      return {
+        sessionId,
+        createdAt: group.createdAt,
+        memberCount: group.users.length,
+        venueCategory: group.venueCategory,
+        members: group.users.map((member) => ({
+          id: member.id,
+          label: member.name?.trim() || "Guest",
+          avatarUrl: member.avatarUrl,
+          authenticatedUserId: member.authenticatedUserId,
+        })),
+        invitees: inviteeIds
+          .map((inviteeId) => inviteeById.get(inviteeId))
+          .filter((invitee): invitee is NonNullable<typeof invitee> => Boolean(invitee))
+          .map((invitee) => ({
+            id: invitee.id,
+            email: invitee.email,
+            displayName: invitee.displayName,
+            avatarUrl: invitee.avatarUrl,
+          })),
+      } satisfies PickAgainGroupSummary;
+    }),
+  );
+
+  const eligibleGroups: PickAgainGroupSummary[] = groups.filter(
+    isPickAgainGroupSummary,
+  );
+
+  return eligibleGroups
+    .sort(
+      (left, right) =>
+        new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
+    )
+    .slice(0, PICK_AGAIN_LIMIT);
 };

@@ -255,6 +255,15 @@ export const getUserById = async (userId: string) => {
   return rows[0] ? mapUser(rows[0]) : null;
 };
 
+export const getUsersByIds = async (userIds: string[]) => {
+  const uniqueUserIds = Array.from(new Set(userIds.filter(Boolean)));
+  if (uniqueUserIds.length === 0) {
+    return [];
+  }
+  const users = await Promise.all(uniqueUserIds.map((userId) => getUserById(userId)));
+  return users.filter((user): user is NonNullable<typeof user> => Boolean(user));
+};
+
 export const getUserByEmail = async (email: string) => {
   await ensureAuthSchema();
   const normalizedEmail = email.trim().toLowerCase();

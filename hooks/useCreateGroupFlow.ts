@@ -3,20 +3,22 @@ import { useRouter } from "next/router";
 import { toast } from "sonner";
 import { useAuth } from "../lib/auth/AuthProvider";
 import { getPreciseJoinLocation } from "../lib/nativePreciseLocation";
-import type { FriendSummary } from "../lib/authTypes";
+import type { FriendSummary, PickAgainInviteeSummary } from "../lib/authTypes";
 import { useAppStore } from "../lib/store/AppStoreProvider";
 import type { VenueCategory } from "../lib/types";
 
-type InviteCandidate = FriendSummary & {
+export type InviteCandidate = FriendSummary & {
   isFriend: boolean;
 };
 
 type UseCreateGroupFlowOptions = {
   initialCategory?: VenueCategory;
+  initialInvitees?: PickAgainInviteeSummary[];
 };
 
 export function useCreateGroupFlow({
   initialCategory = "bar",
+  initialInvitees = [],
 }: UseCreateGroupFlowOptions = {}) {
   const store = useAppStore();
   const { authStatus, authenticatedUser, isNative } = useAuth();
@@ -38,6 +40,35 @@ export function useCreateGroupFlow({
   useEffect(() => {
     setCategory(initialCategory);
   }, [initialCategory]);
+
+  useEffect(() => {
+    if (!isNative || authStatus !== "signed_in") {
+      setSelectedInvitees([]);
+      return;
+    }
+
+    if (initialInvitees.length === 0) {
+      setSelectedInvitees([]);
+      return;
+    }
+
+    setSelectedInvitees((current) => {
+      const nextInvitees = initialInvitees.map<InviteCandidate>((invitee) => {
+        const matchingFriend = friends.find((friend) => friend.id === invitee.id);
+        return {
+          ...(matchingFriend || invitee),
+          isFriend: Boolean(matchingFriend),
+        };
+      });
+      const currentKey = current
+        .map((invitee) => `${invitee.id}:${invitee.isFriend ? "1" : "0"}`)
+        .join("|");
+      const nextKey = nextInvitees
+        .map((invitee) => `${invitee.id}:${invitee.isFriend ? "1" : "0"}`)
+        .join("|");
+      return currentKey === nextKey ? current : nextInvitees;
+    });
+  }, [authStatus, friends, initialInvitees, isNative]);
 
   useEffect(() => {
     if (!isNative || authStatus !== "signed_in") {
@@ -141,6 +172,14 @@ export function useCreateGroupFlow({
       }));
   }, [friends, inviteSearchValue]);
 
+  const additionalSelectedInvitees = useMemo(
+    () =>
+      selectedInvitees.filter(
+        (invitee) => !friends.some((friend) => friend.id === invitee.id),
+      ),
+    [friends, selectedInvitees],
+  );
+
   const sendSelectedInvites = async (sessionId: string) => {
     const inviteResults = await Promise.allSettled(
       selectedInvitees.map(async (invitee) => {
@@ -239,6 +278,7 @@ export function useCreateGroupFlow({
     emailLookupLoading,
     emailLookupResult,
     error,
+    additionalSelectedInvitees,
     filteredFriendResults,
     friendsLoading,
     handleCreate,

@@ -10,6 +10,8 @@ import { useCreateGroupFlow } from "../hooks/useCreateGroupFlow";
 import type {
   CollectionListItem,
   InviteListItem,
+  PickAgainGroupSummary,
+  PickAgainInviteeSummary,
   RecentGroupSummary,
 } from "../lib/authTypes";
 import { useAuth } from "../lib/auth/AuthProvider";
@@ -36,16 +38,72 @@ const getGreeting = () => {
 };
 
 const HISTORY_SKELETON_COUNT = 4;
+const PICK_AGAIN_SKELETON_COUNT = 3;
+const pickAgainAvatarPalette = [
+  "#7c5cbf",
+  "#3d8ef5",
+  "#e05c8a",
+  "#e07f2b",
+  "#4caf8a",
+  "#ff6b6b",
+  "#ffd166",
+  "#06d6a0",
+] as const;
+
+const categoryMeta: Record<
+  VenueCategory,
+  { label: string; emoji: string }
+> = {
+  bar: { label: "Bars", emoji: "🍸" },
+  restaurant: { label: "Dinner", emoji: "🍽" },
+  cafe: { label: "Cafe", emoji: "☕" },
+  night_club: { label: "Club", emoji: "🎵" },
+  brewery: { label: "Breweries", emoji: "🍺" },
+};
+
+const formatRelativeTime = (isoValue: string) => {
+  const diffMs = Date.now() - new Date(isoValue).getTime();
+  const diffHours = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60)));
+  if (diffHours < 1) {
+    const diffMinutes = Math.max(1, Math.floor(diffMs / (1000 * 60)));
+    return `${diffMinutes}m ago`;
+  }
+  if (diffHours < 24) {
+    return `${diffHours}h ago`;
+  }
+  return `${Math.max(1, Math.floor(diffHours / 24))}d ago`;
+};
+
+const getPickAgainLabel = (
+  members: PickAgainGroupSummary["members"],
+  currentUserId?: string,
+) => {
+  const orderedMembers = [
+    ...members.filter((member) => member.authenticatedUserId !== currentUserId),
+    ...members.filter((member) => member.authenticatedUserId === currentUserId),
+  ];
+  const labels = orderedMembers.map((member) => member.label).filter(Boolean);
+  if (labels.length === 0) {
+    return "Previous crew";
+  }
+  if (labels.length <= 3) {
+    return labels.join(", ");
+  }
+  return `${labels.slice(0, 3).join(", ")} +${labels.length - 3}`;
+};
 
 function DashboardCreateSheet({
   initialCategory,
+  initialInvitees,
   onClose,
 }: {
   initialCategory: VenueCategory;
+  initialInvitees: PickAgainInviteeSummary[];
   onClose: () => void;
 }) {
   const createFlow = useCreateGroupFlow({
     initialCategory,
+    initialInvitees,
   });
 
   return (
@@ -87,10 +145,13 @@ function DashboardPage() {
   const router = useRouter();
   const { authStatus, authenticatedUser, isNative } = useAuth();
   const [recentGroups, setRecentGroups] = useState<RecentGroupSummary[]>([]);
+  const [pickAgainGroups, setPickAgainGroups] = useState<PickAgainGroupSummary[]>([]);
   const [invites, setInvites] = useState<InviteListItem[]>([]);
   const [collections, setCollections] = useState<CollectionListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [pickAgainLoading, setPickAgainLoading] = useState(true);
+  const [pickAgainError, setPickAgainError] = useState<string | null>(null);
   const [inviteLoading, setInviteLoading] = useState(true);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [collectionLoading, setCollectionLoading] = useState(true);
@@ -104,6 +165,9 @@ function DashboardPage() {
   const [isCreateSheetOpen, setIsCreateSheetOpen] = useState(false);
   const [createSheetCategory, setCreateSheetCategory] =
     useState<VenueCategory>("bar");
+  const [createSheetInvitees, setCreateSheetInvitees] = useState<
+    PickAgainInviteeSummary[]
+  >([]);
   const autoLocationInFlightRef = useRef(false);
 
   const maybeRefreshPreciseLocation = async () => {
@@ -159,18 +223,28 @@ function DashboardPage() {
     const load = async () => {
       try {
         setLoading(true);
+        setPickAgainLoading(true);
         setInviteLoading(true);
         setCollectionLoading(true);
         setError(null);
+        setPickAgainError(null);
         setInviteError(null);
         setCollectionError(null);
-        const [groupsResponse, invitesResponse, collectionsResponse] = await Promise.all([
-          fetch("/api/recent-groups"),
-          fetch("/api/invites"),
-          fetch("/api/collections"),
-        ]);
+        const [groupsResponse, pickAgainResponse, invitesResponse, collectionsResponse] =
+          await Promise.all([
+            fetch("/api/recent-groups"),
+            fetch("/api/pick-again"),
+            fetch("/api/invites"),
+            fetch("/api/collections"),
+          ]);
         const groupsPayload = (await groupsResponse.json().catch(() => ({}))) as {
           groups?: RecentGroupSummary[];
+          message?: string;
+        };
+        const pickAgainPayload = (await pickAgainResponse
+          .json()
+          .catch(() => ({}))) as {
+          groups?: PickAgainGroupSummary[];
           message?: string;
         };
         const invitesPayload = (await invitesResponse.json().catch(() => ({}))) as {
@@ -195,15 +269,25 @@ function DashboardPage() {
           );
         }
         setRecentGroups(groupsPayload.groups || []);
+        if (!pickAgainResponse.ok) {
+          setPickAgainError(
+            pickAgainPayload.message || "Unable to load pick again groups.",
+          );
+          setPickAgainGroups([]);
+        } else {
+          setPickAgainGroups(pickAgainPayload.groups || []);
+        }
         setInvites(invitesPayload.invites || []);
         setCollections(collectionsPayload.collections || []);
       } catch (err: any) {
         const message = err.message || "Unable to load dashboard.";
         setError(message);
+        setPickAgainError(message);
         setInviteError(message);
         setCollectionError(message);
       } finally {
         setLoading(false);
+        setPickAgainLoading(false);
         setInviteLoading(false);
         setCollectionLoading(false);
       }
@@ -230,7 +314,10 @@ function DashboardPage() {
     [invites],
   );
 
-  const openCreate = (category?: string) => {
+  const openCreate = (
+    category?: string,
+    invitees: PickAgainInviteeSummary[] = [],
+  ) => {
     if (
       category === "bar" ||
       category === "restaurant" ||
@@ -242,6 +329,7 @@ function DashboardPage() {
     } else {
       setCreateSheetCategory("bar");
     }
+    setCreateSheetInvitees(invitees);
     setIsCreateSheetOpen(true);
   };
 
@@ -481,6 +569,108 @@ function DashboardPage() {
     </div>
   );
 
+  const renderPickAgainCard = (group: PickAgainGroupSummary) => {
+    const orderedMembers = [
+      ...group.members.filter(
+        (member) => member.authenticatedUserId !== authenticatedUser?.id,
+      ),
+      ...group.members.filter(
+        (member) => member.authenticatedUserId === authenticatedUser?.id,
+      ),
+    ];
+    const category =
+      group.venueCategory && group.venueCategory in categoryMeta
+        ? categoryMeta[group.venueCategory as VenueCategory]
+        : categoryMeta.bar;
+    const visibleMembers = orderedMembers.slice(0, 4);
+    const overflowCount = Math.max(0, group.memberCount - visibleMembers.length);
+
+    return (
+      <div
+        key={group.sessionId}
+        className="w-[188px] shrink-0 rounded-[20px] border border-white/10 bg-[#141418]"
+      >
+        <div className="flex flex-col gap-[14px] p-4">
+          <div className="flex items-center">
+            {visibleMembers.map((member, index) => (
+              <div
+                key={member.id}
+                className={`flex h-10 w-10 items-center justify-center rounded-full border-[2.5px] border-[#141418] font-display text-sm font-extrabold text-white shadow-[0_0_0_1px_rgba(0,0,0,0.35)] ${
+                  index === 0 ? "" : "-ml-[10px]"
+                }`}
+                style={{
+                  backgroundColor:
+                    pickAgainAvatarPalette[index % pickAgainAvatarPalette.length],
+                }}
+              >
+                {member.label.charAt(0).toUpperCase()}
+              </div>
+            ))}
+            {overflowCount > 0 ? (
+              <div className="-ml-[10px] flex h-10 w-10 items-center justify-center rounded-full border-[2.5px] border-[#141418] bg-[#252530] font-display text-[11px] font-bold text-[#5a5a70] shadow-[0_0_0_1px_rgba(0,0,0,0.35)]">
+                +{overflowCount}
+              </div>
+            ) : null}
+          </div>
+          <div className="flex items-end justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-[12px] font-semibold text-white">
+                {getPickAgainLabel(group.members, authenticatedUser?.id)}
+              </div>
+              <div className="mt-1 flex items-center gap-1 text-[10.5px] text-[#5a5a70]">
+                <span className="h-[5px] w-[5px] rounded-full bg-[#00e5a0] opacity-70" />
+                <span className="truncate">
+                  Last: {category.label} · {formatRelativeTime(group.createdAt)}
+                </span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => openCreate(group.venueCategory || "bar", group.invitees)}
+              className="flex shrink-0 items-center gap-1 rounded-[10px] bg-[#00e5a0] px-[10px] py-[7px] font-display text-[11px] font-extrabold text-black transition active:scale-[0.93]"
+            >
+              Go
+              <svg width="10" height="10" fill="none" viewBox="0 0 10 10">
+                <path
+                  d="M2 5h6M5 2l3 3-3 3"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderPickAgainSkeleton = (key: string) => (
+    <div
+      key={key}
+      className="w-[188px] shrink-0 rounded-[20px] border border-white/10 bg-[#141418] p-4"
+    >
+      <div className="flex items-center">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <div
+            key={`${key}-avatar-${index}`}
+            className={`h-10 w-10 rounded-full border-[2.5px] border-[#141418] bg-white/10 ${
+              index === 0 ? "" : "-ml-[10px]"
+            }`}
+          />
+        ))}
+      </div>
+      <div className="mt-[14px] flex items-end justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <div className="h-3 w-28 rounded-full bg-white/12" />
+          <div className="mt-2 h-3 w-24 rounded-full bg-white/8" />
+        </div>
+        <div className="h-8 w-14 rounded-[10px] bg-white/10" />
+      </div>
+    </div>
+  );
+
   return (
     <main className="min-h-[100svh] bg-[#0a0a0d] text-[#f0f0f5]">
       <div className="mx-auto flex min-h-[100svh] w-full max-w-[430px] flex-col pt-5">
@@ -541,6 +731,47 @@ function DashboardPage() {
                 </button>
               </div>
             </div>
+
+            {!pickAgainLoading && !pickAgainError && pickAgainGroups.length > 0 ? (
+              <>
+                <div className="flex items-center justify-between px-5 pb-3 pt-6">
+                  <div className="font-display text-[17px] font-bold tracking-[-0.02em] text-white">
+                    Pick Again
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("history")}
+                    className="text-xs font-medium text-[#00e5a0]"
+                  >
+                    See all →
+                  </button>
+                </div>
+                <div className="flex gap-[11px] overflow-x-auto px-5 pb-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  {pickAgainGroups.map(renderPickAgainCard)}
+                </div>
+              </>
+            ) : null}
+            {pickAgainLoading ? (
+              <>
+                <div className="flex items-center justify-between px-5 pb-3 pt-6">
+                  <div className="font-display text-[17px] font-bold tracking-[-0.02em] text-white">
+                    Pick Again
+                  </div>
+                </div>
+                <div className="flex gap-[11px] overflow-x-auto px-5 pb-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  {Array.from({ length: PICK_AGAIN_SKELETON_COUNT }).map((_, index) =>
+                    renderPickAgainSkeleton(`pick-again-skeleton-${index}`),
+                  )}
+                </div>
+              </>
+            ) : null}
+            {!pickAgainLoading && pickAgainError ? (
+              <div className="px-5 pb-6 pt-6">
+                <div className="rounded-[18px] border border-rose-500/20 bg-rose-500/10 p-4 text-sm text-rose-200">
+                  {pickAgainError}
+                </div>
+              </div>
+            ) : null}
 
             <div className="flex items-center justify-between px-5 pb-3 pt-6">
               <div className="font-display text-[17px] font-bold tracking-[-0.02em] text-white">
@@ -741,6 +972,7 @@ function DashboardPage() {
         {isCreateSheetOpen ? (
           <DashboardCreateSheet
             initialCategory={createSheetCategory}
+            initialInvitees={createSheetInvitees}
             onClose={() => setIsCreateSheetOpen(false)}
           />
         ) : null}
