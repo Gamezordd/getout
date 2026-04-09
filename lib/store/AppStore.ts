@@ -10,6 +10,7 @@ import type {
   VenueCategory,
   VotesByVenue,
 } from "../types";
+import type { CollectionListItem } from "../authTypes";
 import { shareLinkText } from "../constants";
 import { formatCompactCount } from "../formatCount";
 import { mergeVenues } from "../mergeVenues";
@@ -649,6 +650,44 @@ export class AppStore {
       throw new Error(payload.message || "Unable to finalize venue.");
     }
     await this.loadGroup();
+  }
+
+  async saveVenueToCollections(venue: Venue) {
+    const venueCategory = this.venueCategory;
+    if (!venueCategory) {
+      throw new Error("Missing venue category.");
+    }
+
+    const response = await fetch("/api/collections", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        place: {
+          id: venue.id,
+          name: venue.name,
+          address: venue.address,
+          area: venue.area,
+          priceLabel: venue.priceLabel,
+          closingTimeLabel: venue.closingTimeLabel,
+          photos: venue.photos,
+          rating: venue.rating,
+          userRatingCount: venue.userRatingCount,
+          venueCategory,
+          location: venue.location,
+        },
+      }),
+    });
+
+    const payload = (await response.json().catch(() => ({}))) as {
+      collection?: CollectionListItem;
+      message?: string;
+    };
+
+    if (!response.ok || !payload.collection) {
+      throw new Error(payload.message || "Unable to save place to Collections.");
+    }
+
+    return payload.collection;
   }
 
   setSelectedVenue(venueId: string | null) {

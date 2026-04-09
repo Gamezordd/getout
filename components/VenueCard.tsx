@@ -30,6 +30,9 @@ type Props = {
   currentUserId: string | null;
   onSelect: () => void;
   onVote: () => void;
+  showSaveToCollectionsAction?: boolean;
+  isSavingToCollections?: boolean;
+  onSaveToCollections?: () => void;
 };
 
 type MetadataItem = {
@@ -76,6 +79,9 @@ export default function VenueCard({
   currentUserId,
   onSelect,
   onVote,
+  showSaveToCollectionsAction = false,
+  isSavingToCollections = false,
+  onSaveToCollections,
 }: Props) {
   const photos = Array.isArray(venue.photos) ? venue.photos.slice(0, 6) : [];
   const firstPhoto = photos[0] || null;
@@ -162,7 +168,10 @@ export default function VenueCard({
 
     const observer = new IntersectionObserver(
       ([entry]) => {
-        setIsCardVisible(entry.isIntersecting && entry.intersectionRatio >= CARD_VISIBILITY_THRESHOLD);
+        setIsCardVisible(
+          entry.isIntersecting &&
+            entry.intersectionRatio >= CARD_VISIBILITY_THRESHOLD,
+        );
       },
       {
         threshold: [0, CARD_VISIBILITY_THRESHOLD, 1],
@@ -182,7 +191,8 @@ export default function VenueCard({
     const intervalId = window.setInterval(() => {
       setActivePhoto((current) => {
         const currentIndex = current ? photos.indexOf(current) : -1;
-        const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % photos.length : 0;
+        const nextIndex =
+          currentIndex >= 0 ? (currentIndex + 1) % photos.length : 0;
         return photos[nextIndex] || current;
       });
     }, AUTO_ADVANCE_INTERVAL_MS);
@@ -224,9 +234,7 @@ export default function VenueCard({
     .map((user) => ({
       user,
       eta:
-        typeof etaByUser?.[user.id] === "number"
-          ? etaByUser[user.id]
-          : null,
+        typeof etaByUser?.[user.id] === "number" ? etaByUser[user.id] : null,
     }))
     .sort((a, b) => {
       if (a.eta === null) return 1;
@@ -240,7 +248,8 @@ export default function VenueCard({
     1,
   );
   const voteCount = voteSummary?.count || 0;
-  const voteFill = totalUsers > 0 ? Math.min(100, (voteCount / totalUsers) * 100) : 0;
+  const voteFill =
+    totalUsers > 0 ? Math.min(100, (voteCount / totalUsers) * 100) : 0;
   const locationLabel = venue.area || venue.address || null;
   const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
     `${venue.name} ${venue.address || ""}`.trim(),
@@ -252,7 +261,12 @@ export default function VenueCard({
           key: "location",
           node: (
             <span className="inline-flex min-w-0 items-center gap-1.5 text-[#b0b0bf]">
-              <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-[#8b8b9c]">
+              <svg
+                viewBox="0 0 20 20"
+                fill="currentColor"
+                aria-hidden="true"
+                className="h-3.5 w-3.5 shrink-0 text-[#8b8b9c]"
+              >
                 <path d="M10 2a6 6 0 0 1 6 6c0 4.418-4.5 8.667-5.37 9.46a1 1 0 0 1-1.26 0C8.5 16.667 4 12.418 4 8a6 6 0 0 1 6-6Zm0 3a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z" />
               </svg>
               <span className="truncate">{locationLabel}</span>
@@ -300,7 +314,10 @@ export default function VenueCard({
 
   const navigateLightbox = (direction: number) => {
     setLightboxIndex((current) => {
-      const nextIndex = Math.min(Math.max(current + direction, 0), photos.length - 1);
+      const nextIndex = Math.min(
+        Math.max(current + direction, 0),
+        photos.length - 1,
+      );
       if (nextIndex === current) return current;
       setLightboxDirection(direction);
       setActivePhoto(photos[nextIndex] || activePhoto);
@@ -383,11 +400,18 @@ export default function VenueCard({
                   <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-white/72">
                     {venue.rating ? (
                       <span className="inline-flex items-center gap-1 text-[#ffbe3d]">
-                        <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" className="h-3.5 w-3.5">
-                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.539 1.118l-2.8-2.034a1 1 0 00-1.176 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.462a1 1 0 00.95-.69l1.07-3.292z" />
+                        <svg
+                          viewBox="0 0 20 20"
+                          fill="currentColor"
+                          aria-hidden="true"
+                          className="h-3.5 w-3.5"
+                        >
+                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.539 1.118l-2.8-2.034a1 1 0 0 00-1.176 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.462a1 1 0 0 00.95-.69l1.07-3.292z" />
                         </svg>
                         {venue.rating}
-                        <span className="text-white/60">({formatCompactCount(venue.userRatingCount || 0)})</span>
+                        <span className="text-white/60">
+                          ({formatCompactCount(venue.userRatingCount || 0)})
+                        </span>
                       </span>
                     ) : null}
                     <span>{resolvedSourceLabel}</span>
@@ -401,16 +425,16 @@ export default function VenueCard({
               </div>
             </div>
           </div>
-          )}
+        )}
 
-          {photos.length > 1 && (
-            <div
-              ref={thumbnailStripRef}
-              className="flex gap-2 overflow-x-auto px-4 pb-1 pt-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-            >
-              {photos.map((photo, index) => {
-                const isActive = photo === activePhoto;
-                return (
+        {photos.length > 1 && (
+          <div
+            ref={thumbnailStripRef}
+            className="flex gap-2 overflow-x-auto px-4 pb-1 pt-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          >
+            {photos.map((photo, index) => {
+              const isActive = photo === activePhoto;
+              return (
                 <button
                   key={`${venue.id}-photo-${index}`}
                   type="button"
@@ -485,10 +509,18 @@ export default function VenueCard({
                   <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[#7d7d90]">
                     {venue.rating && (
                       <span className="inline-flex items-center gap-1 text-[#ffbe3d]">
-                        <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" className="h-3.5 w-3.5">
-                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.539 1.118l-2.8-2.034a1 1 0 00-1.176 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.462a1 1 0 00.95-.69l1.07-3.292z" />
+                        <svg
+                          viewBox="0 0 20 20"
+                          fill="currentColor"
+                          aria-hidden="true"
+                          className="h-3.5 w-3.5"
+                        >
+                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.539 1.118l-2.8-2.034a1 1 0 0 00-1.176 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.462a1 1 0 0 00.95-.69l1.07-3.292z" />
                         </svg>
-                        {venue.rating} <span className="text-[#7d7d90]">({formatCompactCount(venue.userRatingCount || 0)})</span>
+                        {venue.rating}{" "}
+                        <span className="text-[#7d7d90]">
+                          ({formatCompactCount(venue.userRatingCount || 0)})
+                        </span>
                       </span>
                     )}
                     <span>{resolvedSourceLabel}</span>
@@ -507,7 +539,7 @@ export default function VenueCard({
         <div className="mx-4 rounded-[18px] bg-[#1c1c22] px-4 py-3">
           <div className="mb-3 flex items-center justify-between">
             <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[#727287]">
-              🚗 Travel times
+              Travel times
             </p>
             <p className="font-display text-base font-bold text-[#f0f0f5]">
               {sortedUsers.length > 0 ? getTravelRange(preciseEtaByUser) : "--"}
@@ -517,7 +549,8 @@ export default function VenueCard({
             <div className="space-y-2.5">
               {sortedUsers.map(({ user, eta }, index) => {
                 const isCurrentUser = user.id === currentUserId;
-                const width = eta === null ? 0 : Math.max(8, Math.round((eta / maxEta) * 100));
+                const width =
+                  eta === null ? 0 : Math.max(8, Math.round((eta / maxEta) * 100));
                 const tone =
                   eta === null
                     ? { bar: "bg-[#30303b]", text: "text-[#8b8b9c]" }
@@ -538,13 +571,24 @@ export default function VenueCard({
                     >
                       {getUserInitialsLabel(user)}
                     </div>
-                    <p className={`min-w-0 flex-1 truncate text-xs ${isCurrentUser ? "font-semibold text-[#f0f0f5]" : "text-[#8b8b9c]"}`}>
+                    <p
+                      className={`min-w-0 flex-1 truncate text-xs ${
+                        isCurrentUser
+                          ? "font-semibold text-[#f0f0f5]"
+                          : "text-[#8b8b9c]"
+                      }`}
+                    >
                       {getUserLocationSensitiveLabel(user, currentUserId)}
                     </p>
                     <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#24242d]">
-                      <div className={`h-full rounded-full ${tone.bar}`} style={{ width: `${width}%` }} />
+                      <div
+                        className={`h-full rounded-full ${tone.bar}`}
+                        style={{ width: `${width}%` }}
+                      />
                     </div>
-                    <p className={`w-10 text-right font-display text-xs font-bold ${tone.text}`}>
+                    <p
+                      className={`w-10 text-right font-display text-xs font-bold ${tone.text}`}
+                    >
                       {eta === null ? "--" : `${Math.round(eta)}m`}
                     </p>
                   </div>
@@ -563,7 +607,10 @@ export default function VenueCard({
             {metadataItems.length > 0 && (
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
                 {metadataItems.map((item, index) => (
-                  <span key={item.key} className="inline-flex min-w-0 items-center gap-x-2">
+                  <span
+                    key={item.key}
+                    className="inline-flex min-w-0 items-center gap-x-2"
+                  >
                     {index > 0 && <span className="text-[#5f5f70]">·</span>}
                     {item.node}
                   </span>
@@ -589,7 +636,10 @@ export default function VenueCard({
 
         <div className="px-4 pb-4 pt-3">
           <div className="mb-3 h-1.5 overflow-hidden rounded-full bg-[#1c1c22]">
-            <div className="h-full rounded-full bg-[#00e5a0] transition-all duration-500" style={{ width: `${voteFill}%` }} />
+            <div
+              className="h-full rounded-full bg-[#00e5a0] transition-all duration-500"
+              style={{ width: `${voteFill}%` }}
+            />
           </div>
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
@@ -600,17 +650,29 @@ export default function VenueCard({
                 {voteSummary?.label || "No votes yet"}
               </p>
             </div>
-            <button
-              type="button"
-              onClick={onVote}
-              className={`shrink-0 rounded-full px-4 py-2 text-sm font-bold transition active:scale-[0.98] ${
-                hasCurrentUserVote
-                  ? "border border-[#00e5a0]/20 bg-[#00e5a0]/12 text-[#00e5a0]"
-                  : "bg-[#00e5a0] text-black"
-              }`}
-            >
-              {hasCurrentUserVote ? "Picked" : "👉 Pick"}
-            </button>
+            <div className="flex shrink-0 items-center gap-2">
+              {showSaveToCollectionsAction && onSaveToCollections ? (
+                <button
+                  type="button"
+                  onClick={onSaveToCollections}
+                  disabled={isSavingToCollections}
+                  className="rounded-full border border-white/10 bg-[#1c1c22] px-4 py-2 text-sm font-bold text-[#f0f0f5] transition hover:border-white/20 disabled:opacity-60"
+                >
+                  {isSavingToCollections ? "Saving..." : "Save"}
+                </button>
+              ) : null}
+              <button
+                type="button"
+                onClick={onVote}
+                className={`rounded-full px-4 py-2 text-sm font-bold transition active:scale-[0.98] ${
+                  hasCurrentUserVote
+                    ? "border border-[#00e5a0]/20 bg-[#00e5a0]/12 text-[#00e5a0]"
+                    : "bg-[#00e5a0] text-black"
+                }`}
+              >
+                {hasCurrentUserVote ? "Picked" : "Pick"}
+              </button>
+            </div>
           </div>
         </div>
       </article>

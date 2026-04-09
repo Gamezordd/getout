@@ -20,6 +20,9 @@ type Props = {
   isRefreshing?: boolean;
   onRefresh?: () => void;
   loadingState?: "idle" | "skeleton";
+  showSaveToCollectionsAction?: boolean;
+  savingCollectionVenueId?: string | null;
+  onSaveToCollections?: (venue: Venue) => void;
 };
 
 const SKELETON_COUNT = 6;
@@ -116,6 +119,9 @@ export default function PlaceList({
   isRefreshing = false,
   onRefresh,
   loadingState = "idle",
+  showSaveToCollectionsAction = false,
+  savingCollectionVenueId = null,
+  onSaveToCollections,
 }: Props) {
   const { mergedVenues: rankedVenues, suggestedRankById } = useMemo(
     () => mergeVenues(suggestedVenues, manualVenues),
@@ -267,6 +273,11 @@ export default function PlaceList({
             currentUserId={currentUserId}
             onSelect={() => onSelect(venue.id)}
             onVote={() => onVote(venue.id)}
+            showSaveToCollectionsAction={showSaveToCollectionsAction}
+            isSavingToCollections={savingCollectionVenueId === venue.id}
+            onSaveToCollections={
+              onSaveToCollections ? () => onSaveToCollections(venue) : undefined
+            }
           />
         );
       })}

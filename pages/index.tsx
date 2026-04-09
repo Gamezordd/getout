@@ -29,7 +29,7 @@ import { getUserActivityLabel } from "../lib/userDisplay";
 
 function HomePage() {
   const store = useAppStore();
-  const { authenticatedUser, isNative, startupResolved } = useAuth();
+  const { authenticatedUser, authStatus, isNative, startupResolved } = useAuth();
   const router = useRouter();
   const [showFinalizeDialog, setShowFinalizeDialog] = useState(false);
   const [showInviteDialog, setShowInviteDialog] = useState(false);
@@ -38,6 +38,9 @@ function HomePage() {
   const [pendingName, setPendingName] = useState("");
   const [nameError, setNameError] = useState<string | null>(null);
   const [isSavingName, setIsSavingName] = useState(false);
+  const [savingCollectionVenueId, setSavingCollectionVenueId] = useState<string | null>(
+    null,
+  );
   const [dismissedPreciseBanner, setDismissedPreciseBanner] = useState(false);
   const [dismissedNamePrompt, setDismissedNamePrompt] = useState(false);
   const [isDetectingPreciseLocation, setIsDetectingPreciseLocation] =
@@ -187,6 +190,28 @@ function HomePage() {
     }
   }, [pendingName, store]);
 
+  const handleSaveVenueToCollections = useCallback(
+    async (venue: (typeof store.venues)[number]) => {
+      if (savingCollectionVenueId === venue.id) return;
+      try {
+        setSavingCollectionVenueId(venue.id);
+        await store.saveVenueToCollections(venue);
+        toast.success("Saved to collections", {
+          description: `${venue.name} is now in your saved spots.`,
+        });
+      } catch (err: any) {
+        toast.error("Couldn't save to collections", {
+          description: err.message || "Try again in a moment.",
+        });
+      } finally {
+        setSavingCollectionVenueId((current) =>
+          current === venue.id ? null : current,
+        );
+      }
+    },
+    [savingCollectionVenueId, store],
+  );
+
   const handleSkipName = useCallback(() => {
     if (typeof window !== "undefined" && namePromptKey) {
       window.sessionStorage.setItem(namePromptKey, "1");
@@ -333,6 +358,9 @@ function HomePage() {
               isRefreshing={store.isLoadingSuggestions}
               onRefresh={handleRefreshSuggestions}
               loadingState={showSuggestionSkeletons ? "skeleton" : "idle"}
+              showSaveToCollectionsAction={isNative && authStatus === "signed_in"}
+              savingCollectionVenueId={savingCollectionVenueId}
+              onSaveToCollections={handleSaveVenueToCollections}
             />
           )}
         </section>
