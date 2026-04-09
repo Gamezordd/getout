@@ -192,7 +192,6 @@ export const groupActions = (
     let resolvedLocation = payload.location;
     let resolvedLocationLabel = payload.locationLabel || null;
     let resolvedLocationSource = payload.locationSource || "precise";
-    let shouldRecomputeSuggestions = false;
 
     if (!resolvedLocation) {
       if (!group.defaultApproximateLocation) {
@@ -204,7 +203,6 @@ export const groupActions = (
       resolvedLocationLabel =
         payload.locationLabel || group.defaultApproximateLocationLabel || null;
       resolvedLocationSource = "ip";
-      shouldRecomputeSuggestions = isOwner;
     }
 
     if (!resolvedLocation) {
@@ -231,7 +229,6 @@ export const groupActions = (
       userId: user.id,
       isOwner,
     });
-    group.suggestionsStatus = shouldRecomputeSuggestions ? "pending" : "ready";
     await saveGroup(payload.sessionId, group);
     if (authenticatedUser) {
       void acceptInviteForSession({
@@ -260,6 +257,9 @@ export const groupActions = (
           .catch(() => undefined);
       }
     }
+    await recomputeSuggestionsForGroup(payload.sessionId, group, {
+      rotateSuggestions: false,
+    });
     void safeTrigger(channel, "group-updated", {
       reason: "join",
       userId: user.id,
