@@ -1,4 +1,5 @@
 import Dialog from "./Dialog";
+import InvitePeoplePickerPanel from "./InvitePeoplePickerPanel";
 import type { CreateGroupFlowState } from "../hooks/useCreateGroupFlow";
 import { CATEGORY_OPTIONS } from "../lib/entryFlow";
 
@@ -22,6 +23,7 @@ export default function CreateGroupFields({
     error,
     filteredFriendResults,
     friendsLoading,
+    inviteError,
     inviteDialogOpen,
     inviteSearchValue,
     isNative,
@@ -70,7 +72,7 @@ export default function CreateGroupFields({
           })}
         </div>
 
-        {isNative && authStatus === "signed_in" ? (
+        {!isSheetVariant && isNative && authStatus === "signed_in" ? (
           <div className={isSheetVariant ? "mb-5 mt-5" : "mb-5 mt-8"}>
             <button
               type="button"
@@ -118,8 +120,7 @@ export default function CreateGroupFields({
             </button>
             {!isSheetVariant ? (
               <p className="mt-2 text-[12px] leading-5 text-[#5e5e74]">
-                Pick friends before creating the group. Invites are sent right after
-                creation.
+                Pick friends now so they are easy to invite once the group is live.
               </p>
             ) : null}
           </div>
@@ -144,154 +145,28 @@ export default function CreateGroupFields({
         description="Search saved friends by name or email, or type an app user's exact email."
         className="max-h-[75svh]"
       >
-        <div className="mt-4 flex w-full flex-col">
-          <input
-            value={inviteSearchValue}
-            onChange={(event) => setInviteSearchValue(event.target.value)}
-            placeholder="Search friends or enter email"
-            className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-900 outline-none"
-          />
-          <div className="mt-4 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
-            {friendsLoading ? (
-              <p className="text-sm text-slate-500">Loading friends...</p>
-            ) : null}
-            {!friendsLoading &&
-            filteredFriendResults.length === 0 &&
-            !emailLookupResult ? (
-              <p className="text-sm text-slate-500">
-                No matching friends yet. Try an exact app-user email.
-              </p>
-            ) : null}
-            {additionalSelectedInvitees.map((result) => {
-              const isSelected = selectedInvitees.some(
-                (entry) => entry.id === result.id,
-              );
-              return (
-                <button
-                  key={result.id}
-                  type="button"
-                  onClick={() =>
-                    setSelectedInvitees((current) =>
-                      isSelected
-                        ? current.filter((entry) => entry.id !== result.id)
-                        : [...current, result],
-                    )
-                  }
-                  className={`w-full rounded-2xl border px-4 py-3 text-left ${
-                    isSelected
-                      ? "border-emerald-500 bg-emerald-50"
-                      : "border-slate-200 bg-white"
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-slate-900">
-                        {result.displayName}
-                      </p>
-                      <p className="truncate text-xs text-slate-500">
-                        {result.email}
-                      </p>
-                    </div>
-                    <span className="rounded-full border border-slate-200 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                      {result.isFriend ? "Friend" : "App user"}
-                    </span>
-                  </div>
-                </button>
-              );
-            })}
-            {filteredFriendResults.map((result) => {
-              const isSelected = selectedInvitees.some(
-                (entry) => entry.id === result.id,
-              );
-              return (
-                <button
-                  key={result.id}
-                  type="button"
-                  onClick={() =>
-                    setSelectedInvitees((current) =>
-                      isSelected
-                        ? current.filter((entry) => entry.id !== result.id)
-                        : [...current, result],
-                    )
-                  }
-                  className={`w-full rounded-2xl border px-4 py-3 text-left ${
-                    isSelected
-                      ? "border-emerald-500 bg-emerald-50"
-                      : "border-slate-200 bg-white"
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-slate-900">
-                        {result.displayName}
-                      </p>
-                      <p className="truncate text-xs text-slate-500">
-                        {result.email}
-                      </p>
-                    </div>
-                    <span className="rounded-full border border-slate-200 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                      Friend
-                    </span>
-                  </div>
-                </button>
-              );
-            })}
-            {emailLookupLoading ? (
-              <p className="text-sm text-slate-500">Checking app user...</p>
-            ) : null}
-            {emailLookupResult &&
-            !filteredFriendResults.some(
-              (friend) => friend.id === emailLookupResult.id,
-            ) ? (
-              <button
-                type="button"
-                onClick={() =>
-                  setSelectedInvitees((current) => {
-                    const alreadySelected = current.some(
-                      (entry) => entry.id === emailLookupResult.id,
-                    );
-                    if (alreadySelected) {
-                      return current.filter(
-                        (entry) => entry.id !== emailLookupResult.id,
-                      );
-                    }
-                    return [...current, emailLookupResult];
-                  })
+        <InvitePeoplePickerPanel
+          inviteState={{
+            additionalSelectedInvitees,
+            emailLookupLoading,
+            emailLookupResult,
+            filteredFriendResults,
+            friendsLoading,
+            inviteError,
+            inviteSearchValue,
+            selectedInvitees,
+            setInviteSearchValue: (value) => setInviteSearchValue(value),
+            toggleInvitee: (invitee) =>
+              setSelectedInvitees((current) => {
+                const isSelected = current.some((entry) => entry.id === invitee.id);
+                if (isSelected) {
+                  return current.filter((entry) => entry.id !== invitee.id);
                 }
-                className={`w-full rounded-2xl border px-4 py-3 text-left ${
-                  selectedInvitees.some(
-                    (entry) => entry.id === emailLookupResult.id,
-                  )
-                    ? "border-emerald-500 bg-emerald-50"
-                    : "border-slate-200 bg-white"
-                }`}
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-slate-900">
-                      {emailLookupResult.displayName}
-                    </p>
-                    <p className="truncate text-xs text-slate-500">
-                      {emailLookupResult.email}
-                    </p>
-                  </div>
-                  <span className="rounded-full border border-slate-200 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                    {emailLookupResult.isFriend ? "Friend" : "App user"}
-                  </span>
-                </div>
-              </button>
-            ) : null}
-          </div>
-          <div className="mt-4 flex gap-2">
-            <button
-              type="button"
-              onClick={() => setInviteDialogOpen(false)}
-              className="flex-1 rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700"
-            >
-              Done
-            </button>
-          </div>
-        </div>
+                return [...current, invitee];
+              }),
+          }}
+          onSecondaryAction={() => setInviteDialogOpen(false)}
+        />
       </Dialog>
     </>
   );

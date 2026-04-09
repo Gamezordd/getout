@@ -41,6 +41,7 @@ function HomePage() {
   const [savingCollectionVenueId, setSavingCollectionVenueId] = useState<string | null>(
     null,
   );
+  const [savedCollectionVenueIds, setSavedCollectionVenueIds] = useState<string[]>([]);
   const [dismissedPreciseBanner, setDismissedPreciseBanner] = useState(false);
   const [dismissedNamePrompt, setDismissedNamePrompt] = useState(false);
   const [isDetectingPreciseLocation, setIsDetectingPreciseLocation] =
@@ -54,6 +55,10 @@ function HomePage() {
   useEffect(() => {
     setDismissedPreciseBanner(getPreciseLocationBannerDismissed());
   }, []);
+
+  useEffect(() => {
+    setSavedCollectionVenueIds([]);
+  }, [store.sessionId]);
 
   useEffect(() => {
     if (typeof window === "undefined" || !namePromptKey) return;
@@ -192,10 +197,18 @@ function HomePage() {
 
   const handleSaveVenueToCollections = useCallback(
     async (venue: (typeof store.venues)[number]) => {
-      if (savingCollectionVenueId === venue.id) return;
+      if (
+        savingCollectionVenueId === venue.id ||
+        savedCollectionVenueIds.includes(venue.id)
+      ) {
+        return;
+      }
       try {
         setSavingCollectionVenueId(venue.id);
         await store.saveVenueToCollections(venue);
+        setSavedCollectionVenueIds((current) =>
+          current.includes(venue.id) ? current : [...current, venue.id],
+        );
         toast.success("Saved to collections", {
           description: `${venue.name} is now in your saved spots.`,
         });
@@ -209,7 +222,7 @@ function HomePage() {
         );
       }
     },
-    [savingCollectionVenueId, store],
+    [savedCollectionVenueIds, savingCollectionVenueId, store],
   );
 
   const handleSkipName = useCallback(() => {
@@ -360,6 +373,7 @@ function HomePage() {
               loadingState={showSuggestionSkeletons ? "skeleton" : "idle"}
               showSaveToCollectionsAction={isNative && authStatus === "signed_in"}
               savingCollectionVenueId={savingCollectionVenueId}
+              savedCollectionVenueIds={savedCollectionVenueIds}
               onSaveToCollections={handleSaveVenueToCollections}
             />
           )}

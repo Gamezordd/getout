@@ -32,6 +32,7 @@ type Props = {
   onVote: () => void;
   showSaveToCollectionsAction?: boolean;
   isSavingToCollections?: boolean;
+  isSavedToCollections?: boolean;
   onSaveToCollections?: () => void;
 };
 
@@ -81,6 +82,7 @@ export default function VenueCard({
   onVote,
   showSaveToCollectionsAction = false,
   isSavingToCollections = false,
+  isSavedToCollections = false,
   onSaveToCollections,
 }: Props) {
   const photos = Array.isArray(venue.photos) ? venue.photos.slice(0, 6) : [];
@@ -655,10 +657,18 @@ export default function VenueCard({
                 <button
                   type="button"
                   onClick={onSaveToCollections}
-                  disabled={isSavingToCollections}
-                  className="rounded-full border border-white/10 bg-[#1c1c22] px-4 py-2 text-sm font-bold text-[#f0f0f5] transition hover:border-white/20 disabled:opacity-60"
+                  disabled={isSavingToCollections || isSavedToCollections}
+                  className={`rounded-full px-4 py-2 text-sm font-bold transition disabled:opacity-60 ${
+                    isSavedToCollections
+                      ? "border border-[#00e5a0]/20 bg-[#00e5a0]/12 text-[#00e5a0]"
+                      : "border border-white/10 bg-[#1c1c22] text-[#f0f0f5] hover:border-white/20"
+                  }`}
                 >
-                  {isSavingToCollections ? "Saving..." : "Save"}
+                  {isSavingToCollections
+                    ? "Saving..."
+                    : isSavedToCollections
+                      ? "✓ Saved"
+                      : "Save"}
                 </button>
               ) : null}
               <button
@@ -670,7 +680,7 @@ export default function VenueCard({
                     : "bg-[#00e5a0] text-black"
                 }`}
               >
-                {hasCurrentUserVote ? "Picked" : "Pick"}
+                {hasCurrentUserVote ? "Picked" : "👉 Pick"}
               </button>
             </div>
           </div>

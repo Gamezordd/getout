@@ -22,6 +22,7 @@ type Props = {
   loadingState?: "idle" | "skeleton";
   showSaveToCollectionsAction?: boolean;
   savingCollectionVenueId?: string | null;
+  savedCollectionVenueIds?: string[];
   onSaveToCollections?: (venue: Venue) => void;
 };
 
@@ -121,6 +122,7 @@ export default function PlaceList({
   loadingState = "idle",
   showSaveToCollectionsAction = false,
   savingCollectionVenueId = null,
+  savedCollectionVenueIds = [],
   onSaveToCollections,
 }: Props) {
   const { mergedVenues: rankedVenues, suggestedRankById } = useMemo(
@@ -275,6 +277,7 @@ export default function PlaceList({
             onVote={() => onVote(venue.id)}
             showSaveToCollectionsAction={showSaveToCollectionsAction}
             isSavingToCollections={savingCollectionVenueId === venue.id}
+            isSavedToCollections={savedCollectionVenueIds.includes(venue.id)}
             onSaveToCollections={
               onSaveToCollections ? () => onSaveToCollections(venue) : undefined
             }
