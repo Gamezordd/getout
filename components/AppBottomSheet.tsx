@@ -24,7 +24,7 @@ export default function AppBottomSheet({
     const updateSnapRatio = () => {
       const isCompactViewport =
         window.innerWidth <= 390 || window.innerHeight <= 760;
-      setInitialSnapRatio(isCompactViewport ? 0.6 : 0.5);
+      setInitialSnapRatio(isCompactViewport ? 0.3 : 0.4);
     };
 
     updateSnapRatio();
