@@ -37,6 +37,7 @@ import {
   RADIUS_OPTIONS_METERS,
   TARGET_SUGGESTION_COUNT,
 } from "./constants";
+import { prepareSuggestionEnrichmentForCurrentSuggestions } from "./suggestion-enrichment-shared";
 import { safeTrigger } from "./utils";
 import { ensureVotingDeadlineState } from "./venue-lock";
 
@@ -979,6 +980,11 @@ export default async function handler(
           rotateSuggestions: true,
           clearVotes: true,
         });
+        await prepareSuggestionEnrichmentForCurrentSuggestions(sessionId);
+        const latestGroup = await findGroup(sessionId);
+        if (latestGroup) {
+          payload = buildPayloadFromGroup(latestGroup);
+        }
       } catch (error) {
         await setSuggestionsStatus(sessionId, group, "error");
         throw error;
@@ -1001,6 +1007,11 @@ export default async function handler(
           payload = await recomputeSuggestionsForGroup(sessionId, group, {
             rotateSuggestions: false,
           });
+          await prepareSuggestionEnrichmentForCurrentSuggestions(sessionId);
+          const latestGroup = await findGroup(sessionId);
+          if (latestGroup) {
+            payload = buildPayloadFromGroup(latestGroup);
+          }
           const channel = `private-group-${sessionId}`;
           await safeTrigger(channel, "group-updated", {
             reason: "suggestions-ready",

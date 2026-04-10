@@ -63,6 +63,32 @@ const getTravelRange = (etas?: Record<string, number>) => {
   return `0 - ${Math.round(max)} min`;
 };
 
+function AiSparkIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+      className={className}
+    >
+      <path
+        d="M12 2.5l2.2 6.3 6.3 2.2-6.3 2.2-2.2 6.3-2.2-6.3-6.3-2.2 6.3-2.2 2.2-6.3Z"
+        fill="currentColor"
+      />
+      <path
+        d="M18.25 3l1 2.75L22 6.75 19.25 7.75l-1 2.75-1-2.75-2.75-1 2.75-1 1-2.75Z"
+        fill="currentColor"
+        opacity="0.82"
+      />
+      <path
+        d="M5.75 14l.85 2.25 2.25.85-2.25.85-.85 2.25-.85-2.25-2.25-.85 2.25-.85.85-2.25Z"
+        fill="currentColor"
+        opacity="0.7"
+      />
+    </svg>
+  );
+}
+
 export default function VenueCard({
   venue,
   badgeText,
@@ -225,6 +251,15 @@ export default function VenueCard({
   }, [activePhoto]);
 
   const preciseUsers = users.filter((user) => user.locationSource === "precise");
+  const aiCharacteristics = Array.isArray(venue.aiCharacteristics)
+    ? venue.aiCharacteristics.slice(0, 3)
+    : [];
+  const isAiLoading =
+    badgeTone === "ranked" && venue.aiEnrichmentStatus === "loading";
+  const showAiCharacteristics =
+    badgeTone === "ranked" &&
+    venue.aiEnrichmentStatus === "ready" &&
+    aiCharacteristics.length === 3;
 
   const preciseEtaByUser = Object.fromEntries(
     preciseUsers
@@ -418,6 +453,25 @@ export default function VenueCard({
                     ) : null}
                     <span>{resolvedSourceLabel}</span>
                   </div>
+                  {(isAiLoading || showAiCharacteristics) && (
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      {isAiLoading ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-[#00e5a0]/20 bg-[rgba(10,10,14,0.58)] px-2.5 py-0.5 text-[10px] font-semibold text-[#b9f7df] backdrop-blur-sm">
+                          <AiSparkIcon className="h-4 w-4 text-[#00e5a0] animate-pulse" />
+                          AI reading reviews
+                        </span>
+                      ) : (
+                        aiCharacteristics.map((characteristic) => (
+                          <span
+                            key={`${venue.id}-${characteristic}`}
+                            className="rounded-full border border-white/10 bg-[rgba(10,10,14,0.58)] px-3.5 py-1.5 text-[12px] font-semibold text-white/86 backdrop-blur-sm"
+                          >
+                            {characteristic}
+                          </span>
+                        ))
+                      )}
+                    </div>
+                  )}
                 </div>
                 {medalNote && (
                   <span className="shrink-0 rounded-md bg-[#00e5a0] px-2 py-0.5 font-display text-[10px] font-bold uppercase tracking-[0.08em] text-black">
@@ -527,6 +581,25 @@ export default function VenueCard({
                     )}
                     <span>{resolvedSourceLabel}</span>
                   </div>
+                  {(isAiLoading || showAiCharacteristics) && (
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      {isAiLoading ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-[#00e5a0]/18 bg-[#1c1c22] px-2.5 py-0.5 text-[10px] font-semibold text-[#b7e8d5]">
+                          <AiSparkIcon className="h-4 w-4 text-[#00e5a0] animate-pulse" />
+                          AI reading reviews
+                        </span>
+                      ) : (
+                        aiCharacteristics.map((characteristic) => (
+                          <span
+                            key={`${venue.id}-${characteristic}`}
+                            className="rounded-full border border-white/10 bg-[#1c1c22] px-3.5 py-1.5 text-[12px] font-semibold text-[#d8d8e1]"
+                          >
+                            {characteristic}
+                          </span>
+                        ))
+                      )}
+                    </div>
+                  )}
                 </div>
                 {medalNote && (
                   <span className="shrink-0 rounded-md bg-[#00e5a0] px-2 py-0.5 font-display text-[10px] font-bold uppercase tracking-[0.08em] text-black">

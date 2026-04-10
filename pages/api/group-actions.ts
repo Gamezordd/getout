@@ -8,6 +8,7 @@ import {
   recomputeSuggestionsForGroup,
   syncManualVenueMetricsForGroup,
 } from "./suggestions";
+import { prepareSuggestionEnrichmentForCurrentSuggestions } from "./suggestion-enrichment-shared";
 import {
   AddManualVenueRequest,
   FinalizeVenueRequest,
@@ -260,6 +261,7 @@ export const groupActions = (
     await recomputeSuggestionsForGroup(payload.sessionId, group, {
       rotateSuggestions: false,
     });
+    await prepareSuggestionEnrichmentForCurrentSuggestions(payload.sessionId);
     void safeTrigger(channel, "group-updated", {
       reason: "join",
       userId: user.id,
@@ -275,6 +277,7 @@ export const groupActions = (
       group,
       group.manualVenues,
     );
+    await prepareSuggestionEnrichmentForCurrentSuggestions(payload.sessionId);
     await safeTrigger(channel, "group-updated", { reason: "manual-venues" });
     return res.status(200).json(buildGroupResponse(group));
   },
@@ -291,6 +294,7 @@ export const groupActions = (
       const hydratedVenue = await hydrateManualVenuePhotos(normalizedVenue);
       group.manualVenues.push(hydratedVenue);
       await syncManualVenueMetricsForGroup(payload.sessionId, group, [hydratedVenue]);
+      await prepareSuggestionEnrichmentForCurrentSuggestions(payload.sessionId);
       await safeTrigger(channel, "group-updated", { reason: "manual-venues" });
     }
     return res.status(200).json(buildGroupResponse(group));
@@ -303,6 +307,7 @@ export const groupActions = (
       (venue) => venue.id !== payload.venueId,
     );
     await syncManualVenueMetricsForGroup(payload.sessionId, group, []);
+    await prepareSuggestionEnrichmentForCurrentSuggestions(payload.sessionId);
     await safeTrigger(channel, "group-updated", { reason: "manual-venues" });
     return res.status(200).json(buildGroupResponse(group));
   },
@@ -368,6 +373,7 @@ export const groupActions = (
       await recomputeSuggestionsForGroup(payload.sessionId, group, {
         rotateSuggestions: false,
       });
+      await prepareSuggestionEnrichmentForCurrentSuggestions(payload.sessionId);
       await safeTrigger(channel, "group-updated", { reason: "update-user" });
       return res.status(200).json(buildGroupResponse(group));
     }
@@ -423,6 +429,7 @@ export const groupActions = (
     await recomputeSuggestionsForGroup(payload.sessionId, group, {
       rotateSuggestions: false,
     });
+    await prepareSuggestionEnrichmentForCurrentSuggestions(payload.sessionId);
     await safeTrigger(channel, "group-updated", { reason: "remove-user" });
     return res.status(200).json(buildGroupResponse(group));
   },

@@ -27,6 +27,9 @@ export type Venue = {
   userRatingCount?: number;
   addedByUserId?: string;
   source?: "manual" | "collection" | "google";
+  aiCharacteristics?: string[];
+  aiEnrichmentStatus?: "idle" | "loading" | "ready" | "error";
+  aiEnrichmentCachedAt?: string;
 };
 
 export type LockedVenue = {

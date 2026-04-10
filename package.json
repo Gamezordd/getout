@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "cleanup:groups": "node scripts/delete-all-groups.mjs",
+    "cleanup:vibes": "node scripts/delete-stale-vibe-indicators.mjs",
     "cap:sync": "cap sync android",
     "cap:android": "cap open android"
   },

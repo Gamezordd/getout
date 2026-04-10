@@ -21,6 +21,10 @@ export type SuggestionsResponse = {
   suggestionsStatus?: SuggestionsStatus;
 };
 
+export type SuggestionEnrichmentResponse = {
+  suggestedVenues: Venue[];
+};
+
 export type CacheEntry = {
   timestamp: number;
   payload: Omit<SuggestionsResponse, "votes">;

@@ -49,6 +49,10 @@ type SuggestionsPayload = {
   suggestionsStatus?: SuggestionsStatus;
 };
 
+type SuggestionEnrichmentPayload = {
+  suggestedVenues: Venue[];
+};
+
 const generateSessionId = () => {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID();
@@ -184,6 +188,23 @@ export class AppStore {
 
   reconcileVotes(votes: VotesByVenue) {
     this.votes = { ...(votes || {}) };
+  }
+
+  reconcileSuggestedVenueEnrichment(nextSuggestedVenues: Venue[]) {
+    if (this.suggestedVenues.length === 0) {
+      this.suggestedVenues = nextSuggestedVenues;
+      this.venues = mergeVenues(nextSuggestedVenues, this.manualVenues).mergedVenues;
+      return;
+    }
+
+    const nextById = new Map(nextSuggestedVenues.map((venue) => [venue.id, venue]));
+    const mergedSuggestedVenues = this.suggestedVenues.map((venue) => {
+      const nextVenue = nextById.get(venue.id);
+      return nextVenue ? { ...venue, ...nextVenue } : venue;
+    });
+
+    this.suggestedVenues = mergedSuggestedVenues;
+    this.venues = mergeVenues(mergedSuggestedVenues, this.manualVenues).mergedVenues;
   }
 
   buildAvatarUrl(name?: string | null, fallbackSeed?: string) {
@@ -399,6 +420,22 @@ export class AppStore {
   refreshSuggestions() {
     this.votes = {};
     return this.fetchSuggestions({ refresh: true });
+  }
+
+  async fetchSuggestionEnrichment() {
+    if (!this.sessionId) return;
+    const response = await fetch(
+      `/api/suggestion-enrichment?sessionId=${encodeURIComponent(this.sessionId)}`,
+    );
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(payload.message || "Unable to fetch suggestion enrichment.");
+    }
+
+    const data = (await response.json()) as SuggestionEnrichmentPayload;
+    runInAction(() => {
+      this.reconcileSuggestedVenueEnrichment(data.suggestedVenues || []);
+    });
   }
 
   async addManualVenue(place: {
