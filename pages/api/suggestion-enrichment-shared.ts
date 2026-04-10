@@ -3,14 +3,24 @@ import { findGroup, saveGroup, type GroupPayload } from "../../lib/groupStore";
 import { redis } from "../../lib/redis";
 import { mergeVenues } from "../../lib/mergeVenues";
 import type { Venue } from "../../lib/types";
+import { send } from "../../lib/vercelQueue";
 import { safeTrigger } from "./utils";
 
 const ENRICHMENT_CACHE_PREFIX = "suggestions:ai-place";
 const ENRICHMENT_LOCK_PREFIX = "suggestions:ai-lock";
+const ENRICHMENT_ACTIVE_FINGERPRINT_PREFIX = "suggestions:ai-active";
 const ENRICHMENT_CACHE_VERSION = 1;
 const ENRICHMENT_CACHE_TTL_SECONDS = 60 * 60 * 24 * 14;
 const ENRICHMENT_LOCK_TTL_SECONDS = 90;
 const TARGET_VISIBLE_SUGGESTION_COUNT = 6;
+export const SUGGESTION_ENRICHMENT_TOPIC = "suggestion-enrichment";
+
+export type SuggestionEnrichmentMessage = {
+  sessionId: string;
+  fingerprint: string;
+  requestedPlaceIds: string[];
+  queuedAt: string;
+};
 
 type CachedEnrichment = {
   placeId: string;
@@ -56,6 +66,9 @@ const getCacheKey = (placeId: string) =>
 
 const getLockKey = (sessionId: string, fingerprint: string) =>
   `${ENRICHMENT_LOCK_PREFIX}:${sessionId}:${fingerprint}`;
+
+const getActiveFingerprintKey = (sessionId: string) =>
+  `${ENRICHMENT_ACTIVE_FINGERPRINT_PREFIX}:${sessionId}`;
 
 const isGooglePlaceId = (placeId: string) =>
   Boolean(placeId) && !placeId.startsWith("geo-");
@@ -298,6 +311,20 @@ const triggerFinishedEvent = async (sessionId: string) => {
   });
 };
 
+const getActiveFingerprint = async (sessionId: string) => {
+  const fingerprint = await redis.get<string>(getActiveFingerprintKey(sessionId));
+  return typeof fingerprint === "string" ? fingerprint : null;
+};
+
+const setActiveFingerprint = async (sessionId: string, fingerprint: string) => {
+  await redis.set(getActiveFingerprintKey(sessionId), fingerprint, {
+    ex: ENRICHMENT_CACHE_TTL_SECONDS,
+  });
+};
+
+const isFingerprintActive = async (sessionId: string, fingerprint: string) =>
+  (await getActiveFingerprint(sessionId)) === fingerprint;
+
 const markEnrichmentErrored = async (
   sessionId: string,
   requestedPlaceIds: string[],
@@ -330,7 +357,22 @@ const markEnrichmentErrored = async (
   await triggerFinishedEvent(sessionId);
 };
 
-const runEnrichmentJob = async (sessionId: string, requestedPlaceIds: string[]) => {
+export const processSuggestionEnrichmentJob = async (
+  message: SuggestionEnrichmentMessage,
+) => {
+  const { sessionId, requestedPlaceIds, fingerprint } = message;
+  if (!(await isFingerprintActive(sessionId, fingerprint))) {
+    return;
+  }
+
+  const claimKey = getLockKey(sessionId, fingerprint);
+  const lockResult = await redis.set(claimKey, Date.now().toString(), {
+    nx: true,
+    ex: ENRICHMENT_LOCK_TTL_SECONDS,
+  });
+  if (lockResult !== "OK") return;
+
+  try {
   const apiKey = getGoogleMapsApiKey();
   const model = getGeminiModel();
   const group = await findGroup(sessionId);
@@ -413,6 +455,9 @@ const runEnrichmentJob = async (sessionId: string, requestedPlaceIds: string[]) 
 
   const latestGroup = await findGroup(sessionId);
   if (!latestGroup) return;
+  if (!(await isFingerprintActive(sessionId, fingerprint))) {
+    return;
+  }
   const stillVisibleIds = new Set(
     getVisibleSuggestedVenues(latestGroup).map((venue) => venue.id),
   );
@@ -426,6 +471,11 @@ const runEnrichmentJob = async (sessionId: string, requestedPlaceIds: string[]) 
 
   await saveGroup(sessionId, latestGroup);
   await triggerFinishedEvent(sessionId);
+  } catch (e) {
+    console.error(`Error processing suggestion enrichment for ${sessionId}:`, e);
+  } finally {
+    await redis.del(claimKey);
+  }
 };
 
 export const prepareSuggestionEnrichmentForCurrentSuggestions = async (
@@ -472,27 +522,31 @@ export const prepareSuggestionEnrichmentForCurrentSuggestions = async (
     await saveGroup(sessionId, group);
   }
 
-  if (uncachedPlaceIds.length === 0) return;
-
-  const fingerprint = buildFingerprint({ placeIds: uncachedPlaceIds.sort() });
-  const lockKey = getLockKey(sessionId, fingerprint);
-  const lockResult = await redis.set(lockKey, Date.now().toString(), {
-    nx: true,
-    ex: ENRICHMENT_LOCK_TTL_SECONDS,
+  const requestedPlaceIds = [...uncachedPlaceIds].sort();
+  const visiblePlaceIds = visibleSuggestedVenues.map((venue) => venue.id).sort();
+  const fingerprint = buildFingerprint({
+    visiblePlaceIds,
+    requestedPlaceIds,
   });
-  if (lockResult !== "OK") return;
+  await setActiveFingerprint(sessionId, fingerprint);
 
-  void runEnrichmentJob(sessionId, uncachedPlaceIds).catch((error) => {
-    console.error(
-      `Error enriching suggestions for session ${sessionId}:`,
-      error,
-    );
-    return markEnrichmentErrored(sessionId, uncachedPlaceIds);
-  }).finally(async () => {
-    await redis.del(lockKey);
-  });
+  if (requestedPlaceIds.length === 0) return;
+  console.log("publishing suggestion enrichment request");
+  await send(
+    SUGGESTION_ENRICHMENT_TOPIC,
+    {
+      sessionId,
+      fingerprint,
+      requestedPlaceIds,
+      queuedAt: new Date().toISOString(),
+    } satisfies SuggestionEnrichmentMessage,
+  );
 };
 
 export const buildSuggestionEnrichmentPayload = (group: GroupPayload) => ({
   suggestedVenues: group.suggestions?.suggestedVenues || [],
 });
+
+export const markSuggestionEnrichmentErrored = async (
+  message: SuggestionEnrichmentMessage,
+) => markEnrichmentErrored(message.sessionId, message.requestedPlaceIds);

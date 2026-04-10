@@ -123,6 +123,23 @@ function HomePage() {
     void store.fetchSuggestions();
   }, [store, store.sessionId, store.users.length, store.manualVenues.length]);
 
+  useEffect(() => {
+    const hasPendingEnrichment = store.suggestedVenues.some(
+      (venue) => venue.aiEnrichmentStatus === "loading",
+    );
+    if (!store.sessionId || !hasPendingEnrichment) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      void store.fetchSuggestionEnrichment().catch(() => undefined);
+    }, 8000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [store, store.sessionId, store.suggestedVenues]);
+
   const handleVote = useCallback(
     async (venueId: string) => {
       if (!store.currentUserId) return;

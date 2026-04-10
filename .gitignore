@@ -2,8 +2,11 @@ node_modules
 
 .next
 
-.env
+.env*
 .env.local.example
+.env.backup
 
 *.pem
 *.jks
+.vercel
+.env*.local

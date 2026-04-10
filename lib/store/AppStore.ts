@@ -417,9 +417,10 @@ export class AppStore {
     return requestPromise;
   }
 
-  refreshSuggestions() {
+  async refreshSuggestions() {
     this.votes = {};
-    return this.fetchSuggestions({ refresh: true });
+    await this.fetchSuggestions({ refresh: true });
+    await this.fetchSuggestions();
   }
 
   async fetchSuggestionEnrichment() {
