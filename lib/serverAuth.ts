@@ -111,6 +111,10 @@ const clearCookie = () =>
     expires: new Date(0),
   });
 
+export const clearAuthCookie = (res: NextApiResponse) => {
+  res.setHeader("Set-Cookie", clearCookie());
+};
+
 const getSessionIdFromRequest = (req: NextApiRequest) => {
   const cookies = parse(req.headers.cookie || "");
   const sessionId = cookies[SESSION_COOKIE_NAME];
@@ -217,7 +221,7 @@ export const revokeSession = async (req: NextApiRequest, res: NextApiResponse) =
         AND revoked_at IS NULL
     `;
   }
-  res.setHeader("Set-Cookie", clearCookie());
+  clearAuthCookie(res);
 };
 
 export const updateAuthenticatedDisplayName = async (

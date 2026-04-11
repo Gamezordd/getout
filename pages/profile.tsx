@@ -124,6 +124,13 @@ function ProfilePage() {
             >
               Sign out
             </button>
+            <button
+              type="button"
+              onClick={() => void router.push("/delete-account")}
+              className="w-full rounded-2xl border border-rose-500/30 px-4 py-3 text-sm font-semibold text-rose-200"
+            >
+              Delete account
+            </button>
           </>
         ) : (
           <p className="text-sm text-[#8b8b9c]">

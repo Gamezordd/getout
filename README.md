@@ -32,6 +32,7 @@ The Android manifest is configured as a share target for `text/plain`. When a us
 - Set `DATABASE_URL` and `GOOGLE_AUTH_SERVER_CLIENT_ID` in your environment.
 - For Android builds, also provide `GOOGLE_AUTH_SERVER_CLIENT_ID` to Gradle or add `google.auth.serverClientId=...` to `android/local.properties`.
 - Web keeps the existing anonymous/open flow; only the native app shows Google sign-in.
+- Public account deletion is exposed at `/delete-account`. Set `NEXT_PUBLIC_SUPPORT_EMAIL` so the page can show a fallback support contact for users who are not currently signed in on that device.
 
 ## Android FCM invite notifications
 
