@@ -1,5 +1,9 @@
-﻿import { useEffect, useRef, useState } from "react";
-import type { LatLng, VenueCategory } from "../lib/types";
+import { useEffect, useRef, useState } from "react";
+import type { LatLng, PlaceAttribution, VenueCategory } from "../lib/types";
+import {
+  GoogleMapsAttribution,
+  PlaceAttributionList,
+} from "./GoogleMapsAttribution";
 
 export type PlaceResult = {
   id: string;
@@ -9,6 +13,8 @@ export type PlaceResult = {
   priceLabel?: string;
   closingTimeLabel?: string;
   photos?: string[];
+  googleMapsAttributionRequired?: boolean;
+  placeAttributions?: PlaceAttribution[];
   rating?: number;
   userRatingCount?: number;
   venueCategory?: VenueCategory;
@@ -181,6 +187,15 @@ export default function PlaceSearch({
               <p className={isDark ? "text-sm text-[#64647a]" : "text-base text-slate-500"}>{place.address}</p>
             </button>
           ))}
+          {results.some((place) => place.googleMapsAttributionRequired) ? (
+            <div className="pt-1">
+              <GoogleMapsAttribution />
+              <PlaceAttributionList
+                attributions={results.flatMap((place) => place.placeAttributions || [])}
+                className="mt-1"
+              />
+            </div>
+          ) : null}
         </div>
       ) : null}
     </div>

@@ -4,7 +4,9 @@ import {
   getUserInitialsLabel,
   getUserLocationSensitiveLabel,
 } from "../lib/userDisplay";
+import { collectPhotoAttributions } from "../lib/googleMapsAttribution";
 import type { User, Venue } from "../lib/types";
+import { PhotoAttributionLine, PlaceAttributionList } from "./GoogleMapsAttribution";
 import ImageLightbox from "./ImageLightbox";
 
 type VoteSummary = {
@@ -371,6 +373,10 @@ export default function VenueCard({
   const resolvedSourceLabel =
     sourceLabel || (badgeTone === "manual" ? "Manual pick" : "Suggested");
   const showImageHeroLoader = !showPhotoHero && isImageLoading;
+  const visiblePhotoAttributions = collectPhotoAttributions(
+    venue.photoAttributions,
+    photos.length > 1 ? [0, 1, 2, 3, 4, 5] : [0],
+  );
 
   const openLightbox = () => {
     const nextIndex = activePhoto
@@ -747,9 +753,17 @@ export default function VenueCard({
                     {index > 0 && <span className="text-[#5f5f70]">·</span>}
                     {item.node}
                   </span>
-                ))}
-              </div>
-            )}
+            ))}
+          </div>
+        )}
+
+        {showPhotoHero && visiblePhotoAttributions.length > 0 && (
+          <PhotoAttributionLine
+            attributions={visiblePhotoAttributions}
+            className="px-4 pt-3"
+            prefix={photos.length > 1 ? "Photos" : "Photo"}
+          />
+        )}
             {addedByName && (
               <p className="mt-1 text-xs text-[#77778a]">Added by {addedByName}</p>
             )}
@@ -816,10 +830,18 @@ export default function VenueCard({
             </div>
           </div>
         </div>
+
+        {venue.placeAttributions?.length ? (
+          <PlaceAttributionList
+            attributions={venue.placeAttributions}
+            className="px-4 pb-4"
+          />
+        ) : null}
       </article>
 
       <ImageLightbox
         photos={photos}
+        photoAttributions={venue.photoAttributions}
         currentIndex={lightboxIndex}
         direction={lightboxDirection}
         isOpen={isLightboxOpen}

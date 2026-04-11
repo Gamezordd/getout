@@ -1,7 +1,12 @@
 import { randomUUID } from "crypto";
 import type { CollectionListItem } from "./authTypes";
 import { redis } from "./redis";
-import type { LatLng, VenueCategory } from "./types";
+import type {
+  GooglePhotoAuthorAttribution,
+  LatLng,
+  PlaceAttribution,
+  VenueCategory,
+} from "./types";
 import { ensureAuthSchema, getSql } from "./serverAuth";
 
 type CollectionRow = {
@@ -13,6 +18,9 @@ type CollectionRow = {
   area: string | null;
   price_label: string | null;
   closing_time_label: string | null;
+  google_maps_attribution_required: boolean | null;
+  place_attributions_json: PlaceAttribution[] | null;
+  photo_attributions_json: GooglePhotoAuthorAttribution[][] | null;
   photos_json: string[] | null;
   rating: number | null;
   user_rating_count: number | null;
@@ -32,6 +40,9 @@ type SaveCollectionPlaceParams = {
     priceLabel?: string;
     closingTimeLabel?: string;
     photos?: string[];
+    googleMapsAttributionRequired?: boolean;
+    placeAttributions?: PlaceAttribution[];
+    photoAttributions?: GooglePhotoAuthorAttribution[][];
     rating?: number;
     userRatingCount?: number;
     venueCategory: VenueCategory;
@@ -50,6 +61,13 @@ const mapCollection = (row: CollectionRow): CollectionListItem => ({
   priceLabel: row.price_label,
   closingTimeLabel: row.closing_time_label,
   photos: Array.isArray(row.photos_json) ? row.photos_json : [],
+  googleMapsAttributionRequired: Boolean(row.google_maps_attribution_required),
+  placeAttributions: Array.isArray(row.place_attributions_json)
+    ? row.place_attributions_json
+    : [],
+  photoAttributions: Array.isArray(row.photo_attributions_json)
+    ? row.photo_attributions_json
+    : [],
   rating: row.rating,
   userRatingCount: row.user_rating_count,
   venueCategory: row.venue_category,
@@ -91,6 +109,9 @@ export const ensureCollectionSchema = async () => {
           area TEXT,
           price_label TEXT,
           closing_time_label TEXT,
+          google_maps_attribution_required BOOLEAN NOT NULL DEFAULT FALSE,
+          place_attributions_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+          photo_attributions_json JSONB NOT NULL DEFAULT '[]'::jsonb,
           photos_json JSONB NOT NULL DEFAULT '[]'::jsonb,
           rating DOUBLE PRECISION,
           user_rating_count INTEGER,
@@ -115,6 +136,18 @@ export const ensureCollectionSchema = async () => {
       await sql`
         ALTER TABLE user_collections
         ADD COLUMN IF NOT EXISTS visited_at TIMESTAMPTZ
+      `;
+      await sql`
+        ALTER TABLE user_collections
+        ADD COLUMN IF NOT EXISTS google_maps_attribution_required BOOLEAN NOT NULL DEFAULT FALSE
+      `;
+      await sql`
+        ALTER TABLE user_collections
+        ADD COLUMN IF NOT EXISTS place_attributions_json JSONB NOT NULL DEFAULT '[]'::jsonb
+      `;
+      await sql`
+        ALTER TABLE user_collections
+        ADD COLUMN IF NOT EXISTS photo_attributions_json JSONB NOT NULL DEFAULT '[]'::jsonb
       `;
       await sql`
         CREATE UNIQUE INDEX IF NOT EXISTS user_collections_user_place_idx
@@ -148,6 +181,9 @@ export const listCollectionsForUser = async (
       area,
       price_label,
       closing_time_label,
+      google_maps_attribution_required,
+      place_attributions_json,
+      photo_attributions_json,
       photos_json,
       rating,
       user_rating_count,
@@ -206,6 +242,9 @@ export const saveCollectionPlaceForUser = async ({
         area,
         price_label,
         closing_time_label,
+        google_maps_attribution_required,
+        place_attributions_json,
+        photo_attributions_json,
         photos_json,
         rating,
         user_rating_count,
@@ -222,6 +261,9 @@ export const saveCollectionPlaceForUser = async ({
         ${place.area || null},
         ${place.priceLabel || null},
         ${place.closingTimeLabel || null},
+        ${Boolean(place.googleMapsAttributionRequired)},
+        ${JSON.stringify(place.placeAttributions || [])}::jsonb,
+        ${JSON.stringify(place.photoAttributions || [])}::jsonb,
         ${JSON.stringify(place.photos || [])}::jsonb,
         ${typeof place.rating === "number" ? place.rating : null},
         ${
@@ -243,6 +285,9 @@ export const saveCollectionPlaceForUser = async ({
         area,
         price_label,
         closing_time_label,
+        google_maps_attribution_required,
+        place_attributions_json,
+        photo_attributions_json,
         photos_json,
         rating,
         user_rating_count,
@@ -262,6 +307,9 @@ export const saveCollectionPlaceForUser = async ({
       area,
       price_label,
       closing_time_label,
+      google_maps_attribution_required,
+      place_attributions_json,
+      photo_attributions_json,
       photos_json,
       rating,
       user_rating_count,
@@ -305,6 +353,9 @@ export const updateCollectionVisitedForUser = async (params: {
       area,
       price_label,
       closing_time_label,
+      google_maps_attribution_required,
+      place_attributions_json,
+      photo_attributions_json,
       photos_json,
       rating,
       user_rating_count,

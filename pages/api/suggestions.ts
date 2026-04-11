@@ -7,6 +7,7 @@ import {
 import { redis } from "../../lib/redis";
 import type {
   EtaMatrix,
+  PlaceAttribution,
   LatLng,
   TotalsByVenue,
   Venue,
@@ -112,6 +113,22 @@ const getAreaFromAddressComponents = (components?: Array<{
   }
 
   return undefined;
+};
+
+const mapPlaceAttributions = (attributions: unknown): PlaceAttribution[] => {
+  if (!Array.isArray(attributions)) return [];
+  return attributions
+    .map((attribution) => ({
+      provider:
+        typeof attribution?.provider === "string"
+          ? attribution.provider.trim()
+          : "",
+      providerUri:
+        typeof attribution?.providerUri === "string"
+          ? attribution.providerUri
+          : undefined,
+    }))
+    .filter((attribution) => attribution.provider.length > 0);
 };
 
 const normalizeCityLabel = (value?: string | null) =>
@@ -319,10 +336,10 @@ const fetchTopPlaces = async (
       {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
-          "X-Goog-Api-Key": apiKey,
-          "X-Goog-FieldMask":
-          "places.id,places.displayName,places.formattedAddress,places.addressComponents,places.location,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours",
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": apiKey,
+        "X-Goog-FieldMask":
+          "places.id,places.displayName,places.formattedAddress,places.addressComponents,places.location,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours,places.attributions",
         },
         body: JSON.stringify({
           includedTypes: [venueCategory],
@@ -359,6 +376,8 @@ const fetchTopPlaces = async (
           priceLabel: getPriceLabel(place.priceLevel),
           closingTimeLabel: getClosingTimeLabel(place.currentOpeningHours),
           photos: [],
+          googleMapsAttributionRequired: true,
+          placeAttributions: mapPlaceAttributions(place.attributions),
           location: { lat: location.latitude, lng: location.longitude },
           rating: place.rating || 0,
           userRatingCount: place.userRatingCount || 0,
@@ -498,6 +517,10 @@ const getCollectionCandidates = async (params: {
           priceLabel: item.priceLabel || undefined,
           closingTimeLabel: item.closingTimeLabel || undefined,
           photos: item.photos || [],
+          googleMapsAttributionRequired:
+            item.googleMapsAttributionRequired ?? false,
+          placeAttributions: item.placeAttributions || [],
+          photoAttributions: item.photoAttributions || [],
           rating:
             typeof item.rating === "number" ? item.rating : undefined,
           userRatingCount:

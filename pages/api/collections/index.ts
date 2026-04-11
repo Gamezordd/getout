@@ -1,6 +1,10 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import type { VenueCategory } from "../../../lib/types";
 import type { CollectionListItem } from "../../../lib/authTypes";
+import type {
+  GooglePhotoAuthorAttribution,
+  PlaceAttribution,
+} from "../../../lib/types";
 import {
   listCollectionsForUser,
   saveCollectionPlaceForUser,
@@ -16,6 +20,9 @@ type RequestBody = {
     priceLabel?: string;
     closingTimeLabel?: string;
     photos?: string[];
+    googleMapsAttributionRequired?: boolean;
+    placeAttributions?: PlaceAttribution[];
+    photoAttributions?: GooglePhotoAuthorAttribution[][];
     rating?: number;
     userRatingCount?: number;
     venueCategory?: VenueCategory;
@@ -82,6 +89,29 @@ export default async function handler(
         closingTimeLabel: place.closingTimeLabel?.trim(),
         photos: Array.isArray(place.photos)
           ? place.photos.filter((photo): photo is string => typeof photo === "string")
+          : [],
+        googleMapsAttributionRequired: Boolean(
+          place.googleMapsAttributionRequired,
+        ),
+        placeAttributions: Array.isArray(place.placeAttributions)
+          ? place.placeAttributions.filter(
+              (attribution): attribution is PlaceAttribution =>
+                typeof attribution?.provider === "string" &&
+                attribution.provider.trim().length > 0,
+            )
+          : [],
+        photoAttributions: Array.isArray(place.photoAttributions)
+          ? place.photoAttributions.map((entries) =>
+              Array.isArray(entries)
+                ? entries.filter(
+                    (
+                      attribution,
+                    ): attribution is GooglePhotoAuthorAttribution =>
+                      typeof attribution?.displayName === "string" &&
+                      attribution.displayName.trim().length > 0,
+                  )
+                : [],
+            )
           : [],
         rating: typeof place.rating === "number" ? place.rating : undefined,
         userRatingCount:

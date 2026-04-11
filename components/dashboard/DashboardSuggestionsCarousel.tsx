@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DashboardCuratedPlace } from "../../lib/authTypes";
 import type { VenueCategory } from "../../lib/types";
+import { collectPhotoAttributions } from "../../lib/googleMapsAttribution";
+import {
+  GoogleMapsAttribution,
+  PhotoAttributionLine,
+  PlaceAttributionList,
+} from "../GoogleMapsAttribution";
 
 type Props = {
   title: string;
@@ -115,6 +121,9 @@ export default function DashboardSuggestionsCarousel({
   const cityDescriptor = cityLabel?.trim() ? cityLabel.trim() : "your city";
   const isSaved = activePlace ? savedPlaceIds.includes(activePlace.id) : false;
   const isSaving = activePlace ? isSavingPlaceId === activePlace.id : false;
+  const activePhotoAttributions = activePlace
+    ? collectPhotoAttributions(activePlace.photoAttributions, [0])
+    : [];
 
   useEffect(() => {
     setActiveIndex(0);
@@ -371,6 +380,19 @@ export default function DashboardSuggestionsCarousel({
                   aria-label={`Show ${place.name}`}
                 />
               ))}
+            </div>
+          ) : null}
+          {activePlace.googleMapsAttributionRequired ? (
+            <div className="mt-3 px-1">
+              <PhotoAttributionLine
+                attributions={activePhotoAttributions}
+                className="mb-1"
+              />
+              <GoogleMapsAttribution />
+              <PlaceAttributionList
+                attributions={activePlace.placeAttributions}
+                className="mt-1"
+              />
             </div>
           ) : null}
         </>

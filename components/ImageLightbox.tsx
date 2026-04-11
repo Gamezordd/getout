@@ -1,9 +1,12 @@
 import { useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import type { GooglePhotoAuthorAttribution } from "../lib/types";
+import { PhotoAttributionLine } from "./GoogleMapsAttribution";
 import { registerNativeBackInterceptor } from "../lib/nativeBackNavigation";
 
 type Props = {
   photos: string[];
+  photoAttributions?: GooglePhotoAuthorAttribution[][];
   currentIndex: number;
   direction: number;
   isOpen: boolean;
@@ -20,6 +23,7 @@ const swipeThreshold = 8000;
 
 export default function ImageLightbox({
   photos,
+  photoAttributions = [],
   currentIndex,
   direction,
   isOpen,
@@ -91,6 +95,10 @@ export default function ImageLightbox({
               <p className="mt-1 text-xs text-white/60">
                 {currentIndex + 1} / {photos.length}
               </p>
+              <PhotoAttributionLine
+                attributions={photoAttributions[currentIndex] || []}
+                className="mt-2 text-white/60"
+              />
             </div>
             <button
               type="button"

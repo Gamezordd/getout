@@ -1,4 +1,9 @@
 import { useMemo } from "react";
+import {
+  GoogleMapsAttribution,
+  PlaceAttributionList,
+} from "./GoogleMapsAttribution";
+import { requiresGoogleMapsAttribution } from "../lib/googleMapsAttribution";
 import { mergeVenues } from "../lib/mergeVenues";
 import { getUserActivityLabel } from "../lib/userDisplay";
 import VenueCard from "./VenueCard";
@@ -197,6 +202,15 @@ export default function PlaceList({
     return map;
   }, [rankedVenues, userById]);
 
+  const showGoogleMapsAttribution = useMemo(
+    () => rankedVenues.some((venue) => requiresGoogleMapsAttribution(venue)),
+    [rankedVenues],
+  );
+  const aggregatedPlaceAttributions = useMemo(
+    () => rankedVenues.flatMap((venue) => venue.placeAttributions || []),
+    [rankedVenues],
+  );
+
   if (loadingState === "skeleton") {
     return (
       <div className="flex flex-col gap-4">
@@ -311,6 +325,15 @@ export default function PlaceList({
           </span>
         </button>
       )}
+      {showGoogleMapsAttribution ? (
+        <div className="px-1 pt-1">
+          <GoogleMapsAttribution />
+          <PlaceAttributionList
+            attributions={aggregatedPlaceAttributions}
+            className="mt-1"
+          />
+        </div>
+      ) : null}
     </div>
   );
 }

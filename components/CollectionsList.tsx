@@ -1,5 +1,11 @@
 import { formatCompactCount } from "../lib/formatCount";
 import type { CollectionListItem } from "../lib/authTypes";
+import { collectPhotoAttributions, requiresGoogleMapsAttribution } from "../lib/googleMapsAttribution";
+import {
+  GoogleMapsAttribution,
+  PhotoAttributionLine,
+  PlaceAttributionList,
+} from "./GoogleMapsAttribution";
 
 type Props = {
   collections: CollectionListItem[];
@@ -87,6 +93,12 @@ export default function CollectionsList({
   variant = "dashboard",
 }: Props) {
   const isEntry = variant === "entry";
+  const showGoogleMapsAttribution = collections.some((item) =>
+    requiresGoogleMapsAttribution(item),
+  );
+  const aggregatedPlaceAttributions = collections.flatMap(
+    (item) => item.placeAttributions || [],
+  );
 
   return (
     <div className="space-y-4">
@@ -130,6 +142,10 @@ export default function CollectionsList({
         const photos = Array.isArray(item.photos) ? item.photos.slice(0, 5) : [];
         const heroUrl = photos[0] || null;
         const thumbnailUrls = photos.slice(1, 4);
+        const visiblePhotoAttributions = collectPhotoAttributions(
+          item.photoAttributions,
+          heroUrl ? [0, 1, 2, 3] : [],
+        );
         const ratingLabel = formatRating(item.rating);
         const reviewCountLabel =
           typeof item.userRatingCount === "number" && item.userRatingCount > 0
@@ -222,6 +238,14 @@ export default function CollectionsList({
               </div>
             ) : null}
 
+            {visiblePhotoAttributions.length > 0 ? (
+              <PhotoAttributionLine
+                attributions={visiblePhotoAttributions}
+                className="px-4 pt-3"
+                prefix={thumbnailUrls.length > 0 ? "Photos" : "Photo"}
+              />
+            ) : null}
+
             <div className="p-4">
               {item.address ? (
                 <div className="text-sm text-[#8b8b9c]">{item.address}</div>
@@ -290,10 +314,26 @@ export default function CollectionsList({
                   </button>
                 </div>
               ) : null}
+
+              {item.placeAttributions?.length ? (
+                <PlaceAttributionList
+                  attributions={item.placeAttributions}
+                  className="mt-3"
+                />
+              ) : null}
             </div>
           </div>
         );
       })}
+      {!loading && !error && showGoogleMapsAttribution ? (
+        <div className="px-1">
+          <GoogleMapsAttribution />
+          <PlaceAttributionList
+            attributions={aggregatedPlaceAttributions}
+            className="mt-1"
+          />
+        </div>
+      ) : null}
     </div>
   );
 }

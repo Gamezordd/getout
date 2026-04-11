@@ -1,5 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import type { LatLng, VenueCategory } from "../../lib/types";
+import type {
+  LatLng,
+  PlaceAttribution,
+  VenueCategory,
+} from "../../lib/types";
 import {
   getClosingTimeLabel,
   getPriceLabel,
@@ -14,6 +18,8 @@ type PlaceResult = {
   priceLabel?: string;
   closingTimeLabel?: string;
   photos?: string[];
+  googleMapsAttributionRequired?: boolean;
+  placeAttributions?: PlaceAttribution[];
   rating?: number;
   userRatingCount?: number;
   venueCategory?: VenueCategory;
@@ -60,6 +66,22 @@ const getAreaFromAddressComponents = (
   return undefined;
 };
 
+const mapPlaceAttributions = (attributions: unknown): PlaceAttribution[] => {
+  if (!Array.isArray(attributions)) return [];
+  return attributions
+    .map((attribution) => ({
+      provider:
+        typeof attribution?.provider === "string"
+          ? attribution.provider.trim()
+          : "",
+      providerUri:
+        typeof attribution?.providerUri === "string"
+          ? attribution.providerUri
+          : undefined,
+    }))
+    .filter((attribution) => attribution.provider.length > 0);
+};
+
 const searchTextPlaces = async (
   apiKey: string,
   query: string,
@@ -81,7 +103,7 @@ const searchTextPlaces = async (
         "Content-Type": "application/json",
         "X-Goog-Api-Key": apiKey,
         "X-Goog-FieldMask":
-          "places.id,places.displayName,places.formattedAddress,places.addressComponents,places.location,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours,places.primaryType,places.types",
+          "places.id,places.displayName,places.formattedAddress,places.addressComponents,places.location,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours,places.primaryType,places.types,places.attributions",
       },
       body: JSON.stringify({
         textQuery: query,
@@ -110,6 +132,8 @@ const searchTextPlaces = async (
       priceLabel: getPriceLabel(place.priceLevel),
       closingTimeLabel: getClosingTimeLabel(place.currentOpeningHours),
       photos: [],
+      googleMapsAttributionRequired: true,
+      placeAttributions: mapPlaceAttributions(place.attributions),
       rating: typeof place.rating === "number" ? place.rating : undefined,
       userRatingCount:
         typeof place.userRatingCount === "number"
@@ -169,6 +193,8 @@ const geocodeAddress = async (
           )
         : undefined,
       photos: [],
+      googleMapsAttributionRequired: true,
+      placeAttributions: [],
       location: {
         lat: result.geometry?.location?.lat,
         lng: result.geometry?.location?.lng,

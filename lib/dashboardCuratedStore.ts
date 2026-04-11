@@ -1,6 +1,11 @@
 import { randomUUID } from "crypto";
 import type { DashboardCuratedPlace } from "./authTypes";
-import type { LatLng, VenueCategory } from "./types";
+import type {
+  GooglePhotoAuthorAttribution,
+  LatLng,
+  PlaceAttribution,
+  VenueCategory,
+} from "./types";
 import { ensureAuthSchema, getSql } from "./serverAuth";
 
 type DashboardCuratedRow = {
@@ -14,6 +19,9 @@ type DashboardCuratedRow = {
   area: string | null;
   price_label: string | null;
   closing_time_label: string | null;
+  google_maps_attribution_required: boolean | null;
+  place_attributions_json: PlaceAttribution[] | null;
+  photo_attributions_json: GooglePhotoAuthorAttribution[][] | null;
   photos_json: string[] | null;
   rating: number | null;
   user_rating_count: number | null;
@@ -35,6 +43,9 @@ export type DashboardCuratedPlaceInput = {
   priceLabel?: string | null;
   closingTimeLabel?: string | null;
   photos?: string[];
+  googleMapsAttributionRequired?: boolean;
+  placeAttributions?: PlaceAttribution[];
+  photoAttributions?: GooglePhotoAuthorAttribution[][];
   rating?: number | null;
   userRatingCount?: number | null;
   location: LatLng;
@@ -56,6 +67,13 @@ const mapDashboardCuratedPlace = (
   priceLabel: row.price_label,
   closingTimeLabel: row.closing_time_label,
   photos: Array.isArray(row.photos_json) ? row.photos_json : [],
+  googleMapsAttributionRequired: Boolean(row.google_maps_attribution_required),
+  placeAttributions: Array.isArray(row.place_attributions_json)
+    ? row.place_attributions_json
+    : [],
+  photoAttributions: Array.isArray(row.photo_attributions_json)
+    ? row.photo_attributions_json
+    : [],
   rating: row.rating,
   userRatingCount: row.user_rating_count,
   venueCategory: row.category,
@@ -81,6 +99,9 @@ export const ensureDashboardCuratedSchema = async () => {
           area TEXT,
           price_label TEXT,
           closing_time_label TEXT,
+          google_maps_attribution_required BOOLEAN NOT NULL DEFAULT FALSE,
+          place_attributions_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+          photo_attributions_json JSONB NOT NULL DEFAULT '[]'::jsonb,
           photos_json JSONB NOT NULL DEFAULT '[]'::jsonb,
           rating DOUBLE PRECISION,
           user_rating_count INTEGER,
@@ -93,6 +114,18 @@ export const ensureDashboardCuratedSchema = async () => {
       await sql`
         CREATE UNIQUE INDEX IF NOT EXISTS dashboard_curated_places_city_place_idx
         ON dashboard_curated_places (city_key, place_id)
+      `;
+      await sql`
+        ALTER TABLE dashboard_curated_places
+        ADD COLUMN IF NOT EXISTS google_maps_attribution_required BOOLEAN NOT NULL DEFAULT FALSE
+      `;
+      await sql`
+        ALTER TABLE dashboard_curated_places
+        ADD COLUMN IF NOT EXISTS place_attributions_json JSONB NOT NULL DEFAULT '[]'::jsonb
+      `;
+      await sql`
+        ALTER TABLE dashboard_curated_places
+        ADD COLUMN IF NOT EXISTS photo_attributions_json JSONB NOT NULL DEFAULT '[]'::jsonb
       `;
       await sql`
         CREATE INDEX IF NOT EXISTS dashboard_curated_places_lookup_idx
@@ -121,6 +154,9 @@ export const listDashboardCuratedPlaces = async (params: {
       area,
       price_label,
       closing_time_label,
+      google_maps_attribution_required,
+      place_attributions_json,
+      photo_attributions_json,
       photos_json,
       rating,
       user_rating_count,
@@ -158,6 +194,9 @@ export const upsertDashboardCuratedPlaces = async (
         area,
         price_label,
         closing_time_label,
+        google_maps_attribution_required,
+        place_attributions_json,
+        photo_attributions_json,
         photos_json,
         rating,
         user_rating_count,
@@ -176,6 +215,9 @@ export const upsertDashboardCuratedPlaces = async (
         ${place.area || null},
         ${place.priceLabel || null},
         ${place.closingTimeLabel || null},
+        ${Boolean(place.googleMapsAttributionRequired)},
+        ${JSON.stringify(place.placeAttributions || [])}::jsonb,
+        ${JSON.stringify(place.photoAttributions || [])}::jsonb,
         ${JSON.stringify(place.photos || [])}::jsonb,
         ${place.rating ?? null},
         ${place.userRatingCount ?? null},
@@ -191,6 +233,9 @@ export const upsertDashboardCuratedPlaces = async (
         area = EXCLUDED.area,
         price_label = EXCLUDED.price_label,
         closing_time_label = EXCLUDED.closing_time_label,
+        google_maps_attribution_required = EXCLUDED.google_maps_attribution_required,
+        place_attributions_json = EXCLUDED.place_attributions_json,
+        photo_attributions_json = EXCLUDED.photo_attributions_json,
         photos_json = EXCLUDED.photos_json,
         rating = EXCLUDED.rating,
         user_rating_count = EXCLUDED.user_rating_count,

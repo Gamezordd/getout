@@ -1,4 +1,9 @@
-import type { LatLng, VenueCategory } from "./types";
+import type {
+  GooglePhotoAuthorAttribution,
+  LatLng,
+  PlaceAttribution,
+  VenueCategory,
+} from "./types";
 
 export type AuthenticatedUser = {
   id: string;
@@ -94,6 +99,9 @@ export type CollectionListItem = {
   priceLabel?: string | null;
   closingTimeLabel?: string | null;
   photos?: string[];
+  googleMapsAttributionRequired?: boolean;
+  placeAttributions?: PlaceAttribution[];
+  photoAttributions?: GooglePhotoAuthorAttribution[][];
   rating?: number | null;
   userRatingCount?: number | null;
   venueCategory?: VenueCategory | null;
@@ -111,6 +119,9 @@ export type DashboardCuratedPlace = {
   priceLabel?: string | null;
   closingTimeLabel?: string | null;
   photos?: string[];
+  googleMapsAttributionRequired?: boolean;
+  placeAttributions?: PlaceAttribution[];
+  photoAttributions?: GooglePhotoAuthorAttribution[][];
   rating?: number | null;
   userRatingCount?: number | null;
   venueCategory: VenueCategory;

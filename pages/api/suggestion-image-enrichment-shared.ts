@@ -2,7 +2,10 @@ import { createHash } from "crypto";
 import { findGroup, saveGroup, type GroupPayload } from "../../lib/groupStore";
 import { mergeVenues } from "../../lib/mergeVenues";
 import { redis } from "../../lib/redis";
-import type { Venue } from "../../lib/types";
+import type {
+  GooglePhotoAuthorAttribution,
+  Venue,
+} from "../../lib/types";
 import { send } from "../../lib/vercelQueue";
 import { safeTrigger } from "./utils";
 
@@ -26,12 +29,19 @@ export type SuggestionImageEnrichmentMessage = {
 type CachedImageEnrichment = {
   placeId: string;
   photos: string[];
+  photoAttributions: GooglePhotoAuthorAttribution[][];
   version: number;
   updatedAt: string;
 };
 
 type PlacePhoto = {
   name?: string;
+  authorAttributions?: GooglePhotoAuthorAttribution[];
+};
+
+type ResolvedPhotoSet = {
+  photos: string[];
+  photoAttributions: GooglePhotoAuthorAttribution[][];
 };
 
 const buildFingerprint = (value: unknown) =>
@@ -64,9 +74,35 @@ const normalizePhotos = (value: unknown) => {
     .slice(0, SUGGESTION_PHOTO_LIMIT);
 };
 
+const normalizePhotoAttributions = (value: unknown) => {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, SUGGESTION_PHOTO_LIMIT).map((entry) => {
+    if (!Array.isArray(entry)) return [];
+    return entry
+      .map((attribution) => ({
+        displayName:
+          typeof attribution?.displayName === "string"
+            ? attribution.displayName.trim()
+            : "",
+        uri:
+          typeof attribution?.uri === "string" ? attribution.uri : undefined,
+        photoUri:
+          typeof attribution?.photoUri === "string"
+            ? attribution.photoUri
+            : undefined,
+      }))
+      .filter((attribution) => attribution.displayName.length > 0);
+  });
+};
+
 const arraysEqual = (left: string[] = [], right: string[] = []) =>
   left.length === right.length &&
   left.every((value, index) => value === right[index]);
+
+const photoAttributionsEqual = (
+  left: GooglePhotoAuthorAttribution[][] = [],
+  right: GooglePhotoAuthorAttribution[][] = [],
+) => JSON.stringify(left) === JSON.stringify(right);
 
 const getGoogleMapsApiKey = () => {
   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
@@ -84,16 +120,22 @@ const readCachedImageEnrichment = async (placeId: string) => {
   return {
     ...cached,
     photos,
+    photoAttributions: normalizePhotoAttributions(cached.photoAttributions),
   };
 };
 
-const writeCachedImageEnrichment = async (placeId: string, photos: string[]) => {
+const writeCachedImageEnrichment = async (
+  placeId: string,
+  photos: string[],
+  photoAttributions: GooglePhotoAuthorAttribution[][],
+) => {
   const updatedAt = new Date().toISOString();
   await redis.set(
     getCacheKey(placeId),
     {
       placeId,
       photos,
+      photoAttributions,
       version: IMAGE_CACHE_VERSION,
       updatedAt,
     } satisfies CachedImageEnrichment,
@@ -109,6 +151,7 @@ const updateSuggestedVenueImages = (
     {
       imageEnrichmentStatus: Venue["imageEnrichmentStatus"];
       photos?: string[];
+      photoAttributions?: GooglePhotoAuthorAttribution[][];
       imageEnrichmentCachedAt?: string;
     }
   >,
@@ -124,6 +167,10 @@ const updateSuggestedVenueImages = (
         update.imageEnrichmentStatus === "ready"
           ? normalizePhotos(update.photos)
           : venue.photos || [],
+      photoAttributions:
+        update.imageEnrichmentStatus === "ready"
+          ? normalizePhotoAttributions(update.photoAttributions)
+          : venue.photoAttributions || [],
       imageEnrichmentStatus: update.imageEnrichmentStatus,
       imageEnrichmentCachedAt:
         update.imageEnrichmentStatus === "ready"
@@ -134,6 +181,10 @@ const updateSuggestedVenueImages = (
     if (
       venue.imageEnrichmentStatus !== nextVenue.imageEnrichmentStatus ||
       !arraysEqual(venue.photos || [], nextVenue.photos || []) ||
+      !photoAttributionsEqual(
+        venue.photoAttributions || [],
+        nextVenue.photoAttributions || [],
+      ) ||
       venue.imageEnrichmentCachedAt !== nextVenue.imageEnrichmentCachedAt
     ) {
       changed = true;
@@ -160,7 +211,10 @@ const getPhotoMediaUrl = async (apiKey: string, photoName: string) => {
   return typeof data?.photoUri === "string" ? data.photoUri : null;
 };
 
-const fetchPlacePhotoUrls = async (apiKey: string, venue: Venue) => {
+const fetchPlacePhotoUrls = async (
+  apiKey: string,
+  venue: Venue,
+): Promise<ResolvedPhotoSet | null> => {
   if (!isGooglePlaceId(venue.id)) return null;
 
   const response = await fetch(
@@ -169,7 +223,7 @@ const fetchPlacePhotoUrls = async (apiKey: string, venue: Venue) => {
       headers: {
         "Content-Type": "application/json",
         "X-Goog-Api-Key": apiKey,
-        "X-Goog-FieldMask": "photos.name",
+        "X-Goog-FieldMask": "photos.name,photos.authorAttributions",
       },
     },
   );
@@ -178,16 +232,43 @@ const fetchPlacePhotoUrls = async (apiKey: string, venue: Venue) => {
 
   const data = await response.json().catch(() => null);
   const photos = Array.isArray(data?.photos) ? (data.photos as PlacePhoto[]) : [];
-  const photoNames = photos
-    .map((photo) => photo.name)
-    .filter((name): name is string => Boolean(name))
+  const resolvedRefs = photos
+    .map((photo) => ({
+      name: typeof photo.name === "string" ? photo.name.trim() : "",
+      authorAttributions: normalizePhotoAttributions([
+        Array.isArray(photo.authorAttributions) ? photo.authorAttributions : [],
+      ])[0] || [],
+    }))
+    .filter((photo) => photo.name.length > 0)
     .slice(0, SUGGESTION_PHOTO_LIMIT);
 
-  if (photoNames.length === 0) return null;
+  if (resolvedRefs.length === 0) return null;
 
-  const urls = await Promise.all(photoNames.map((photoName) => getPhotoMediaUrl(apiKey, photoName)));
-  const nextPhotos = urls.filter((url): url is string => Boolean(url));
-  return nextPhotos.length > 0 ? nextPhotos : null;
+  const urls = await Promise.all(
+    resolvedRefs.map((photo) => getPhotoMediaUrl(apiKey, photo.name)),
+  );
+  const resolvedPhotos = urls
+    .map((url, index) =>
+      url
+        ? {
+            url,
+            authorAttributions: resolvedRefs[index]?.authorAttributions || [],
+          }
+        : null,
+    )
+    .filter(Boolean) as Array<{
+    url: string;
+    authorAttributions: GooglePhotoAuthorAttribution[];
+  }>;
+
+  if (resolvedPhotos.length === 0) return null;
+
+  return {
+    photos: resolvedPhotos.map((entry) => entry.url),
+    photoAttributions: resolvedPhotos.map(
+      (entry) => entry.authorAttributions,
+    ),
+  };
 };
 
 const triggerFinishedEvent = async (sessionId: string) => {
@@ -223,6 +304,7 @@ const markImageEnrichmentErrored = async (
     {
       imageEnrichmentStatus: Venue["imageEnrichmentStatus"];
       photos?: string[];
+      photoAttributions?: GooglePhotoAuthorAttribution[][];
       imageEnrichmentCachedAt?: string;
     }
   >();
@@ -277,6 +359,7 @@ export const processSuggestionImageEnrichmentJob = async (
       {
         imageEnrichmentStatus: Venue["imageEnrichmentStatus"];
         photos?: string[];
+        photoAttributions?: GooglePhotoAuthorAttribution[][];
         imageEnrichmentCachedAt?: string;
       }
     >();
@@ -290,6 +373,7 @@ export const processSuggestionImageEnrichmentJob = async (
       updates.set(venue.id, {
         imageEnrichmentStatus: "ready",
         photos: cached.photos,
+        photoAttributions: cached.photoAttributions,
         imageEnrichmentCachedAt: cached.updatedAt,
       });
     });
@@ -297,22 +381,27 @@ export const processSuggestionImageEnrichmentJob = async (
     const fetchedPhotos = await Promise.all(
       uncachedVenues.map(async (venue) => ({
         venue,
-        photos: await fetchPlacePhotoUrls(apiKey, venue),
+        photoSet: await fetchPlacePhotoUrls(apiKey, venue),
       })),
     );
 
-    for (const { venue, photos } of fetchedPhotos) {
-      if (!photos || photos.length === 0) {
+    for (const { venue, photoSet } of fetchedPhotos) {
+      if (!photoSet || photoSet.photos.length === 0) {
         updates.set(venue.id, {
           imageEnrichmentStatus: "error",
         });
         continue;
       }
 
-      const updatedAt = await writeCachedImageEnrichment(venue.id, photos);
+      const updatedAt = await writeCachedImageEnrichment(
+        venue.id,
+        photoSet.photos,
+        photoSet.photoAttributions,
+      );
       updates.set(venue.id, {
         imageEnrichmentStatus: "ready",
-        photos,
+        photos: photoSet.photos,
+        photoAttributions: photoSet.photoAttributions,
         imageEnrichmentCachedAt: updatedAt,
       });
     }
@@ -355,6 +444,7 @@ export const prepareSuggestionImageEnrichmentForCurrentSuggestions = async (
     {
       imageEnrichmentStatus: Venue["imageEnrichmentStatus"];
       photos?: string[];
+      photoAttributions?: GooglePhotoAuthorAttribution[][];
       imageEnrichmentCachedAt?: string;
     }
   >();
@@ -366,6 +456,7 @@ export const prepareSuggestionImageEnrichmentForCurrentSuggestions = async (
       updates.set(venue.id, {
         imageEnrichmentStatus: "ready",
         photos: existingPhotos,
+        photoAttributions: normalizePhotoAttributions(venue.photoAttributions),
         imageEnrichmentCachedAt: venue.imageEnrichmentCachedAt,
       });
       continue;
@@ -381,6 +472,7 @@ export const prepareSuggestionImageEnrichmentForCurrentSuggestions = async (
       updates.set(venue.id, {
         imageEnrichmentStatus: "ready",
         photos: cached.photos,
+        photoAttributions: cached.photoAttributions,
         imageEnrichmentCachedAt: cached.updatedAt,
       });
       continue;

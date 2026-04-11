@@ -108,7 +108,7 @@ const fetchResolvedPlace = async (placeId, placeName, apiKey) => {
         "Content-Type": "application/json",
         "X-Goog-Api-Key": apiKey,
         "X-Goog-FieldMask":
-          "id,displayName,formattedAddress,addressComponents,location,photos.name,rating,userRatingCount,priceLevel,currentOpeningHours.openNow,currentOpeningHours.nextCloseTime",
+          "id,displayName,formattedAddress,addressComponents,location,attributions,photos.name,photos.authorAttributions,rating,userRatingCount,priceLevel,currentOpeningHours.openNow,currentOpeningHours.nextCloseTime",
       },
     },
   );
@@ -120,8 +120,28 @@ const fetchResolvedPlace = async (placeId, placeName, apiKey) => {
   const data = await response.json().catch(() => null);
   const photos = Array.isArray(data?.photos) ? data.photos : [];
   const photoRefs = photos
-    .map((photo) => photo?.name)
-    .filter((value) => typeof value === "string" && value.trim())
+    .map((photo) => ({
+      name: typeof photo?.name === "string" ? photo.name.trim() : "",
+      authorAttributions: Array.isArray(photo?.authorAttributions)
+        ? photo.authorAttributions
+            .map((attribution) => ({
+              displayName:
+                typeof attribution?.displayName === "string"
+                  ? attribution.displayName.trim()
+                  : "",
+              uri:
+                typeof attribution?.uri === "string"
+                  ? attribution.uri
+                  : undefined,
+              photoUri:
+                typeof attribution?.photoUri === "string"
+                  ? attribution.photoUri
+                  : undefined,
+            }))
+            .filter((attribution) => attribution.displayName)
+        : [],
+    }))
+    .filter((photo) => photo.name)
     .slice(0, 6);
 
   const formattedAddress =
@@ -146,7 +166,23 @@ const fetchResolvedPlace = async (placeId, placeName, apiKey) => {
     area,
     priceLabel: getPriceLabel(data?.priceLevel),
     closingTimeLabel: getClosingTimeLabel(data?.currentOpeningHours),
-    photos: photoRefs,
+    photos: photoRefs.map((photo) => photo.name),
+    googleMapsAttributionRequired: true,
+    placeAttributions: Array.isArray(data?.attributions)
+      ? data.attributions
+          .map((attribution) => ({
+            provider:
+              typeof attribution?.provider === "string"
+                ? attribution.provider.trim()
+                : "",
+            providerUri:
+              typeof attribution?.providerUri === "string"
+                ? attribution.providerUri
+                : undefined,
+          }))
+          .filter((attribution) => attribution.provider)
+      : [],
+    photoAttributions: photoRefs.map((photo) => photo.authorAttributions),
     rating: typeof data?.rating === "number" ? data.rating : null,
     userRatingCount:
       typeof data?.userRatingCount === "number" ? data.userRatingCount : null,
@@ -182,6 +218,9 @@ const ensureSchema = async (sql) => {
       area TEXT,
       price_label TEXT,
       closing_time_label TEXT,
+      google_maps_attribution_required BOOLEAN NOT NULL DEFAULT FALSE,
+      place_attributions_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+      photo_attributions_json JSONB NOT NULL DEFAULT '[]'::jsonb,
       photos_json JSONB NOT NULL DEFAULT '[]'::jsonb,
       rating DOUBLE PRECISION,
       user_rating_count INTEGER,
@@ -194,6 +233,18 @@ const ensureSchema = async (sql) => {
   await sql`
     CREATE UNIQUE INDEX IF NOT EXISTS dashboard_curated_places_city_place_idx
     ON dashboard_curated_places (city_key, place_id)
+  `;
+  await sql`
+    ALTER TABLE dashboard_curated_places
+    ADD COLUMN IF NOT EXISTS google_maps_attribution_required BOOLEAN NOT NULL DEFAULT FALSE
+  `;
+  await sql`
+    ALTER TABLE dashboard_curated_places
+    ADD COLUMN IF NOT EXISTS place_attributions_json JSONB NOT NULL DEFAULT '[]'::jsonb
+  `;
+  await sql`
+    ALTER TABLE dashboard_curated_places
+    ADD COLUMN IF NOT EXISTS photo_attributions_json JSONB NOT NULL DEFAULT '[]'::jsonb
   `;
   await sql`
     CREATE INDEX IF NOT EXISTS dashboard_curated_places_lookup_idx
@@ -271,6 +322,9 @@ const main = async () => {
             area,
             price_label,
             closing_time_label,
+            google_maps_attribution_required,
+            place_attributions_json,
+            photo_attributions_json,
             photos_json,
             rating,
             user_rating_count,
@@ -289,6 +343,9 @@ const main = async () => {
             ${resolved.area},
             ${resolved.priceLabel},
             ${resolved.closingTimeLabel},
+            ${Boolean(resolved.googleMapsAttributionRequired)},
+            ${JSON.stringify(resolved.placeAttributions || [])}::jsonb,
+            ${JSON.stringify(resolved.photoAttributions || [])}::jsonb,
             ${JSON.stringify(resolved.photos)}::jsonb,
             ${resolved.rating},
             ${resolved.userRatingCount},
@@ -304,6 +361,9 @@ const main = async () => {
             area = EXCLUDED.area,
             price_label = EXCLUDED.price_label,
             closing_time_label = EXCLUDED.closing_time_label,
+            google_maps_attribution_required = EXCLUDED.google_maps_attribution_required,
+            place_attributions_json = EXCLUDED.place_attributions_json,
+            photo_attributions_json = EXCLUDED.photo_attributions_json,
             photos_json = EXCLUDED.photos_json,
             rating = EXCLUDED.rating,
             user_rating_count = EXCLUDED.user_rating_count,

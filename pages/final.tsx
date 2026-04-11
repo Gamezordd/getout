@@ -3,7 +3,13 @@ import { useRouter } from "next/router";
 import { useEffect, useMemo } from "react";
 import useInstallPrompt from "../hooks/useInstallPrompt";
 import { useAuth } from "../lib/auth/AuthProvider";
+import { collectPhotoAttributions, requiresGoogleMapsAttribution } from "../lib/googleMapsAttribution";
 import { useAppStore } from "../lib/store/AppStoreProvider";
+import {
+  GoogleMapsAttribution,
+  PhotoAttributionLine,
+  PlaceAttributionList,
+} from "../components/GoogleMapsAttribution";
 
 const AVATAR_BACKGROUNDS = [
   "from-violet-500 to-indigo-500",
@@ -179,6 +185,11 @@ function FinalPage() {
   }, [lockedVenue, venueDetails?.address]);
 
   const heroImage = venueDetails?.photos?.[0];
+  const heroPhotoAttributions = collectPhotoAttributions(
+    venueDetails?.photoAttributions,
+    [0],
+  );
+  const showGoogleMapsVenueAttribution = requiresGoogleMapsAttribution(venueDetails);
   const venueTypeParts = [
     venueDetails?.area,
     store.venueCategory?.replace("_", " "),
@@ -443,6 +454,21 @@ function FinalPage() {
               <p className="mt-2 text-[15px] leading-6 text-[#d0d0db]">
                 {lockedVenue.address || venueDetails?.address || "Address unavailable"}
               </p>
+              {heroPhotoAttributions.length > 0 ? (
+                <PhotoAttributionLine
+                  attributions={heroPhotoAttributions}
+                  className="mt-3"
+                />
+              ) : null}
+              {showGoogleMapsVenueAttribution ? (
+                <div className="mt-3">
+                  <GoogleMapsAttribution />
+                  <PlaceAttributionList
+                    attributions={venueDetails?.placeAttributions}
+                    className="mt-1"
+                  />
+                </div>
+              ) : null}
             </div>
             <a
               href={`https://www.google.com/maps/search/?api=1&query=${mapsQuery}`}

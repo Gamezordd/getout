@@ -1,6 +1,17 @@
-﻿export type LatLng = {
+export type LatLng = {
   lat: number;
   lng: number;
+};
+
+export type GooglePhotoAuthorAttribution = {
+  displayName: string;
+  uri?: string;
+  photoUri?: string;
+};
+
+export type PlaceAttribution = {
+  provider: string;
+  providerUri?: string;
 };
 
 export type User = {
@@ -27,6 +38,9 @@ export type Venue = {
   userRatingCount?: number;
   addedByUserId?: string;
   source?: "manual" | "collection" | "google";
+  googleMapsAttributionRequired?: boolean;
+  placeAttributions?: PlaceAttribution[];
+  photoAttributions?: GooglePhotoAuthorAttribution[][];
   aiCharacteristics?: string[];
   aiEnrichmentStatus?: "idle" | "loading" | "ready" | "error";
   aiEnrichmentCachedAt?: string;

@@ -1,5 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import type { LatLng, VenueCategory } from "../../lib/types";
+import type {
+  LatLng,
+  PlaceAttribution,
+  VenueCategory,
+} from "../../lib/types";
 import {
   getClosingTimeLabel,
   getPriceLabel,
@@ -14,6 +18,8 @@ type PlaceResult = {
   priceLabel?: string;
   closingTimeLabel?: string;
   photos?: string[];
+  googleMapsAttributionRequired?: boolean;
+  placeAttributions?: PlaceAttribution[];
   rating?: number;
   userRatingCount?: number;
   venueCategory?: VenueCategory;
@@ -77,6 +83,22 @@ const getAreaFromAddressComponents = (
   return undefined;
 };
 
+const mapPlaceAttributions = (attributions: unknown): PlaceAttribution[] => {
+  if (!Array.isArray(attributions)) return [];
+  return attributions
+    .map((attribution) => ({
+      provider:
+        typeof attribution?.provider === "string"
+          ? attribution.provider.trim()
+          : "",
+      providerUri:
+        typeof attribution?.providerUri === "string"
+          ? attribution.providerUri
+          : undefined,
+    }))
+    .filter((attribution) => attribution.provider.length > 0);
+};
+
 const mapPlaceToResult = async (_apiKey: string, place: any) => {
   const location = place.location;
   if (!location) return null;
@@ -89,6 +111,8 @@ const mapPlaceToResult = async (_apiKey: string, place: any) => {
     priceLabel: getPriceLabel(place.priceLevel),
     closingTimeLabel: getClosingTimeLabel(place.currentOpeningHours),
     photos: [],
+    googleMapsAttributionRequired: true,
+    placeAttributions: mapPlaceAttributions(place.attributions),
     rating: typeof place.rating === "number" ? place.rating : undefined,
     userRatingCount:
       typeof place.userRatingCount === "number"
@@ -104,7 +128,7 @@ const mapPlaceToResult = async (_apiKey: string, place: any) => {
 
 const fetchPlaceById = async (apiKey: string, placeId: string) => {
   const response = await fetch(
-    `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}?fields=id,displayName,formattedAddress,addressComponents,location,rating,userRatingCount,priceLevel,currentOpeningHours,primaryType,types&key=${encodeURIComponent(apiKey)}`,
+    `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}?fields=id,displayName,formattedAddress,addressComponents,location,rating,userRatingCount,priceLevel,currentOpeningHours,primaryType,types,attributions&key=${encodeURIComponent(apiKey)}`,
   );
 
   if (!response.ok) {
@@ -122,7 +146,7 @@ const searchTextPlace = async (apiKey: string, query: string) => {
       "Content-Type": "application/json",
       "X-Goog-Api-Key": apiKey,
       "X-Goog-FieldMask":
-        "places.id,places.displayName,places.formattedAddress,places.addressComponents,places.location,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours,places.primaryType,places.types",
+        "places.id,places.displayName,places.formattedAddress,places.addressComponents,places.location,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours,places.primaryType,places.types,places.attributions",
     },
     body: JSON.stringify({
       textQuery: query,
@@ -166,6 +190,8 @@ const reverseGeocode = async (apiKey: string, location: LatLng) => {
           })),
         )
       : undefined,
+    googleMapsAttributionRequired: true,
+    placeAttributions: [],
     location,
   } satisfies PlaceResult;
 };

@@ -10,8 +10,10 @@ import { useAppStore } from "../lib/store/AppStoreProvider";
 import Dialog from "./Dialog";
 import PlaceSearch, { PlaceResult } from "./PlaceSearch";
 import { User } from "../lib/types";
+import { requiresGoogleMapsAttribution } from "../lib/googleMapsAttribution";
 import PlaceList from "./PlaceList";
 import Loader from "./Loader";
+import { GoogleMapsAttribution, PlaceAttributionList } from "./GoogleMapsAttribution";
 
 interface Props {
   isExpanded: boolean;
@@ -267,6 +269,15 @@ const DrawerContent = observer(function DrawerContent({
                     <p className="mt-2 text-xs text-slate-500">
                       Travel time: {travelTimeRange || "--"}
                     </p>
+                    {requiresGoogleMapsAttribution(selectedVenue) ? (
+                      <div className="mt-3">
+                        <GoogleMapsAttribution />
+                        <PlaceAttributionList
+                          attributions={selectedVenue.placeAttributions}
+                          className="mt-1"
+                        />
+                      </div>
+                    ) : null}
                   </div>
                 </div>
                 <div className="mt-3 space-y-2">
