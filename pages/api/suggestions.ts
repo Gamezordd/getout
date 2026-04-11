@@ -37,6 +37,7 @@ import {
   RADIUS_OPTIONS_METERS,
   TARGET_SUGGESTION_COUNT,
 } from "./constants";
+import { enqueueInitialSuggestionsGeneration } from "./initial-suggestions-shared";
 import { prepareSuggestionImageEnrichmentForCurrentSuggestions } from "./suggestion-image-enrichment-shared";
 import { prepareSuggestionEnrichmentForCurrentSuggestions } from "./suggestion-enrichment-shared";
 import { safeTrigger } from "./utils";
@@ -177,6 +178,8 @@ const buildPayloadFromGroup = (group: GroupPayload): SuggestionsPayload => ({
   warning: group.suggestions?.warning,
   suggestionsStatus: group.suggestionsStatus,
 });
+
+export const buildSuggestionsPayloadFromGroup = buildPayloadFromGroup;
 
 const CACHE_TTL_SECONDS = Math.max(60, Math.round(CACHE_TTL_MS / 1000));
 const FINAL_SUGGESTIONS_CACHE_PREFIX = "suggestions:final";
@@ -907,16 +910,21 @@ export default async function handler(
         reason: "suggestions-refreshed",
       });
     } else if (shouldGenerateInitialSuggestions) {
-      if (group.suggestionsStatus !== "generating") {
-        await setSuggestionsStatus(sessionId, group, "generating");
+      if (group.suggestionsStatus !== "pending" && group.suggestionsStatus !== "generating") {
+        await setSuggestionsStatus(sessionId, group, "pending");
+        group.suggestionsStatus = "pending";
       }
-      group.suggestionsStatus = "generating";
-
+      await enqueueInitialSuggestionsGeneration(sessionId);
       const lockAcquired = await tryAcquireSuggestionLock(sessionId);
       if (!lockAcquired) {
-        payload = buildPayloadFromGroup(group);
+        const latestGroup = await findGroup(sessionId);
+        payload = buildPayloadFromGroup(latestGroup || group);
       } else {
         try {
+          if (group.suggestionsStatus !== "generating") {
+            await setSuggestionsStatus(sessionId, group, "generating");
+            group.suggestionsStatus = "generating";
+          }
           payload = await recomputeSuggestionsForGroup(sessionId, group, {
             rotateSuggestions: false,
           });

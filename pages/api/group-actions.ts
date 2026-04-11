@@ -8,6 +8,7 @@ import {
   recomputeSuggestionsForGroup,
   syncManualVenueMetricsForGroup,
 } from "./suggestions";
+import { enqueueInitialSuggestionsGeneration } from "./initial-suggestions-shared";
 import { prepareSuggestionImageEnrichmentForCurrentSuggestions } from "./suggestion-image-enrichment-shared";
 import { prepareSuggestionEnrichmentForCurrentSuggestions } from "./suggestion-enrichment-shared";
 import {
@@ -231,6 +232,9 @@ export const groupActions = (
       userId: user.id,
       isOwner,
     });
+    if (isOwner) {
+      group.suggestionsStatus = "pending";
+    }
     await saveGroup(payload.sessionId, group);
     if (authenticatedUser) {
       void acceptInviteForSession({
@@ -259,11 +263,15 @@ export const groupActions = (
           .catch(() => undefined);
       }
     }
-    await recomputeSuggestionsForGroup(payload.sessionId, group, {
-      rotateSuggestions: false,
-    });
-    await prepareSuggestionEnrichmentForCurrentSuggestions(payload.sessionId);
-    await prepareSuggestionImageEnrichmentForCurrentSuggestions(payload.sessionId);
+    if (isOwner) {
+      await enqueueInitialSuggestionsGeneration(payload.sessionId);
+    } else {
+      await recomputeSuggestionsForGroup(payload.sessionId, group, {
+        rotateSuggestions: false,
+      });
+      await prepareSuggestionEnrichmentForCurrentSuggestions(payload.sessionId);
+      await prepareSuggestionImageEnrichmentForCurrentSuggestions(payload.sessionId);
+    }
     void safeTrigger(channel, "group-updated", {
       reason: "join",
       userId: user.id,

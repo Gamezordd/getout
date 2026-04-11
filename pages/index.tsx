@@ -124,6 +124,26 @@ function HomePage() {
   }, [store, store.sessionId, store.users.length, store.manualVenues.length]);
 
   useEffect(() => {
+    const shouldPollSuggestions =
+      store.sessionId &&
+      !store.lockedVenue &&
+      (store.suggestionsStatus === "pending" ||
+        store.suggestionsStatus === "generating");
+
+    if (!shouldPollSuggestions) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      void store.fetchSuggestions().catch(() => undefined);
+    }, 2500);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [store, store.lockedVenue, store.sessionId, store.suggestionsStatus]);
+
+  useEffect(() => {
     const hasPendingEnrichment = store.suggestedVenues.some(
       (venue) =>
         venue.aiEnrichmentStatus === "loading" ||
