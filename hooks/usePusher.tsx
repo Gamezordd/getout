@@ -23,6 +23,10 @@ type AiEnrichmentFinishedPayload = {
   reason?: string;
 };
 
+type ImageEnrichmentFinishedPayload = {
+  reason?: string;
+};
+
 export default function usePusher(
   onJoin?: (userId: string) => void,
   onVote?: (voterId: string, venueId?: string) => void,
@@ -76,6 +80,16 @@ export default function usePusher(
         // Ignore enrichment refresh errors.
       }
     });
+    channel.bind(
+      "image_enrichment_finished",
+      async (_data?: ImageEnrichmentFinishedPayload) => {
+        try {
+          await store.fetchSuggestionEnrichment();
+        } catch {
+          // Ignore enrichment refresh errors.
+        }
+      },
+    );
 
     return () => {
       channel.unbind("group-updated", refresh);
@@ -83,6 +97,7 @@ export default function usePusher(
       channel.unbind("votes-update");
       channel.unbind("names-update");
       channel.unbind("ai_enrichment_finished");
+      channel.unbind("image_enrichment_finished");
       channel.unbind("pusher:subscription_succeeded");
       channel.unbind("pusher:subscription_error");
       client.unsubscribe(`private-group-${store.sessionId}`);

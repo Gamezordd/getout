@@ -1,5 +1,16 @@
 {
   "functions": {
+    "pages/api/queue/suggestion-image-enrichment.ts": {
+      "maxDuration": 300,
+      "experimentalTriggers": [
+        {
+          "type": "queue/v2beta",
+          "topic": "suggestion-image-enrichment",
+          "retryAfterSeconds": 60,
+          "initialDelaySeconds": 0
+        }
+      ]
+    },
     "pages/api/queue/suggestion-enrichment.ts": {
       "maxDuration": 300,
       "experimentalTriggers": [

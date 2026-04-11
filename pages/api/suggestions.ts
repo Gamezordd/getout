@@ -37,19 +37,14 @@ import {
   RADIUS_OPTIONS_METERS,
   TARGET_SUGGESTION_COUNT,
 } from "./constants";
+import { prepareSuggestionImageEnrichmentForCurrentSuggestions } from "./suggestion-image-enrichment-shared";
 import { prepareSuggestionEnrichmentForCurrentSuggestions } from "./suggestion-enrichment-shared";
 import { safeTrigger } from "./utils";
 import { ensureVotingDeadlineState } from "./venue-lock";
 
 type SuggestionsPayload = Omit<SuggestionsResponse, "votes">;
 
-type PlacePhoto = {
-  name?: string;
-};
-
-type GoogleCandidateVenue = Venue & {
-  placePhotos?: PlacePhoto[];
-};
+type GoogleCandidateVenue = Venue;
 
 type RecomputeOptions = {
   rotateSuggestions: boolean;
@@ -189,9 +184,6 @@ const COLLECTION_SUGGESTIONS_CACHE_PREFIX = "suggestions:collections";
 const GOOGLE_SUGGESTIONS_CACHE_PREFIX = "suggestions:google";
 const SUGGESTION_LOCK_PREFIX = "suggestions:lock";
 const SUGGESTION_LOCK_TTL_SECONDS = 45;
-const shouldEnrichSuggestionPhotos =
-  process.env.ENABLE_SUGGESTION_PHOTO_ENRICHMENT === "true";
-const SUGGESTION_PHOTO_LIMIT = 6;
 const SUGGESTION_PHOTO_CACHE_VERSION = 2;
 
 const readRedisCache = async <T>(key: string) => redis.get<T>(key);
@@ -216,8 +208,6 @@ const buildGroupFingerprint = async (
   return {
     sessionId,
     options,
-    enrichSuggestionPhotos: shouldEnrichSuggestionPhotos,
-    suggestionPhotoLimit: SUGGESTION_PHOTO_LIMIT,
     suggestionPhotoCacheVersion: SUGGESTION_PHOTO_CACHE_VERSION,
     category: group.venueCategory || "bar",
     userLocations: group.users.map((user) => ({
@@ -329,7 +319,7 @@ const fetchTopPlaces = async (
           "Content-Type": "application/json",
           "X-Goog-Api-Key": apiKey,
           "X-Goog-FieldMask":
-            "places.id,places.displayName,places.formattedAddress,places.addressComponents,places.location,places.photos,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours",
+          "places.id,places.displayName,places.formattedAddress,places.addressComponents,places.location,places.rating,places.userRatingCount,places.priceLevel,places.currentOpeningHours",
         },
         body: JSON.stringify({
           includedTypes: [venueCategory],
@@ -366,7 +356,6 @@ const fetchTopPlaces = async (
           priceLabel: getPriceLabel(place.priceLevel),
           closingTimeLabel: getClosingTimeLabel(place.currentOpeningHours),
           photos: [],
-          placePhotos: Array.isArray(place.photos) ? place.photos : [],
           location: { lat: location.latitude, lng: location.longitude },
           rating: place.rating || 0,
           userRatingCount: place.userRatingCount || 0,
@@ -386,56 +375,6 @@ const fetchTopPlaces = async (
     console.error("Error fetching places:", error);
     return { venues: [], nextPageToken: undefined };
   }
-};
-
-const getPhotoMediaUrl = async (
-  apiKey: string,
-  photoName: string,
-): Promise<string | null> => {
-  const response = await fetch(
-    `https://places.googleapis.com/v1/${photoName}/media?maxHeightPx=1200&skipHttpRedirect=true&key=${encodeURIComponent(apiKey)}`,
-  );
-
-  if (!response.ok) return null;
-
-  const data = await response.json().catch(() => null);
-  return typeof data?.photoUri === "string" ? data.photoUri : null;
-};
-
-const resolvePhotoUrls = async (
-  apiKey: string,
-  photos?: PlacePhoto[],
-): Promise<string[]> => {
-  if (!Array.isArray(photos) || photos.length === 0) return [];
-
-  const urls = await Promise.all(
-    photos
-      .map((photo) => photo.name)
-      .filter((name): name is string => Boolean(name))
-      .slice(0, SUGGESTION_PHOTO_LIMIT)
-      .map((photoName) => getPhotoMediaUrl(apiKey, photoName)),
-  );
-
-  return urls.filter((url): url is string => Boolean(url));
-};
-
-const enrichFinalGoogleSuggestionPhotos = async (
-  apiKey: string,
-  venues: GoogleCandidateVenue[],
-) => {
-  if (!shouldEnrichSuggestionPhotos) {
-    return venues.map(({ placePhotos: _placePhotos, ...venue }) => ({
-      ...venue,
-      photos: venue.photos || [],
-    }));
-  }
-
-  return Promise.all(
-    venues.map(async ({ placePhotos, ...venue }) => ({
-      ...venue,
-      photos: await resolvePhotoUrls(apiKey, placePhotos),
-    })),
-  );
 };
 
 const fetchDriveTimesInternal = async (
@@ -796,38 +735,11 @@ export const recomputeSuggestionsForGroup = async (
     ...rankedCollectionCandidates,
     ...rankedGoogleCandidates,
   ].slice(0, TARGET_SUGGESTION_COUNT);
-  const finalGoogleSuggestions = rankedSuggested.filter(
-    (venue): venue is GoogleCandidateVenue => venue.source === "google",
-  );
-  const enrichedGoogleSuggestions = await enrichFinalGoogleSuggestionPhotos(
-    apiKey,
-    finalGoogleSuggestions,
-  );
   const enrichedSuggested = rankedSuggested.map((venue) => {
-    if (venue.source !== "google") {
-      return {
-        ...venue,
-        photos: venue.photos || [],
-      };
-    }
-    return (
-      enrichedGoogleSuggestions.find(
-        (enrichedVenue) => enrichedVenue.id === venue.id,
-      ) || {
-        id: venue.id,
-        name: venue.name,
-        address: venue.address,
-        area: venue.area,
-        priceLabel: venue.priceLabel,
-        closingTimeLabel: venue.closingTimeLabel,
-        location: venue.location,
-        rating: venue.rating,
-        userRatingCount: venue.userRatingCount,
-        addedByUserId: venue.addedByUserId,
-        source: venue.source,
-        photos: [],
-      }
-    );
+    return {
+      ...venue,
+      photos: venue.photos || [],
+    };
   });
 
   enrichedSuggested.forEach((venue) => seenVenueIds.add(venue.id));
@@ -980,7 +892,8 @@ export default async function handler(
           rotateSuggestions: true,
           clearVotes: true,
         });
-        await prepareSuggestionEnrichmentForCurrentSuggestions(sessionId);
+        prepareSuggestionEnrichmentForCurrentSuggestions(sessionId);
+        prepareSuggestionImageEnrichmentForCurrentSuggestions(sessionId);
         const latestGroup = await findGroup(sessionId);
         if (latestGroup) {
           payload = buildPayloadFromGroup(latestGroup);
@@ -1008,6 +921,7 @@ export default async function handler(
             rotateSuggestions: false,
           });
           await prepareSuggestionEnrichmentForCurrentSuggestions(sessionId);
+          await prepareSuggestionImageEnrichmentForCurrentSuggestions(sessionId);
           const latestGroup = await findGroup(sessionId);
           if (latestGroup) {
             payload = buildPayloadFromGroup(latestGroup);

@@ -89,6 +89,35 @@ function AiSparkIcon({ className = "" }: { className?: string }) {
   );
 }
 
+function ImageLoaderIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+      className={className}
+    >
+      <rect
+        x="3.5"
+        y="5"
+        width="17"
+        height="14"
+        rx="3"
+        stroke="currentColor"
+        strokeWidth="1.8"
+      />
+      <circle cx="9" cy="10" r="1.7" fill="currentColor" />
+      <path
+        d="M6.5 16l3.7-4 2.8 3 2.2-2.2 2.3 3.2"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export default function VenueCard({
   venue,
   badgeText,
@@ -256,6 +285,8 @@ export default function VenueCard({
     : [];
   const isAiLoading =
     badgeTone === "ranked" && venue.aiEnrichmentStatus === "loading";
+  const isImageLoading =
+    badgeTone === "ranked" && venue.imageEnrichmentStatus === "loading";
   const showAiCharacteristics =
     badgeTone === "ranked" &&
     venue.aiEnrichmentStatus === "ready" &&
@@ -339,6 +370,7 @@ export default function VenueCard({
   ].filter(Boolean) as MetadataItem[];
   const resolvedSourceLabel =
     sourceLabel || (badgeTone === "manual" ? "Manual pick" : "Suggested");
+  const showImageHeroLoader = !showPhotoHero && isImageLoading;
 
   const openLightbox = () => {
     const nextIndex = activePhoto
@@ -529,6 +561,32 @@ export default function VenueCard({
                 </button>
               );
             })}
+          </div>
+        )}
+
+        {showImageHeroLoader && (
+          <div className="relative h-[212px] overflow-hidden rounded-[24px] bg-[#1a1a22]">
+            <div className="absolute inset-0 animate-pulse bg-[linear-gradient(135deg,#17171e,#22222d,#17171e)]" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(0,229,160,0.12),transparent_52%),linear-gradient(to_bottom,rgba(10,10,14,0.08),rgba(10,10,14,0.65)_72%,rgba(10,10,14,0.9))]" />
+            <div className="absolute left-4 top-4">
+              <div
+                className={`flex h-9 w-9 items-center justify-center rounded-xl font-display text-sm font-extrabold ${
+                  badgeTone === "ranked"
+                    ? isWinner
+                      ? "bg-[#00e5a0] text-black"
+                      : "bg-[rgba(20,20,24,0.9)] text-[#f0f0f5]"
+                    : "bg-[rgba(42,34,18,0.94)] text-[#ffbe3d]"
+                }`}
+              >
+                {badgeText}
+              </div>
+            </div>
+            <div className="absolute inset-x-0 bottom-0 flex h-full items-end px-4 pb-5 pt-10">
+              <div className="inline-flex items-center gap-2 rounded-full border border-[#00e5a0]/20 bg-[rgba(10,10,14,0.62)] px-3 py-1.5 text-[11px] font-semibold text-[#d2f9eb] backdrop-blur-sm">
+                <ImageLoaderIcon className="h-4.5 w-4.5 text-[#00e5a0] animate-pulse" />
+                Loading images
+              </div>
+            </div>
           </div>
         )}
 

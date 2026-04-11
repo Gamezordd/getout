@@ -30,6 +30,8 @@ export type Venue = {
   aiCharacteristics?: string[];
   aiEnrichmentStatus?: "idle" | "loading" | "ready" | "error";
   aiEnrichmentCachedAt?: string;
+  imageEnrichmentStatus?: "idle" | "loading" | "ready" | "error";
+  imageEnrichmentCachedAt?: string;
 };
 
 export type LockedVenue = {

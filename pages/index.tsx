@@ -125,7 +125,9 @@ function HomePage() {
 
   useEffect(() => {
     const hasPendingEnrichment = store.suggestedVenues.some(
-      (venue) => venue.aiEnrichmentStatus === "loading",
+      (venue) =>
+        venue.aiEnrichmentStatus === "loading" ||
+        venue.imageEnrichmentStatus === "loading",
     );
     if (!store.sessionId || !hasPendingEnrichment) {
       return;

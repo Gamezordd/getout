@@ -531,7 +531,6 @@ export const prepareSuggestionEnrichmentForCurrentSuggestions = async (
   await setActiveFingerprint(sessionId, fingerprint);
 
   if (requestedPlaceIds.length === 0) return;
-  console.log("publishing suggestion enrichment request");
   await send(
     SUGGESTION_ENRICHMENT_TOPIC,
     {

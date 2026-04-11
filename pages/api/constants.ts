@@ -1,7 +1,7 @@
 import { VenueCategory } from "../../lib/types";
 
 export const CACHE_TTL_MS = 2 * 60 * 1000;
-export const TARGET_SUGGESTION_COUNT = 6;
+export const TARGET_SUGGESTION_COUNT = 4;
 export const MAX_FETCH_ATTEMPTS = 5;
 export const RADIUS_OPTIONS_METERS = [5000, 8000, 12000];
 
