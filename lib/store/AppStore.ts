@@ -629,6 +629,7 @@ export class AppStore {
     locationSource?: "ip" | "precise";
     venueCategory?: VenueCategory;
     closeVotingInHours?: number;
+    initialVenue?: Venue;
   }) {
     if (!this.sessionId || !this.browserId) {
       throw new Error("Missing session. Open this page from a group link.");
@@ -647,6 +648,7 @@ export class AppStore {
         locationSource: options?.locationSource,
         venueCategory: options?.venueCategory,
         closeVotingInHours: options?.closeVotingInHours,
+        initialVenue: options?.initialVenue,
       }),
     });
     if (!response.ok) {

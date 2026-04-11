@@ -103,6 +103,15 @@ const hydrateManualVenuePhotos = async (venue: Venue): Promise<Venue> => {
   }
 };
 
+const normalizeInitialVenue = (venue: Venue): Venue => ({
+  ...venue,
+  photos: Array.isArray(venue.photos) ? venue.photos.filter(Boolean).slice(0, 6) : [],
+  source: venue.source || "manual",
+  aiCharacteristics: Array.isArray(venue.aiCharacteristics)
+    ? venue.aiCharacteristics
+    : undefined,
+});
+
 export const groupActions = (
   req: NextApiRequest,
   res: NextApiResponse,
@@ -192,6 +201,15 @@ export const groupActions = (
     }
 
     const isOwner = group.sessionMembers.length === 0 && group.users.length === 0;
+    if (isOwner && payload.initialVenue) {
+      const nextVenue = normalizeInitialVenue(payload.initialVenue);
+      const existingManualVenue = group.manualVenues.find(
+        (venue) => venue.id === nextVenue.id,
+      );
+      if (!existingManualVenue) {
+        group.manualVenues.push(nextVenue);
+      }
+    }
     let resolvedLocation = payload.location;
     let resolvedLocationLabel = payload.locationLabel || null;
     let resolvedLocationSource = payload.locationSource || "precise";

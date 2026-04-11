@@ -102,3 +102,31 @@ export type CollectionListItem = {
   location: LatLng;
   createdAt: string;
 };
+
+export type DashboardCuratedPlace = {
+  id: string;
+  name: string;
+  address?: string | null;
+  area?: string | null;
+  priceLabel?: string | null;
+  closingTimeLabel?: string | null;
+  photos?: string[];
+  rating?: number | null;
+  userRatingCount?: number | null;
+  venueCategory: VenueCategory;
+  location: LatLng;
+  cityKey: string;
+  cityLabel: string;
+  aiCharacteristics?: string[];
+  aiEnrichmentStatus?: "idle" | "loading" | "ready" | "error";
+  aiEnrichmentCachedAt?: string;
+};
+
+export type DashboardCuratedSuggestionsResponse = {
+  title: string;
+  contextLabel: string;
+  category: VenueCategory;
+  cityKey?: string | null;
+  cityLabel?: string | null;
+  places: DashboardCuratedPlace[];
+};

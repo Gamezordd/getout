@@ -27,6 +27,7 @@ export default function CreateGroupFields({
     inviteDialogOpen,
     inviteSearchValue,
     isNative,
+    selectedVenue,
     selectedInvitees,
     setCategory,
     setInviteDialogOpen,
@@ -39,38 +40,61 @@ export default function CreateGroupFields({
     <>
       <div className={className}>
         <div className="text-[11.5px] font-bold uppercase tracking-[0.06em] text-[#5e5e74]">
-          Looking for
+          {selectedVenue ? "Starting from" : "Looking for"}
         </div>
-        <div
-          className="mt-2 grid grid-cols-3 gap-[7px]"
-        >
-          {CATEGORY_OPTIONS.map((option) => {
-            const isSelected = option.value === category;
-            return (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => setCategory(option.value)}
-                className={`flex flex-col items-center justify-center gap-1.5 rounded-xl border-[1.5px] px-2 py-3 text-center transition active:scale-[0.95] ${
-                  isSelected
-                    ? "border-[#00e5a0] bg-[rgba(0,229,160,0.11)]"
-                    : isSheetVariant
-                      ? "border-white/10 bg-[#1c1c22]"
-                      : "border-white/10 bg-[#141418]"
-                }`}
-              >
-                <span className="text-[21px] leading-none">{option.emoji}</span>
-                <span
-                  className={`text-[12.5px] font-semibold ${
-                    isSelected ? "text-[#00e5a0]" : "text-[#5e5e74]"
+        {selectedVenue ? (
+          <div
+            className={`mt-2 rounded-[16px] border px-4 py-3 ${
+              isSheetVariant ? "border-white/10 bg-[#1c1c22]" : "border-white/10 bg-[#141418]"
+            }`}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="truncate text-[15px] font-semibold text-white">
+                  {selectedVenue.name}
+                </div>
+                <div className="mt-1 text-[12px] text-[#5e5e74]">
+                  {selectedVenue.area || selectedVenue.address || "Curated pick"}
+                </div>
+              </div>
+              <div className="rounded-full border border-[#00e5a033] bg-[#00e5a012] px-2.5 py-1 text-[11px] font-semibold text-[#00e5a0]">
+                Locked
+              </div>
+            </div>
+            <p className="mt-3 text-[12px] leading-5 text-[#5e5e74]">
+              This place will be added to the new group before the rest of the suggestions load.
+            </p>
+          </div>
+        ) : (
+          <div className="mt-2 grid grid-cols-3 gap-[7px]">
+            {CATEGORY_OPTIONS.map((option) => {
+              const isSelected = option.value === category;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setCategory(option.value)}
+                  className={`flex flex-col items-center justify-center gap-1.5 rounded-xl border-[1.5px] px-2 py-3 text-center transition active:scale-[0.95] ${
+                    isSelected
+                      ? "border-[#00e5a0] bg-[rgba(0,229,160,0.11)]"
+                      : isSheetVariant
+                        ? "border-white/10 bg-[#1c1c22]"
+                        : "border-white/10 bg-[#141418]"
                   }`}
                 >
-                  {option.label}
-                </span>
-              </button>
-            );
-          })}
-        </div>
+                  <span className="text-[21px] leading-none">{option.emoji}</span>
+                  <span
+                    className={`text-[12.5px] font-semibold ${
+                      isSelected ? "text-[#00e5a0]" : "text-[#5e5e74]"
+                    }`}
+                  >
+                    {option.label}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {!isSheetVariant && isNative && authStatus === "signed_in" ? (
           <div className={isSheetVariant ? "mb-5 mt-5" : "mb-5 mt-8"}>

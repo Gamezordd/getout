@@ -69,6 +69,7 @@ export type JoinRequest = {
   locationSource?: "ip" | "precise";
   venueCategory?: VenueCategory;
   closeVotingInHours?: number;
+  initialVenue?: Venue;
 };
 
 export type SetManualVenuesRequest = {

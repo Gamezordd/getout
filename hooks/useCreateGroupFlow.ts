@@ -4,17 +4,19 @@ import { useAuth } from "../lib/auth/AuthProvider";
 import { getPreciseJoinLocation } from "../lib/nativePreciseLocation";
 import type { PickAgainInviteeSummary } from "../lib/authTypes";
 import { useAppStore } from "../lib/store/AppStoreProvider";
-import type { VenueCategory } from "../lib/types";
+import type { Venue, VenueCategory } from "../lib/types";
 import { useInvitePeople } from "./useInvitePeople";
 
 type UseCreateGroupFlowOptions = {
   initialCategory?: VenueCategory;
   initialInvitees?: PickAgainInviteeSummary[];
+  initialVenue?: Venue | null;
 };
 
 export function useCreateGroupFlow({
   initialCategory = "bar",
   initialInvitees = [],
+  initialVenue = null,
 }: UseCreateGroupFlowOptions = {}) {
   const store = useAppStore();
   const { authStatus, authenticatedUser, isNative } = useAuth();
@@ -23,12 +25,17 @@ export function useCreateGroupFlow({
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [selectedVenue, setSelectedVenue] = useState<Venue | null>(initialVenue);
   const closeVotingInHours = 3;
   const inviteState = useInvitePeople({ initialInvitees });
 
   useEffect(() => {
     setCategory(initialCategory);
   }, [initialCategory]);
+
+  useEffect(() => {
+    setSelectedVenue(initialVenue);
+  }, [initialVenue]);
 
   const handleCreate = async () => {
     if (isNative && authStatus !== "signed_in") {
@@ -55,6 +62,7 @@ export function useCreateGroupFlow({
         locationSource: preciseLocation ? "precise" : undefined,
         venueCategory: category,
         closeVotingInHours,
+        initialVenue: selectedVenue || undefined,
       });
       void router.replace({ pathname: "/", query: { sessionId } });
     } catch (err: any) {
@@ -69,6 +77,7 @@ export function useCreateGroupFlow({
     error,
     handleCreate,
     inviteDialogOpen,
+    selectedVenue,
     setCategory,
     setInviteDialogOpen,
     submitting,

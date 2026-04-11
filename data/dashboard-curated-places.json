@@ -1,0 +1,19 @@
+{
+  "cities": [
+    {
+      "cityKey": "bengaluru",
+      "cityLabel": "Bengaluru",
+      "bars": [
+        {
+          "placeId": "ChIJM7dVkh8XrjsR1sG57D5Vo-k",
+          "placeName": "MisoSexy Bangalore"
+        },
+        {
+          "placeId": "ChIJlZ2RuyoUrjsRVJE3jF7lfXg",
+          "placeName": "Toast & Tonic"
+        }
+      ],
+      "cafes": []
+    }
+  ]
+}

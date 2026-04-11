@@ -4,11 +4,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import AppBottomSheet from "../components/AppBottomSheet";
 import CollectionsList from "../components/CollectionsList";
 import CreateGroupFields from "../components/CreateGroupFields";
+import DashboardSuggestionsCarousel from "../components/dashboard/DashboardSuggestionsCarousel";
 import FriendsManager from "../components/FriendsManager";
 import useForegroundResume from "../hooks/useForegroundResume";
 import { useCreateGroupFlow } from "../hooks/useCreateGroupFlow";
 import type {
   CollectionListItem,
+  DashboardCuratedPlace,
+  DashboardCuratedSuggestionsResponse,
   InviteListItem,
   PickAgainGroupSummary,
   PickAgainInviteeSummary,
@@ -17,11 +20,12 @@ import type {
 import { useAuth } from "../lib/auth/AuthProvider";
 import {
   clearCachedPreciseLocation,
+  getCachedPreciseLocation,
   getAutoPreciseLocationEnabled,
   refreshCachedPreciseLocation,
   setPreciseLocationBannerDismissed,
 } from "../lib/nativePreciseLocation";
-import type { VenueCategory } from "../lib/types";
+import type { Venue, VenueCategory } from "../lib/types";
 
 const quickActions = [
   { label: "Bars", emoji: "🍸", category: "bar", sub: "Most popular" },
@@ -95,15 +99,18 @@ const getPickAgainLabel = (
 function DashboardCreateSheet({
   initialCategory,
   initialInvitees,
+  initialVenue,
   onClose,
 }: {
   initialCategory: VenueCategory;
   initialInvitees: PickAgainInviteeSummary[];
+  initialVenue: Venue | null;
   onClose: () => void;
 }) {
   const createFlow = useCreateGroupFlow({
     initialCategory,
     initialInvitees,
+    initialVenue,
   });
 
   return (
@@ -158,6 +165,9 @@ function DashboardPage() {
   const [collectionError, setCollectionError] = useState<string | null>(null);
   const [removingCollectionIds, setRemovingCollectionIds] = useState<string[]>([]);
   const [togglingCollectionIds, setTogglingCollectionIds] = useState<string[]>([]);
+  const [savingDashboardPlaceId, setSavingDashboardPlaceId] = useState<string | null>(
+    null,
+  );
   const [activeTab, setActiveTab] = useState<
     "home" | "friends" | "collections" | "history"
   >("home");
@@ -168,7 +178,17 @@ function DashboardPage() {
   const [createSheetInvitees, setCreateSheetInvitees] = useState<
     PickAgainInviteeSummary[]
   >([]);
+  const [createSheetVenue, setCreateSheetVenue] = useState<Venue | null>(null);
+  const [dashboardSuggestions, setDashboardSuggestions] =
+    useState<DashboardCuratedSuggestionsResponse | null>(null);
+  const [dashboardSuggestionsLoading, setDashboardSuggestionsLoading] =
+    useState(true);
+  const [dashboardSuggestionsError, setDashboardSuggestionsError] =
+    useState<string | null>(null);
   const autoLocationInFlightRef = useRef(false);
+  const dashboardSuggestionsSeedRef = useRef(
+    `dashboard-${Math.random().toString(36).slice(2, 10)}`,
+  );
 
   const maybeRefreshPreciseLocation = async () => {
     if (!isNative || authStatus !== "signed_in") return;
@@ -189,6 +209,31 @@ function DashboardPage() {
     } finally {
       autoLocationInFlightRef.current = false;
     }
+  };
+
+  const fetchDashboardSuggestions = async () => {
+    const preciseLocation = getCachedPreciseLocation();
+    console.log("preciseLocation for dashboard suggestions:", preciseLocation);
+    const params = new URLSearchParams({
+      hour: String(new Date().getHours()),
+      seed: dashboardSuggestionsSeedRef.current,
+    });
+    if (preciseLocation?.locationLabel) {
+      params.set("locationLabel", preciseLocation.locationLabel);
+    }
+
+    const response = await fetch(`/api/dashboard-suggestions?${params.toString()}`);
+    const payload = (await response.json().catch(() => ({}))) as
+      | DashboardCuratedSuggestionsResponse
+      | { message?: string };
+    if (!response.ok) {
+      throw new Error(
+        "message" in payload
+          ? payload.message || "Unable to load dashboard suggestions."
+          : "Unable to load dashboard suggestions.",
+      );
+    }
+    return payload as DashboardCuratedSuggestionsResponse;
   };
 
   useEffect(() => {
@@ -226,10 +271,12 @@ function DashboardPage() {
         setPickAgainLoading(true);
         setInviteLoading(true);
         setCollectionLoading(true);
+        setDashboardSuggestionsLoading(true);
         setError(null);
         setPickAgainError(null);
         setInviteError(null);
         setCollectionError(null);
+        setDashboardSuggestionsError(null);
         const [groupsResponse, pickAgainResponse, invitesResponse, collectionsResponse] =
           await Promise.all([
             fetch("/api/recent-groups"),
@@ -279,6 +326,20 @@ function DashboardPage() {
         }
         setInvites(invitesPayload.invites || []);
         setCollections(collectionsPayload.collections || []);
+        try {
+          const dashboardSuggestionsPayload = await fetchDashboardSuggestions();
+          setDashboardSuggestions(dashboardSuggestionsPayload);
+        } catch (dashboardError: any) {
+          setDashboardSuggestionsError(
+            dashboardError.message || "Unable to load dashboard suggestions.",
+          );
+          setDashboardSuggestions({
+            title: "Curated picks",
+            contextLabel: "Around you",
+            category: "bar",
+            places: [],
+          });
+        }
       } catch (err: any) {
         const message = err.message || "Unable to load dashboard.";
         setError(message);
@@ -290,6 +351,7 @@ function DashboardPage() {
         setPickAgainLoading(false);
         setInviteLoading(false);
         setCollectionLoading(false);
+        setDashboardSuggestionsLoading(false);
       }
     };
 
@@ -305,6 +367,28 @@ function DashboardPage() {
     void maybeRefreshPreciseLocation();
   });
 
+  useEffect(() => {
+    if (activeTab !== "home") return;
+    if (!dashboardSuggestions?.places?.some((place) => place.aiEnrichmentStatus === "loading")) {
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      void fetchDashboardSuggestions()
+        .then((payload) => {
+          setDashboardSuggestions(payload);
+          setDashboardSuggestionsError(null);
+        })
+        .catch((err: any) => {
+          setDashboardSuggestionsError(
+            err.message || "Unable to refresh dashboard suggestions.",
+          );
+        });
+    }, 3200);
+
+    return () => window.clearInterval(timer);
+  }, [activeTab, dashboardSuggestions]);
+
   const avatarLabel = useMemo(
     () => authenticatedUser?.displayName?.trim().charAt(0).toUpperCase() || "G",
     [authenticatedUser?.displayName],
@@ -313,10 +397,15 @@ function DashboardPage() {
     () => invites.filter((invite) => !invite.seenAt).length,
     [invites],
   );
+  const savedCollectionVenueIds = useMemo(
+    () => collections.map((item) => item.placeId),
+    [collections],
+  );
 
   const openCreate = (
     category?: string,
     invitees: PickAgainInviteeSummary[] = [],
+    venue: Venue | null = null,
   ) => {
     if (
       category === "bar" ||
@@ -330,6 +419,7 @@ function DashboardPage() {
       setCreateSheetCategory("bar");
     }
     setCreateSheetInvitees(invitees);
+    setCreateSheetVenue(venue);
     setIsCreateSheetOpen(true);
   };
 
@@ -409,6 +499,70 @@ function DashboardPage() {
     }
   };
 
+  const handleSaveDashboardPlace = async (place: DashboardCuratedPlace) => {
+    const optimisticCollection: CollectionListItem = {
+      id: `dashboard-${place.id}`,
+      placeId: place.id,
+      name: place.name,
+      address: place.address || null,
+      area: place.area || null,
+      priceLabel: place.priceLabel || null,
+      closingTimeLabel: place.closingTimeLabel || null,
+      photos: place.photos || [],
+      rating: place.rating ?? null,
+      userRatingCount: place.userRatingCount ?? null,
+      venueCategory: place.venueCategory,
+      visited: false,
+      visitedAt: null,
+      location: place.location,
+      createdAt: new Date().toISOString(),
+    };
+
+    try {
+      if (collections.some((item) => item.placeId === place.id)) {
+        return;
+      }
+      setSavingDashboardPlaceId(place.id);
+      setCollections((current) => [optimisticCollection, ...current]);
+      const response = await fetch("/api/collections", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          place: {
+            id: place.id,
+            name: place.name,
+            address: place.address,
+            area: place.area,
+            priceLabel: place.priceLabel,
+            closingTimeLabel: place.closingTimeLabel,
+            photos: place.photos,
+            rating: place.rating,
+            userRatingCount: place.userRatingCount,
+            venueCategory: place.venueCategory,
+            location: place.location,
+          },
+        }),
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        collection?: CollectionListItem;
+        message?: string;
+      };
+      if (!response.ok || !payload.collection) {
+        throw new Error(payload.message || "Unable to save to favourites.");
+      }
+      setCollections((current) => {
+        return current.map((item) =>
+          item.placeId === payload.collection?.placeId ? payload.collection! : item,
+        );
+      });
+    } catch (err: any) {
+      setCollections((current) => current.filter((item) => item.placeId !== place.id));
+      setCollectionError(err.message || "Unable to save to favourites.");
+    } finally {
+      setSavingDashboardPlaceId(null);
+    }
+  };
+
   if (!isNative || authStatus !== "signed_in") {
     return null;
   }
@@ -444,6 +598,28 @@ function DashboardPage() {
         {avatarLabel}
       </button>
     </div>
+  );
+
+  const renderCreateGroupCard = () => (
+    <button
+      type="button"
+      onClick={() => openCreate()}
+      className="mx-5 mb-5 flex w-[calc(100%-40px)] items-center gap-[14px] rounded-[20px] border border-[#00e5a033] bg-[linear-gradient(135deg,#0f1f18_0%,#141418_100%)] px-[18px] py-4 text-left"
+    >
+      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] bg-[#00e5a0] shadow-[0_0_0_0_rgba(0,229,160,0.4)] [animation:getoutLoginPulse_2.5s_infinite]">
+        <svg width="22" height="22" fill="none" viewBox="0 0 24 24">
+          <path d="M12 2v20M2 12h20" stroke="#000" strokeWidth="2.5" strokeLinecap="round" />
+        </svg>
+      </div>
+      <div className="flex-1">
+        <div className="font-display text-[16px] font-bold tracking-[-0.02em] text-white">
+          Create a group
+        </div>
+        <div className="mt-1 text-[13px] text-[#5a5a70]">
+          Pick a spot together · share link instantly
+        </div>
+      </div>
+    </button>
   );
 
   const renderGroupCard = (group: RecentGroupSummary, compact = false) => (
@@ -686,25 +862,42 @@ function DashboardPage() {
               {renderDashboardActions()}
             </div>
 
-            <button
-              type="button"
-              onClick={() => openCreate()}
-              className="mx-5 mb-5 flex w-[calc(100%-40px)] items-center gap-[14px] rounded-[20px] border border-[#00e5a033] bg-[linear-gradient(135deg,#0f1f18_0%,#141418_100%)] px-[18px] py-4 text-left"
-            >
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] bg-[#00e5a0] shadow-[0_0_0_0_rgba(0,229,160,0.4)] [animation:getoutLoginPulse_2.5s_infinite]">
-                <svg width="22" height="22" fill="none" viewBox="0 0 24 24">
-                  <path d="M12 2v20M2 12h20" stroke="#000" strokeWidth="2.5" strokeLinecap="round" />
-                </svg>
-              </div>
-              <div className="flex-1">
-                <div className="font-display text-[16px] font-bold tracking-[-0.02em] text-white">
-                  Create a group
-                </div>
-                <div className="mt-1 text-[13px] text-[#5a5a70]">
-                  Pick a spot together · share link instantly
-                </div>
-              </div>
-            </button>
+            {!dashboardSuggestionsLoading &&
+            !dashboardSuggestionsError &&
+            (dashboardSuggestions?.places?.length || 0) === 0 ? (
+              renderCreateGroupCard()
+            ) : (
+              <DashboardSuggestionsCarousel
+                title={dashboardSuggestions?.title || "Curated picks"}
+                contextLabel={dashboardSuggestions?.contextLabel || "Around you"}
+                category={dashboardSuggestions?.category || "bar"}
+                cityLabel={dashboardSuggestions?.cityLabel}
+                places={dashboardSuggestions?.places || []}
+                loading={dashboardSuggestionsLoading}
+                error={dashboardSuggestionsError}
+                onSavePlace={handleSaveDashboardPlace}
+                isSavingPlaceId={savingDashboardPlaceId}
+                savedPlaceIds={savedCollectionVenueIds}
+                onOpenPlace={(place) =>
+                  openCreate(place.venueCategory, [], {
+                    id: place.id,
+                    name: place.name,
+                    address: place.address || undefined,
+                    area: place.area || undefined,
+                    priceLabel: place.priceLabel || undefined,
+                    closingTimeLabel: place.closingTimeLabel || undefined,
+                    photos: place.photos || [],
+                    rating: place.rating || undefined,
+                    userRatingCount: place.userRatingCount || undefined,
+                    location: place.location,
+                    source: "manual",
+                    aiCharacteristics: place.aiCharacteristics,
+                    aiEnrichmentStatus: place.aiEnrichmentStatus,
+                    aiEnrichmentCachedAt: place.aiEnrichmentCachedAt,
+                  })
+                }
+              />
+            )}
 
             <div className="px-5 pb-3">
               <div className="font-display text-[17px] font-bold tracking-[-0.02em] text-white">
@@ -973,7 +1166,11 @@ function DashboardPage() {
           <DashboardCreateSheet
             initialCategory={createSheetCategory}
             initialInvitees={createSheetInvitees}
-            onClose={() => setIsCreateSheetOpen(false)}
+            initialVenue={createSheetVenue}
+            onClose={() => {
+              setIsCreateSheetOpen(false);
+              setCreateSheetVenue(null);
+            }}
           />
         ) : null}
       </div>
@@ -982,6 +1179,3 @@ function DashboardPage() {
 }
 
 export default observer(DashboardPage);
-
-
-

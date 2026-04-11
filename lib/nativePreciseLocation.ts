@@ -4,6 +4,7 @@ import { getPreciseLocationWithOptions } from "./preciseLocation";
 export type CachedPreciseLocation = {
   location: LatLng;
   locationLabel: string | null;
+  city: string | null;
   capturedAt: string;
 };
 
@@ -30,6 +31,7 @@ const parseCachedLocation = (value: string | null): CachedPreciseLocation | null
       location: parsed.location,
       locationLabel:
         typeof parsed.locationLabel === "string" ? parsed.locationLabel : null,
+      city: typeof parsed.city === "string" ? parsed.city : null,
       capturedAt: parsed.capturedAt,
     };
   } catch {
@@ -53,13 +55,14 @@ const reverseGeocodeLocation = async (location: LatLng) => {
   });
   const response = await fetch(`/api/reverse-geocode?${params.toString()}`);
   const payload = (await response.json().catch(() => ({}))) as {
-    result?: { area?: string; name?: string };
+    result?: { area?: string; name?: string, city: string };
     message?: string;
   };
   if (!response.ok || !payload.result) {
     throw new Error(payload.message || "Unable to detect address.");
   }
-  return payload.result.area || payload.result.name || null;
+  console.log("Reverse geocode result:", payload.result);
+  return {area: payload.result.area || payload.result.name || null, city: payload.result.city};
 };
 
 export const getAutoPreciseLocationEnabled = () => {
@@ -128,10 +131,12 @@ export const refreshCachedPreciseLocation = async ({
     return { ok: true as const, cachedLocation: nextCachedLocation };
   }
 
-  const locationLabel = await reverseGeocodeLocation(preciseLocation.location);
+  const {area: locationLabel, city} = await reverseGeocodeLocation(preciseLocation.location);
+  const cityForCache = city || (cachedLocation ? cachedLocation.city : null) || "Unknown";
   const nextCachedLocation: CachedPreciseLocation = {
     location: preciseLocation.location,
     locationLabel,
+    city,
     capturedAt,
   };
   setCachedPreciseLocation(nextCachedLocation);

@@ -11,6 +11,17 @@
         }
       ]
     },
+    "pages/api/queue/dashboard-curated-vibe.ts": {
+      "maxDuration": 300,
+      "experimentalTriggers": [
+        {
+          "type": "queue/v2beta",
+          "topic": "dashboard-curated-vibe",
+          "retryAfterSeconds": 60,
+          "initialDelaySeconds": 0
+        }
+      ]
+    },
     "pages/api/queue/suggestion-image-enrichment.ts": {
       "maxDuration": 300,
       "experimentalTriggers": [

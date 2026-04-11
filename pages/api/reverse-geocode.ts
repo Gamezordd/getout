@@ -6,6 +6,7 @@ type PlaceResult = {
   name: string;
   address?: string;
   area?: string;
+  city: string;
   location: LatLng;
 };
 
@@ -64,12 +65,27 @@ export default async function handler(
           ].some((type) => component.types?.includes(type)),
         )?.long_name
       : undefined;
+    const city = Array.isArray(result.address_components)
+      ? result.address_components.find((component: any) =>
+          [
+            "locality",
+            "sublocality_level_1",
+            "sublocality",
+            "neighborhood",
+            "administrative_area_level_2",
+            "administrative_area_level_1",
+          ].some((type) => component.types?.includes(type)),
+        )?.long_name
+      : undefined;
+
+    console.log("city: ", result.address_components);
     const name = address.split(",")[0] || "Current location";
     const place: PlaceResult = {
       id: result.place_id || `geo-${lat}-${lng}`,
       name,
       address,
       area,
+      city,
       location: { lat, lng },
     };
 
