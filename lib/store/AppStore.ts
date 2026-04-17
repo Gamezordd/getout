@@ -41,6 +41,7 @@ type GroupPayload = {
   lockedVenue?: LockedVenue | null;
   currentUserId?: string;
   isOwner?: boolean;
+  dismissedPlaceIds?: string[];
 };
 
 type SuggestionsPayload = {
@@ -101,6 +102,8 @@ export class AppStore {
   suggestedVenues: Venue[] = [];
   totalsByVenue: TotalsByVenue = {};
   votes: VotesByVenue = {};
+  downvotes: Record<string, string[]> = {};
+  dismissedVenueIds: string[] = [];
   votingClosesAt: string | null = null;
   venueCategory: VenueCategory | null = null;
   contextQuery: string | null = null;
@@ -348,6 +351,7 @@ export class AppStore {
         this.lockedVenue = data.lockedVenue || null;
         this.currentUserId = data.currentUserId || null;
         this.isOwner = Boolean(data.isOwner);
+        this.dismissedVenueIds = data.dismissedPlaceIds || [];
         this.identityResolved = true;
         this.isLoadingGroup = false;
       });
@@ -621,6 +625,43 @@ export class AppStore {
       });
       return false;
     }
+  }
+
+  async confirmDismissal(venueId: string) {
+    if (!this.sessionId || !this.currentUserId) return;
+
+    runInAction(() => {
+      this.dismissedVenueIds = [...this.dismissedVenueIds, venueId];
+      this.suggestedVenues = this.suggestedVenues.filter((v) => v.id !== venueId);
+      this.venues = this.venues.filter((v) => v.id !== venueId);
+    });
+
+    const query = this.contextQuery?.trim() || "";
+    const tokens =
+      query.length >= 2
+        ? Array.from(
+            new Set(
+              query.split(/[\s,]+/).map((t) => t.trim().toLowerCase()).filter(Boolean),
+            ),
+          )
+        : [];
+
+    try {
+      await fetch("/api/downvote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId: this.sessionId,
+          userId: this.currentUserId,
+          placeId: venueId,
+          queryTokens: tokens,
+        }),
+      });
+    } catch {
+      // Non-critical
+    }
+
+    void this.fetchSuggestionsForActiveContext();
   }
 
   applyVote(userId: string, venueId: string) {

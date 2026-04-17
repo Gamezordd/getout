@@ -23,6 +23,8 @@ import {
 import { lockVenueForGroup } from "./venue-lock";
 import { ALLOWED_CATEGORIES } from "./constants";
 import { buildAvatarUrl, buildGroupResponse, safeTrigger } from "./utils";
+import { punishPlaceVector, rewardPlaceVector } from "../../lib/placeVibeStore";
+import { buildWordSetCacheKey } from "../../lib/placeVibeSchema";
 import {
   resolveApproximateLocation,
   reverseGeocodeLocation,
@@ -492,6 +494,17 @@ export const groupActions = (
       venue,
       organizerId: actingMember.userId,
     });
+
+    const contextQuery = group.contextQuery?.trim() || null;
+    if (contextQuery && contextQuery.length >= 2) {
+      const normalizedQueryKey = buildWordSetCacheKey(contextQuery);
+      const downvotedIds = group.downvotes?.[normalizedQueryKey] || [];
+      for (const id of downvotedIds) {
+        void punishPlaceVector({ placeId: id, normalizedQueryKey }).catch(() => undefined);
+      }
+      void rewardPlaceVector({ placeId: payload.venueId, normalizedQueryKey }).catch(() => undefined);
+    }
+
     return res.status(200).json(buildGroupResponse(group));
   },
 });

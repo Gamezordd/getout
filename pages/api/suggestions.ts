@@ -670,6 +670,7 @@ export const recomputeSuggestionsForGroup = async (
   const apiKey = getGoogleMapsApiKey();
   const excludedVenueIds = new Set<string>();
   (group.manualVenues || []).forEach((venue) => excludedVenueIds.add(venue.id));
+  (group.dismissedPlaceIds || []).forEach((id) => excludedVenueIds.add(id));
   if (options.rotateSuggestions) {
     (group.suggestions.seenVenueIds || []).forEach((id) => excludedVenueIds.add(id));
     (group.suggestions.suggestedVenues || []).forEach((venue) =>

@@ -21,6 +21,10 @@ type Props = {
   mostEfficientVenueId: string | null;
   onSelect: (venueId: string) => void;
   onVote: (venueId: string) => void;
+  onThumbsDown?: (venueId: string) => void;
+  downvotedVenueIds?: string[];
+  pendingDismissalVenueIds?: string[];
+  onUndoDismissal?: (venueId: string) => void;
   showRefreshAction?: boolean;
   isRefreshing?: boolean;
   onRefresh?: () => void;
@@ -122,6 +126,10 @@ export default function PlaceList({
   mostEfficientVenueId,
   onSelect,
   onVote,
+  onThumbsDown,
+  downvotedVenueIds = [],
+  pendingDismissalVenueIds = [],
+  onUndoDismissal,
   showRefreshAction = false,
   isRefreshing = false,
   onRefresh,
@@ -297,6 +305,10 @@ export default function PlaceList({
             currentUserId={currentUserId}
             onSelect={() => onSelect(venue.id)}
             onVote={() => onVote(venue.id)}
+            onThumbsDown={onThumbsDown ? () => onThumbsDown(venue.id) : undefined}
+            isDownvoted={downvotedVenueIds.includes(venue.id)}
+            isPendingDismissal={pendingDismissalVenueIds.includes(venue.id)}
+            onUndoDismissal={onUndoDismissal ? () => onUndoDismissal(venue.id) : undefined}
             displayMode={displayMode}
             showSaveToCollectionsAction={showSaveToCollectionsAction}
             isSavingToCollections={savingCollectionVenueId === venue.id}

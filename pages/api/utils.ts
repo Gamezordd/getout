@@ -28,6 +28,7 @@ export const buildGroupResponse = (
   lockedVenue: group.lockedVenue,
   currentUserId,
   isOwner,
+  dismissedPlaceIds: group.dismissedPlaceIds || [],
 });
 
 export const safeTrigger = async (

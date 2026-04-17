@@ -218,7 +218,10 @@ export default async function handler(
     }
 
     const centroid = computeCentroid(group.users.map((user) => user.location));
-    const excludedVenueIds = (group.manualVenues || []).map((venue) => venue.id);
+    const excludedVenueIds = [
+      ...(group.manualVenues || []).map((venue) => venue.id),
+      ...(group.dismissedPlaceIds || []),
+    ];
     const contextualCandidates = await fetchContextualPlacesByRadiusLadder({
       centroid,
       venueType: mapCategoryToSchemaVenueType(category),

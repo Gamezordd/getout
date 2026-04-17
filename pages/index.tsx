@@ -204,6 +204,46 @@ function HomePage() {
     };
   }, [store, store.sessionId, store.suggestedVenues]);
 
+  const [pendingDismissals, setPendingDismissals] = useState<Set<string>>(new Set());
+  const dismissalTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  const handleThumbsDown = useCallback(
+    (venueId: string) => {
+      setPendingDismissals((prev) => new Set(prev).add(venueId));
+      const timer = setTimeout(() => {
+        setPendingDismissals((prev) => {
+          const next = new Set(prev);
+          next.delete(venueId);
+          return next;
+        });
+        dismissalTimers.current.delete(venueId);
+        void store.confirmDismissal(venueId);
+      }, 5000);
+      dismissalTimers.current.set(venueId, timer);
+    },
+    [store],
+  );
+
+  const handleUndoDismissal = useCallback((venueId: string) => {
+    const timer = dismissalTimers.current.get(venueId);
+    if (timer) clearTimeout(timer);
+    dismissalTimers.current.delete(venueId);
+    setPendingDismissals((prev) => {
+      const next = new Set(prev);
+      next.delete(venueId);
+      return next;
+    });
+  }, []);
+
+  const downvotedVenueIds = useMemo(() => {
+    const q = store.contextQuery?.trim() || "";
+    if (q.length < 2) return [];
+    const sortedKey = Array.from(
+      new Set(q.split(/[\s,]+/).map((t) => t.trim().toLowerCase()).filter(Boolean)),
+    ).sort().join(" ");
+    return store.downvotes[sortedKey] || [];
+  }, [store.contextQuery, store.downvotes]);
+
   const handleVote = useCallback(
     async (venueId: string) => {
       if (!store.currentUserId) return;
@@ -494,6 +534,10 @@ function HomePage() {
               mostEfficientVenueId={store.mostEfficientVenueId}
               onSelect={store.setSelectedVenue}
               onVote={handleVote}
+              onThumbsDown={handleThumbsDown}
+              downvotedVenueIds={downvotedVenueIds}
+              pendingDismissalVenueIds={Array.from(pendingDismissals)}
+              onUndoDismissal={handleUndoDismissal}
               showRefreshAction={store.isCurrentUserOrganizer}
               isRefreshing={store.isLoadingSuggestions}
               onRefresh={handleRefreshSuggestions}

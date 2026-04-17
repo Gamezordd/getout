@@ -506,6 +506,83 @@ export const fetchContextualPlacesByRadiusLadder = async (params: {
   return sorted.slice(0, params.limit);
 };
 
+const shiftTowardTarget = (current: number, target: number, magnitude: number) =>
+  Math.min(1, Math.max(0, current + Math.sign(target - current) * magnitude));
+
+const EXTREME_THRESHOLD = 0.15;
+
+const fetchPlaceVector = async (placeId: string): Promise<number[] | null> => {
+  await ensurePlaceVibeSchema();
+  const sql = getSql();
+  const rows = (await sql`
+    SELECT vibe_vector::text AS vibe_vector
+    FROM place_vibe_profiles
+    WHERE place_id = ${placeId}
+    LIMIT 1
+  `) as { vibe_vector: string }[];
+  if (!rows[0]?.vibe_vector) return null;
+  return JSON.parse(rows[0].vibe_vector) as number[];
+};
+
+const updatePlaceVector = async (placeId: string, vector: number[]) => {
+  await ensurePlaceVibeSchema();
+  const sql = getSql();
+  await (sql as any).query(
+    `UPDATE place_vibe_profiles SET vibe_vector = $1::vector, updated_at = NOW() WHERE place_id = $2`,
+    [toPgVectorLiteral(vector), placeId],
+  );
+};
+
+export const punishPlaceVector = async (params: {
+  placeId: string;
+  normalizedQueryKey: string;
+  shiftMagnitude?: number;
+}): Promise<void> => {
+  const { placeId, normalizedQueryKey, shiftMagnitude = 0.05 } = params;
+
+  const cached = await getCachedQueryProfile(normalizedQueryKey);
+  if (!cached?.vibe_vector) return;
+  const queryVec = JSON.parse(cached.vibe_vector) as number[];
+
+  const placeVec = await fetchPlaceVector(placeId);
+  if (!placeVec) return;
+
+  let changed = false;
+  const newVec = placeVec.map((value, i) => {
+    const queryVal = queryVec[i] ?? 0.5;
+    if (Math.abs(queryVal - 0.5) <= EXTREME_THRESHOLD) return value;
+    changed = true;
+    return shiftTowardTarget(value, 0.5, shiftMagnitude);
+  });
+
+  if (changed) await updatePlaceVector(placeId, newVec);
+};
+
+export const rewardPlaceVector = async (params: {
+  placeId: string;
+  normalizedQueryKey: string;
+  shiftMagnitude?: number;
+}): Promise<void> => {
+  const { placeId, normalizedQueryKey, shiftMagnitude = 0.03 } = params;
+
+  const cached = await getCachedQueryProfile(normalizedQueryKey);
+  if (!cached?.vibe_vector) return;
+  const queryVec = JSON.parse(cached.vibe_vector) as number[];
+
+  const placeVec = await fetchPlaceVector(placeId);
+  if (!placeVec) return;
+
+  let changed = false;
+  const newVec = placeVec.map((value, i) => {
+    const queryVal = queryVec[i] ?? 0.5;
+    if (Math.abs(queryVal - 0.5) <= EXTREME_THRESHOLD) return value;
+    changed = true;
+    return shiftTowardTarget(value, queryVal, shiftMagnitude);
+  });
+
+  if (changed) await updatePlaceVector(placeId, newVec);
+};
+
 export const upsertPlaceVibePlaceRow = async (params: {
   placeId: string;
   placeName: string;

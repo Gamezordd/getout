@@ -144,4 +144,5 @@ export type GroupResponse = {
   lockedVenue: LockedVenue | null;
   currentUserId?: string;
   isOwner?: boolean;
+  dismissedPlaceIds?: string[];
 };

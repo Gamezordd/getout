@@ -42,6 +42,8 @@ type GroupPayload = {
   suggestionsStatus: SuggestionsStatus;
   venueCategory: VenueCategory | null;
   lockedVenue: LockedVenue | null;
+  downvotes?: Record<string, string[]>;
+  dismissedPlaceIds?: string[];
 };
 
 const GROUP_PREFIX = "group:";
@@ -69,6 +71,8 @@ const createEmptyGroup = (): GroupPayload => ({
   suggestionsStatus: "idle",
   venueCategory: null,
   lockedVenue: null,
+  downvotes: {},
+  dismissedPlaceIds: [],
 });
 
 const hydrateGroup = async (sessionId: string, group: GroupPayload) => {
@@ -78,6 +82,8 @@ const hydrateGroup = async (sessionId: string, group: GroupPayload) => {
   if (!Array.isArray(hydrated.users)) hydrated.users = [];
   if (!Array.isArray(hydrated.venues)) hydrated.venues = [];
   if (!hydrated.votes) hydrated.votes = {};
+  if (!hydrated.downvotes || typeof hydrated.downvotes !== "object") hydrated.downvotes = {};
+  if (!Array.isArray(hydrated.dismissedPlaceIds)) hydrated.dismissedPlaceIds = [];
   if (typeof hydrated.votingClosesAt !== "string") hydrated.votingClosesAt = null;
   if (
     !hydrated.defaultApproximateLocation ||

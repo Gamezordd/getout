@@ -36,6 +36,10 @@ type Props = {
   isSavingToCollections?: boolean;
   isSavedToCollections?: boolean;
   onSaveToCollections?: () => void;
+  isDownvoted?: boolean;
+  onThumbsDown?: () => void;
+  isPendingDismissal?: boolean;
+  onUndoDismissal?: () => void;
   displayMode?: "default" | "search";
 };
 
@@ -142,6 +146,10 @@ export default function VenueCard({
   isSavingToCollections = false,
   isSavedToCollections = false,
   onSaveToCollections,
+  isDownvoted = false,
+  onThumbsDown,
+  isPendingDismissal = false,
+  onUndoDismissal,
   displayMode = "default",
 }: Props) {
   const photos = Array.isArray(venue.photos) ? venue.photos.slice(0, 6) : [];
@@ -411,7 +419,7 @@ export default function VenueCard({
     <>
       <article
         ref={cardRef}
-        className={`overflow-hidden rounded-[24px] border bg-[#141418] shadow-[0_18px_40px_rgba(0,0,0,0.22)] transition ${
+        className={`relative overflow-hidden rounded-[24px] border bg-[#141418] shadow-[0_18px_40px_rgba(0,0,0,0.22)] transition ${
           isSelected
             ? "border-[#00e5a0]/60"
             : isWinner
@@ -419,6 +427,9 @@ export default function VenueCard({
               : "border-white/10"
         }`}
       >
+        {isPendingDismissal && (
+          <div className="pointer-events-none absolute inset-0 z-10 rounded-[24px] backdrop-blur-sm bg-[#141418]/60" />
+        )}
         {showPhotoHero && (
           <div
             role="button"
@@ -822,6 +833,32 @@ export default function VenueCard({
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-2">
+              {isPendingDismissal ? (
+                <div className="relative z-20 flex items-center gap-2">
+                  <div className="overflow-hidden rounded-full h-[3px] w-14 bg-white/10">
+                    <div
+                      className="h-full w-full origin-left bg-rose-500"
+                      style={{ animation: "shrink-bar 5s linear forwards" }}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={onUndoDismissal}
+                    className="rounded-full border border-white/15 bg-[#1c1c22] px-3 py-1.5 text-xs font-semibold text-[#f0f0f5] transition hover:border-white/30 active:scale-[0.97]"
+                  >
+                    Undo
+                  </button>
+                </div>
+              ) : onThumbsDown ? (
+                <button
+                  type="button"
+                  onClick={onThumbsDown}
+                  aria-label="Not interested"
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-[#1c1c22] text-[#8b8b9c] transition hover:border-white/20 active:scale-[0.97]"
+                >
+                  <span aria-hidden="true" className="text-base leading-none">👎</span>
+                </button>
+              ) : null}
               {showSaveToCollectionsAction && onSaveToCollections ? (
                 <button
                   type="button"

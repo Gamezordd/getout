@@ -17,8 +17,7 @@ const DEFAULT_REQUEST_DELAY_MS = 400;
 const DEFAULT_CONCURRENCY = 3;
 const DISCOVERY_BUFFER_COUNT = 60;
 const MAX_NEARBY_RESULTS = 200;
-const MAX_NEARBY_PAGE_RESULTS = 20;
-const NEXT_PAGE_DELAY_MS = 2500;
+const MAX_NEARBY_SEARCH_RESULTS = 20;
 const DEFAULT_UNIT_RADIUS_METERS = 500;
 
 const DEFAULT_COORDINATES_FILE = path.join(
@@ -40,11 +39,19 @@ const DEFAULT_ARTIFACTS_ROOT = path.join(
   "place-vibe-seed",
 );
 
-const DEFAULT_CATEGORIES = ["pub",];
+const DEFAULT_CATEGORIES = [
+  "cafe",
+  "bar",
+  "restaurant",
+  // "brewery",
+  // "night_club",
+  "pub",
+];
 const CATEGORY_DISCOVERY_THRESHOLDS = {
   cafe: { minRating: 4.0, minReviewCount: 2000 },
   bar: { minRating: 3.8, minReviewCount: 2500 },
   restaurant: { minRating: 3.8, minReviewCount: 2500 },
+  brewery: { minRating: 3.8, minReviewCount: 2000 },
   pub: { minRating: 3.8, minReviewCount: 2500 },
   night_club: { minRating: 4.2, minReviewCount: 2000 },
   bar_and_grill: { minRating: 3.8, minReviewCount: 2000 },
@@ -55,6 +62,7 @@ const SUPPORTED_CATEGORIES = new Set([
   "restaurant",
   "cafe",
   "night_club",
+  "brewery",
   "bar_and_grill",
 ]);
 const SCHEMA_VENUE_TYPES = new Set([
@@ -575,55 +583,56 @@ const getAreaFromAddress = (address) => {
   return parts.length >= 2 ? parts[parts.length - 3] || parts[0] : parts[0] || null;
 };
 
-const fetchLegacyNearbyPlacesPage = async ({
+const fetchNearbyPlacesPage = async ({
   lat,
   lng,
   category,
   radiusMeters,
-  pageToken,
 }) => {
-  const url = new URL(`${BASE_LEGACY_PLACES_URL}/nearbysearch/json`);
-  url.searchParams.set("key", getGoogleMapsApiKey());
-
-  if (pageToken) {
-    url.searchParams.set("pagetoken", pageToken);
-  } else {
-    url.searchParams.set("location", `${lat},${lng}`);
-    url.searchParams.set("radius", String(radiusMeters));
-    url.searchParams.set("type", category);
-    url.searchParams.set("rankby", "prominence");
-  }
-
-  const response = await fetch(url.toString(), {
-    headers: { "Content-Type": "application/json" },
+  const response = await fetch(`${BASE_PLACES_URL}/v1/places:searchNearby`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Goog-Api-Key": getGoogleMapsApiKey(),
+      "X-Goog-FieldMask":
+        "places.id,places.displayName,places.formattedAddress,places.location,places.primaryType,places.types,places.rating,places.userRatingCount",
+    },
+    body: JSON.stringify({
+      includedTypes: [category],
+      maxResultCount: MAX_NEARBY_SEARCH_RESULTS,
+      rankPreference: "POPULARITY",
+      locationRestriction: {
+        circle: {
+          center: {
+            latitude: lat,
+            longitude: lng,
+          },
+          radius: radiusMeters,
+        },
+      },
+    }),
   });
   if (!response.ok) {
     const text = await response.text().catch(() => "");
     throw new Error(
-      `Legacy Nearby Search request failed: ${text || response.status}`,
+      `Nearby Search (New) request failed: ${text || response.status}`,
     );
   }
 
   const data = await response.json().catch(() => null);
-  if (data?.status && !["OK", "ZERO_RESULTS"].includes(data.status)) {
-    throw new Error(`Legacy Nearby Search returned ${data.status}.`);
-  }
-
   await debugPauseAfterPlacesCall(
-    `Nearby Search page for category "${category}" at radius ${radiusMeters}m`,
-    (Array.isArray(data?.results) ? data.results : [])
-      .map((result) =>
-        typeof result?.name === "string" && result.name.trim()
-          ? result.name.trim()
+    `Nearby Search (New) for category "${category}" at radius ${radiusMeters}m`,
+    (Array.isArray(data?.places) ? data.places : [])
+      .map((place) =>
+        typeof place?.displayName?.text === "string" && place.displayName.text.trim()
+          ? place.displayName.text.trim()
           : null,
       )
       .filter(Boolean),
   );
 
   return {
-    results: Array.isArray(data?.results) ? data.results : [],
-    nextPageToken:
-      typeof data?.next_page_token === "string" ? data.next_page_token : null,
+    results: Array.isArray(data?.places) ? data.places : [],
   };
 };
 
@@ -1254,84 +1263,71 @@ const discoverQualifyingCandidates = async ({
     }
 
     const discoveredIds = new Set();
-    let nextPageToken = null;
     scanCount += 1;
+    const page = await fetchNearbyPlacesPage({
+      lat: midpoint.lat,
+      lng: midpoint.lng,
+      category,
+      radiusMeters: unitRadiusMeters,
+    });
+    console.log(
+      `Fetched ${page.results.length} places for category "${category}" at grid cell (${midpoint.rowIndex},${midpoint.columnIndex}) midpoint (${midpoint.lat}, ${midpoint.lng}) with radius ${unitRadiusMeters}m.`,
+    );
 
-    while (dedupedCandidates.size < candidateTarget) {
-      if (nextPageToken) {
-        await sleep(NEXT_PAGE_DELAY_MS);
+    for (const place of page.results.slice(0, MAX_NEARBY_SEARCH_RESULTS)) {
+      const placeId = typeof place?.id === "string" ? place.id : null;
+      const rating =
+        typeof place?.rating === "number" ? place.rating : null;
+      const userRatingsTotal =
+        typeof place?.userRatingCount === "number"
+          ? place.userRatingCount
+          : null;
+
+      if (!placeId || discoveredIds.has(placeId)) continue;
+      discoveredIds.add(placeId);
+
+      if (sharedState.otherPlaceIds.has(placeId)) continue;
+      if (sharedState.existingPlaceIds.has(placeId)) continue;
+      if (typeof rating !== "number" || rating < minRating) continue;
+      if (
+        typeof userRatingsTotal !== "number" ||
+        userRatingsTotal < minReviewCount
+      ) {
+        continue;
       }
+      if (dedupedCandidates.has(placeId)) continue;
 
-      const page = await fetchLegacyNearbyPlacesPage({
-        lat: midpoint.lat,
-        lng: midpoint.lng,
-        category,
-        radiusMeters: unitRadiusMeters,
-        pageToken: nextPageToken,
+      dedupedCandidates.set(placeId, {
+        placeId,
+        placeName:
+          typeof place?.displayName?.text === "string" &&
+          place.displayName.text.trim()
+            ? place.displayName.text.trim()
+            : "Unknown place",
+        address:
+          typeof place?.formattedAddress === "string"
+            ? place.formattedAddress
+            : null,
+        location:
+          typeof place?.location?.latitude === "number" &&
+          typeof place?.location?.longitude === "number"
+            ? {
+                lat: place.location.latitude,
+                lng: place.location.longitude,
+              }
+            : null,
+        rating,
+        userRatingsTotal,
+        googlePlaceType:
+          typeof place?.primaryType === "string" && place.primaryType.trim()
+            ? place.primaryType.trim()
+            : category,
+        gridMidpoint: midpoint,
       });
-      console.log(
-        `Fetched ${page.results.length} places for category "${category}" at grid cell (${midpoint.rowIndex},${midpoint.columnIndex}) midpoint (${midpoint.lat}, ${midpoint.lng}) with radius ${unitRadiusMeters}m.`,
-      );
 
-      for (const place of page.results.slice(0, MAX_NEARBY_PAGE_RESULTS)) {
-        const placeId =
-          typeof place?.place_id === "string" ? place.place_id : null;
-        const rating =
-          typeof place?.rating === "number" ? place.rating : null;
-        const userRatingsTotal =
-          typeof place?.user_ratings_total === "number"
-            ? place.user_ratings_total
-            : null;
-
-        if (!placeId || discoveredIds.has(placeId)) continue;
-        discoveredIds.add(placeId);
-
-        if (sharedState.otherPlaceIds.has(placeId)) continue;
-        if (sharedState.existingPlaceIds.has(placeId)) continue;
-        if (typeof rating !== "number" || rating < minRating) continue;
-        if (
-          typeof userRatingsTotal !== "number" ||
-          userRatingsTotal < minReviewCount
-        ) {
-          continue;
-        }
-        if (dedupedCandidates.has(placeId)) continue;
-
-        dedupedCandidates.set(placeId, {
-          placeId,
-          placeName:
-            typeof place?.name === "string" && place.name.trim()
-              ? place.name.trim()
-              : "Unknown place",
-          address:
-            typeof place?.vicinity === "string"
-              ? place.vicinity
-              : typeof place?.formatted_address === "string"
-                ? place.formatted_address
-                : null,
-          location:
-            typeof place?.geometry?.location?.lat === "number" &&
-            typeof place?.geometry?.location?.lng === "number"
-              ? {
-                  lat: place.geometry.location.lat,
-                  lng: place.geometry.location.lng,
-                }
-              : null,
-          rating,
-          userRatingsTotal,
-          googlePlaceType: category,
-          gridMidpoint: midpoint,
-        });
-
-        if (dedupedCandidates.size >= candidateTarget) {
-          break;
-        }
-      }
-
-      if (!page.nextPageToken || page.results.length === 0) {
+      if (dedupedCandidates.size >= candidateTarget) {
         break;
       }
-      nextPageToken = page.nextPageToken;
     }
   }
 

@@ -4,6 +4,11 @@
 @tailwind components;
 @tailwind utilities;
 
+@keyframes shrink-bar {
+  from { transform: scaleX(1); }
+  to   { transform: scaleX(0); }
+}
+
 :root {
   color-scheme: light;
   --getout-bg: #0a0a0d;
