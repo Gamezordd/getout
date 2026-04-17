@@ -10,3 +10,5 @@ node_modules
 *.jks
 .vercel
 .env*.local
+
+data/generated

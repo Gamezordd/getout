@@ -36,6 +36,7 @@ type Props = {
   isSavingToCollections?: boolean;
   isSavedToCollections?: boolean;
   onSaveToCollections?: () => void;
+  displayMode?: "default" | "search";
 };
 
 type MetadataItem = {
@@ -141,6 +142,7 @@ export default function VenueCard({
   isSavingToCollections = false,
   isSavedToCollections = false,
   onSaveToCollections,
+  displayMode = "default",
 }: Props) {
   const photos = Array.isArray(venue.photos) ? venue.photos.slice(0, 6) : [];
   const firstPhoto = photos[0] || null;
@@ -320,6 +322,7 @@ export default function VenueCard({
   const voteCount = voteSummary?.count || 0;
   const voteFill =
     totalUsers > 0 ? Math.min(100, (voteCount / totalUsers) * 100) : 0;
+  const showTravelTimes = displayMode === "default";
   const locationLabel = venue.area || venue.address || null;
   const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
     `${venue.name} ${venue.address || ""}`.trim(),
@@ -373,6 +376,10 @@ export default function VenueCard({
   const resolvedSourceLabel =
     sourceLabel || (badgeTone === "manual" ? "Manual pick" : "Suggested");
   const showImageHeroLoader = !showPhotoHero && isImageLoading;
+  const formattedVibeDistance =
+    typeof venue.vibeDistance === "number"
+      ? venue.vibeDistance.toFixed(4)
+      : null;
   const visiblePhotoAttributions = collectPhotoAttributions(
     venue.photoAttributions,
     photos.length > 1 ? [0, 1, 2, 3, 4, 5] : [0],
@@ -678,13 +685,19 @@ export default function VenueCard({
         <div className="mx-4 rounded-[18px] bg-[#1c1c22] px-4 py-3">
           <div className="mb-3 flex items-center justify-between">
             <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[#727287]">
-              Travel times
+              {showTravelTimes ? "Travel times" : "Search match"}
             </p>
-            <p className="font-display text-base font-bold text-[#f0f0f5]">
-              {sortedUsers.length > 0 ? getTravelRange(preciseEtaByUser) : "--"}
-            </p>
+            {showTravelTimes ? (
+              <p className="font-display text-base font-bold text-[#f0f0f5]">
+                {sortedUsers.length > 0 ? getTravelRange(preciseEtaByUser) : "--"}
+              </p>
+            ) : formattedVibeDistance ? (
+              <p className="font-display text-sm font-bold text-[#f0f0f5]">
+                {formattedVibeDistance}
+              </p>
+            ) : null}
           </div>
-          {sortedUsers.length > 0 ? (
+          {showTravelTimes && sortedUsers.length > 0 ? (
             <div className="space-y-2.5">
               {sortedUsers.map(({ user, eta }, index) => {
                 const isCurrentUser = user.id === currentUserId;
@@ -734,10 +747,21 @@ export default function VenueCard({
                 );
               })}
             </div>
-          ) : (
+          ) : showTravelTimes ? (
             <p className="text-xs text-[#8b8b9c]">
               Travel times appear after members allow precise location.
             </p>
+          ) : (
+            <div className="space-y-1">
+              <p className="text-xs text-[#8b8b9c]">
+                Vibe-based result for the current group category and city.
+              </p>
+              {formattedVibeDistance ? (
+                <p className="text-[11px] text-[#6fefc6]">
+                  Vector distance: {formattedVibeDistance}
+                </p>
+              ) : null}
+            </div>
           )}
         </div>
 

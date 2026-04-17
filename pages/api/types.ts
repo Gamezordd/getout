@@ -127,6 +127,10 @@ export type GroupResponse = {
   users: User[];
   venues: Venue[];
   manualVenues: Venue[];
+  suggestedVenues: Venue[];
+  etaMatrix: EtaMatrix;
+  totalsByVenue: TotalsByVenue;
+  warning?: string;
   sessionMembers: Array<{
     browserId: string;
     userId: string;
@@ -136,6 +140,7 @@ export type GroupResponse = {
   votingClosesAt?: string | null;
   venueCategory: VenueCategory | null;
   suggestionsStatus?: SuggestionsStatus;
+  contextQuery?: string | null;
   lockedVenue: LockedVenue | null;
   currentUserId?: string;
   isOwner?: boolean;

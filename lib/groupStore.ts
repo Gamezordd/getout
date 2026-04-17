@@ -28,6 +28,7 @@ type SuggestionsStatus = "idle" | "pending" | "generating" | "ready" | "error";
 
 type GroupPayload = {
   createdAt: string | null;
+  contextQuery?: string | null;
   users: User[];
   venues: Venue[];
   manualVenues: Venue[];
@@ -54,6 +55,7 @@ const createEmptySuggestionsSnapshot = (): SuggestionsSnapshot => ({
 
 const createEmptyGroup = (): GroupPayload => ({
   createdAt: null,
+  contextQuery: null,
   users: [],
   venues: [],
   manualVenues: [],
@@ -90,6 +92,7 @@ const hydrateGroup = async (sessionId: string, group: GroupPayload) => {
   if (!hydrated.pushSubscriptions) hydrated.pushSubscriptions = {};
   if (!Array.isArray(hydrated.sessionMembers)) hydrated.sessionMembers = [];
   if (typeof hydrated.createdAt !== "string") hydrated.createdAt = null;
+  if (typeof hydrated.contextQuery !== "string") hydrated.contextQuery = null;
   if (
     hydrated.suggestionsStatus !== "idle" &&
     hydrated.suggestionsStatus !== "pending" &&
@@ -166,6 +169,12 @@ const saveGroup = async (sessionId: string, group: GroupPayload) => {
         ? group.createdAt
         : typeof existingGroup?.createdAt === "string"
           ? existingGroup.createdAt
+          : null,
+    contextQuery:
+      typeof group.contextQuery === "string"
+        ? group.contextQuery
+        : typeof existingGroup?.contextQuery === "string"
+          ? existingGroup.contextQuery
           : null,
   };
   await redis.set(key, nextGroup);

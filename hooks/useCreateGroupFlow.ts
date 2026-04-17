@@ -80,6 +80,7 @@ export function useCreateGroupFlow({
     selectedVenue,
     setCategory,
     setInviteDialogOpen,
+    setSelectedVenue,
     submitting,
     ...inviteState,
   };

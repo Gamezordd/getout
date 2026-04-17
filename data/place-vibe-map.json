@@ -1,0 +1,129 @@
+{
+  "schema_version": "2.2",
+  "place_vibe_profile": {
+    "type": {
+      "__comment": "to be populated by code not AI based on if this vector represents a real place or a synthetic token/keyword",
+      "type": "string",
+      "enum": ["place", "token"],
+      "description": "Whether this profile belongs to a real place or a synthetic token/keyword"
+    },
+    "venue_type": {
+      "type": "string",
+      "enum": [
+        "cafe", "restaurant", "bar", "pub", "brewery", "club",
+        "dessert", "bakery", "brunch", "fast_food", "fine_dining", "lounge", "other"
+      ]
+    },
+    "energy_level": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0
+    },
+    "ambience": {
+      "type": "object",
+      "properties": {
+        "cozy": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "rustic": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "natural": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "warm": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "trendy": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "modern": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "casual": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "intimate": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "aesthetic": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "rooftop": { "type": "number", "minimum": 0.0, "maximum": 1.0 }
+      }
+    },
+    "social_fit": {
+      "type": "object",
+      "properties": {
+        "group_friendly": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "date_friendly": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "solo_friendly": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "work_friendly": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "pet_friendly": { "type": "number", "minimum": 0.0, "maximum": 1.0 }
+      }
+    },
+    "conversation_level": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0
+    },
+    "price_feel": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0
+    },
+    "time_fit": {
+      "type": "object",
+      "properties": {
+        "breakfast": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "brunch": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "lunch": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "evening": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "dinner": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "late_night": { "type": "number", "minimum": 0.0, "maximum": 1.0 }
+      }
+    },
+    "stay_duration": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0
+    },
+    "food_focus": {
+      "type": "object",
+      "properties": {
+        "coffee": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "cocktails": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "beer": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "vegetarian_friendly": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "vegan_friendly": { "type": "number", "minimum": 0.0, "maximum": 1.0 }
+      }
+    },
+    "special_traits": {
+      "type": "object",
+      "properties": {
+        "rooftop": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "outdoor_seating": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "live_music": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "dance": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "scenic_view": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "instagrammable": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "open_late": { "type": "number", "minimum": 0.0, "maximum": 1.0 }
+      }
+    },
+    "negatives": {
+      "type": "object",
+      "properties": {
+        "too_loud": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "too_crowded": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "too_expensive": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "slow_service": { "type": "number", "minimum": 0.0, "maximum": 1.0 }
+      }
+    },
+    "rating": {
+      "type": "number",
+      "minimum": 1.0,
+      "maximum": 5.0
+    },
+    "summary": {
+      "type": "string",
+      "description": "One short natural language summary of the vibe"
+    },
+    "profile_confidence": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "description": "Overall confidence in this profile (based on reviews or token clarity)"
+    },
+    "keywords": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Additional free-form keywords"
+    },
+    "last_updated": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

@@ -28,11 +28,16 @@ type GroupPayload = {
   users: User[];
   venues: Venue[];
   manualVenues?: Venue[];
+  suggestedVenues?: Venue[];
+  etaMatrix?: EtaMatrix;
+  totalsByVenue?: TotalsByVenue;
+  warning?: string;
   sessionMembers?: SessionMember[];
   votes?: VotesByVenue;
   votingClosesAt?: string | null;
   venueCategory?: VenueCategory | null;
   suggestionsStatus?: SuggestionsStatus;
+  contextQuery?: string | null;
   lockedVenue?: LockedVenue | null;
   currentUserId?: string;
   isOwner?: boolean;
@@ -51,6 +56,21 @@ type SuggestionsPayload = {
 
 type SuggestionEnrichmentPayload = {
   suggestedVenues: Venue[];
+};
+
+type PlaceVibeSearchPayload = {
+  venues: Venue[];
+  suggestedVenues: Venue[];
+  etaMatrix: EtaMatrix;
+  totalsByVenue: TotalsByVenue;
+  votes?: VotesByVenue;
+  votingClosesAt?: string | null;
+  warning?: string;
+  suggestionsStatus?: SuggestionsStatus;
+  normalizedQuery?: string;
+  tokens?: string[];
+  cacheHit?: boolean;
+  message?: string;
 };
 
 const generateSessionId = () => {
@@ -83,9 +103,14 @@ export class AppStore {
   votes: VotesByVenue = {};
   votingClosesAt: string | null = null;
   venueCategory: VenueCategory | null = null;
+  contextQuery: string | null = null;
   lockedVenue: LockedVenue | null = null;
   suggestionsStatus: SuggestionsStatus = "idle";
   selectedVenueId: string | null = null;
+  venueSearchQuery = "";
+  searchedVenues: Venue[] = [];
+  isSearchingVenues = false;
+  venueSearchError: string | null = null;
   groupError: string | null = null;
   copyStatus: string | null = null;
   suggestionWarning: string | null = null;
@@ -186,6 +211,10 @@ export class AppStore {
     );
   }
 
+  get isSearchModeActive() {
+    return this.venueSearchQuery.trim().length >= 2;
+  }
+
   reconcileVotes(votes: VotesByVenue) {
     this.votes = { ...(votes || {}) };
   }
@@ -254,6 +283,8 @@ export class AppStore {
     this.sessionId = sessionId;
     if (!isSameSession) {
       this.venueCategory = null;
+      this.contextQuery = null;
+      this.venueSearchQuery = "";
       this.votingClosesAt = null;
       this.lockedVenue = null;
       this.suggestionsStatus = "idle";
@@ -294,8 +325,9 @@ export class AppStore {
         throw new Error(payload.message || "Unable to load group.");
       }
       const data = (await response.json()) as GroupPayload;
+      const nextSuggestedVenues = data.suggestedVenues || [];
       const mergedVenueState = mergeVenues(
-        this.suggestedVenues,
+        nextSuggestedVenues,
         data.manualVenues || [],
       );
       runInAction(() => {
@@ -303,10 +335,16 @@ export class AppStore {
         this.sessionMembers = data.sessionMembers || [];
         this.manualVenues = data.manualVenues || [];
         this.venues = mergedVenueState.mergedVenues;
+        this.suggestedVenues = nextSuggestedVenues;
+        this.etaMatrix = data.etaMatrix || {};
+        this.totalsByVenue = data.totalsByVenue || {};
+        this.suggestionWarning = data.warning || null;
         this.reconcileVotes(data.votes || {});
         this.votingClosesAt = data.votingClosesAt || null;
         this.venueCategory = data.venueCategory || null;
         this.suggestionsStatus = data.suggestionsStatus || "idle";
+        this.contextQuery = data.contextQuery || null;
+        this.venueSearchQuery = data.contextQuery || "";
         this.lockedVenue = data.lockedVenue || null;
         this.currentUserId = data.currentUserId || null;
         this.isOwner = Boolean(data.isOwner);
@@ -320,6 +358,15 @@ export class AppStore {
         this.isLoadingGroup = false;
       });
     }
+  }
+
+  async fetchSuggestionsForActiveContext(options?: { refresh?: boolean }) {
+    const activeQuery = this.contextQuery?.trim() || this.venueSearchQuery.trim();
+    if (activeQuery.length >= 2) {
+      await this.searchVenuesByVibe(activeQuery, options);
+      return;
+    }
+    await this.fetchSuggestions(options);
   }
 
   async fetchSuggestions(options?: { refresh?: boolean }) {
@@ -361,40 +408,9 @@ export class AppStore {
           throw new Error(payload.message || "Unable to fetch suggestions.");
         }
         const data = (await response.json()) as SuggestionsPayload;
-        const mergedVenueState = mergeVenues(
-          data.suggestedVenues || [],
-          this.manualVenues,
-        );
         runInAction(() => {
-          this.venues = mergedVenueState.mergedVenues;
-          this.suggestedVenues = data.suggestedVenues || [];
-          this.totalsByVenue = data.totalsByVenue || {};
-          this.etaMatrix = data.etaMatrix || {};
-          this.reconcileVotes(data.votes || {});
-          this.votingClosesAt = data.votingClosesAt || null;
-          this.suggestionWarning = data.warning || null;
-          this.suggestionsStatus = data.suggestionsStatus || "ready";
+          this.applySuggestionsPayload(data);
           this.isLoadingSuggestions = false;
-          const hasSelected =
-            this.selectedVenueId &&
-            this.venues.find((venue) => venue.id === this.selectedVenueId);
-          if (!hasSelected) {
-            const ranked = this.venues
-              .map((venue) => ({
-                id: venue.id,
-                total: this.totalsByVenue?.[venue.id],
-              }))
-              .filter((item) => typeof item.total === "number") as Array<{
-              id: string;
-              total: number;
-            }>;
-            ranked.sort((a, b) => a.total - b.total);
-            this.selectedVenueId =
-              ranked[0]?.id ||
-              this.venues[0]?.id ||
-              this.suggestedVenues[0]?.id ||
-              null;
-          }
         });
       } catch (err: any) {
         runInAction(() => {
@@ -418,6 +434,10 @@ export class AppStore {
   }
 
   async refreshSuggestions() {
+    if ((this.contextQuery?.trim() || this.venueSearchQuery.trim()).length >= 2) {
+      await this.fetchSuggestionsForActiveContext({ refresh: true });
+      return;
+    }
     this.votes = {};
     await this.fetchSuggestions({ refresh: true });
     await this.fetchSuggestions();
@@ -735,6 +755,102 @@ export class AppStore {
 
   setSelectedVenue(venueId: string | null) {
     this.selectedVenueId = venueId;
+  }
+
+  setVenueSearchQuery(query: string) {
+    this.venueSearchQuery = query;
+  }
+
+  clearVenueSearch() {
+    this.venueSearchQuery = "";
+    this.searchedVenues = [];
+    this.venueSearchError = null;
+    this.isSearchingVenues = false;
+  }
+
+  async searchVenuesByVibe(query: string, options?: { refresh?: boolean }) {
+    const trimmed = query.trim();
+    this.venueSearchQuery = query;
+
+    if (!this.sessionId || !this.venueCategory) {
+      runInAction(() => {
+        this.venueSearchError = "Group search is not ready yet.";
+        this.isSearchingVenues = false;
+      });
+      return;
+    }
+
+    try {
+      this.isSearchingVenues = true;
+      this.venueSearchError = null;
+      const params = new URLSearchParams({ sessionId: this.sessionId });
+      if (this.browserId) {
+        params.set("browserId", this.browserId);
+      }
+      if (trimmed.length >= 2) {
+        params.set("q", trimmed);
+      }
+      if (options?.refresh) {
+        params.set("refresh", "1");
+      }
+
+      const response = await fetch(
+        `/api/suggestions-with-context?${params.toString()}`,
+      );
+      const payload = (await response.json().catch(() => ({}))) as PlaceVibeSearchPayload;
+      if (!response.ok) {
+        throw new Error(payload.message || "Unable to search places.");
+      }
+
+      runInAction(() => {
+        if (this.venueSearchQuery.trim() !== trimmed) return;
+        this.applySuggestionsPayload(payload);
+        this.contextQuery = trimmed.length >= 2 ? trimmed : null;
+        this.venueSearchError = null;
+        this.isSearchingVenues = false;
+      });
+    } catch (err: any) {
+      runInAction(() => {
+        if (this.venueSearchQuery.trim() !== trimmed) return;
+        this.venueSearchError = err.message || "Unable to search places.";
+        this.isSearchingVenues = false;
+      });
+    }
+  }
+
+  private applySuggestionsPayload(data: SuggestionsPayload | PlaceVibeSearchPayload) {
+    const mergedVenueState = mergeVenues(
+      data.suggestedVenues || [],
+      this.manualVenues,
+    );
+    this.venues = mergedVenueState.mergedVenues;
+    this.suggestedVenues = data.suggestedVenues || [];
+    this.totalsByVenue = data.totalsByVenue || {};
+    this.etaMatrix = data.etaMatrix || {};
+    this.reconcileVotes(data.votes || {});
+    this.votingClosesAt = data.votingClosesAt || null;
+    this.suggestionWarning = data.warning || null;
+    this.suggestionsStatus = data.suggestionsStatus || "ready";
+    const hasSelected =
+      this.selectedVenueId &&
+      this.venues.find((venue) => venue.id === this.selectedVenueId);
+    if (!hasSelected) {
+      const ranked = this.venues
+        .map((venue) => ({
+          id: venue.id,
+          total: this.totalsByVenue?.[venue.id],
+        }))
+        .filter((item) => typeof item.total === "number") as Array<{
+        id: string;
+        total: number;
+      }>;
+      ranked.sort((a, b) => a.total - b.total);
+      this.selectedVenueId =
+        ranked[0]?.id ||
+        this.venues[0]?.id ||
+        this.suggestedVenues[0]?.id ||
+        null;
+    }
   }
 
   async updateCurrentUserName(name: string) {

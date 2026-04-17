@@ -1,5 +1,6 @@
 import Dialog from "./Dialog";
 import InvitePeoplePickerPanel from "./InvitePeoplePickerPanel";
+import VibePlaceSearch from "./VibePlaceSearch";
 import type { CreateGroupFlowState } from "../hooks/useCreateGroupFlow";
 import { CATEGORY_OPTIONS } from "../lib/entryFlow";
 
@@ -33,6 +34,7 @@ export default function CreateGroupFields({
     setInviteDialogOpen,
     setInviteSearchValue,
     setSelectedInvitees,
+    setSelectedVenue,
   } = flow;
   const isSheetVariant = variant === "sheet";
 
@@ -57,9 +59,13 @@ export default function CreateGroupFields({
                   {selectedVenue.area || selectedVenue.address || "Curated pick"}
                 </div>
               </div>
-              <div className="rounded-full border border-[#00e5a033] bg-[#00e5a012] px-2.5 py-1 text-[11px] font-semibold text-[#00e5a0]">
-                Locked
-              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedVenue(null)}
+                className="rounded-full border border-[#00e5a033] bg-[#00e5a012] px-2.5 py-1 text-[11px] font-semibold text-[#00e5a0]"
+              >
+                Clear
+              </button>
             </div>
             <p className="mt-3 text-[12px] leading-5 text-[#5e5e74]">
               This place will be added to the new group before the rest of the suggestions load.
@@ -95,6 +101,14 @@ export default function CreateGroupFields({
             })}
           </div>
         )}
+
+        {!selectedVenue ? (
+          <VibePlaceSearch
+            category={category}
+            onSelect={setSelectedVenue}
+            variant={variant}
+          />
+        ) : null}
 
         {!isSheetVariant && isNative && authStatus === "signed_in" ? (
           <div className={isSheetVariant ? "mb-5 mt-5" : "mb-5 mt-8"}>

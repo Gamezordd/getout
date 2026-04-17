@@ -46,6 +46,8 @@ function HomePage() {
   const [dismissedNamePrompt, setDismissedNamePrompt] = useState(false);
   const [isDetectingPreciseLocation, setIsDetectingPreciseLocation] =
     useState(false);
+  const searchDebounceRef = useRef<number | null>(null);
+  const previousSearchQueryRef = useRef("");
   const pushInitRef = useRef(false);
 
   const namePromptKey = store.sessionId
@@ -97,7 +99,7 @@ function HomePage() {
     if (!store.sessionId) return;
     await store.loadGroup();
     if (store.users.length === 0) return;
-    await store.fetchSuggestions();
+    await store.fetchSuggestionsForActiveContext();
   });
 
   useEffect(() => {
@@ -120,8 +122,48 @@ function HomePage() {
   }, [store.currentUserId, store.sessionId]);
 
   useEffect(() => {
-    void store.fetchSuggestions();
-  }, [store, store.sessionId, store.users.length, store.manualVenues.length]);
+    if (
+      store.suggestionsStatus === "ready" &&
+      (store.suggestedVenues.length > 0 || Boolean(store.suggestionWarning))
+    ) {
+      return;
+    }
+    void store.fetchSuggestionsForActiveContext();
+  }, [store, store.sessionId, store.users.length, store.manualVenues.length, store.contextQuery]);
+
+  useEffect(() => {
+    if (searchDebounceRef.current) {
+      window.clearTimeout(searchDebounceRef.current);
+      searchDebounceRef.current = null;
+    }
+
+    const query = store.venueSearchQuery.trim();
+    const previousQuery = previousSearchQueryRef.current.trim();
+    if (!query || query.length < 2) {
+      if (previousQuery.length >= 2) {
+        searchDebounceRef.current = window.setTimeout(() => {
+          void store.searchVenuesByVibe("");
+        }, 250);
+      } else {
+        store.venueSearchError = null;
+        store.isSearchingVenues = false;
+      }
+      previousSearchQueryRef.current = store.venueSearchQuery;
+      return;
+    }
+
+    searchDebounceRef.current = window.setTimeout(() => {
+      void store.searchVenuesByVibe(query);
+    }, 350);
+    previousSearchQueryRef.current = store.venueSearchQuery;
+
+    return () => {
+      if (searchDebounceRef.current) {
+        window.clearTimeout(searchDebounceRef.current);
+        searchDebounceRef.current = null;
+      }
+    };
+  }, [store, store.venueCategory, store.venueSearchQuery]);
 
   useEffect(() => {
     const shouldPollSuggestions =
@@ -135,7 +177,7 @@ function HomePage() {
     }
 
     const intervalId = window.setInterval(() => {
-      void store.fetchSuggestions().catch(() => undefined);
+      void store.fetchSuggestionsForActiveContext().catch(() => undefined);
     }, 2500);
 
     return () => {
@@ -385,6 +427,52 @@ function HomePage() {
           </div>
         )}
         <section className="mt-4 space-y-4">
+          {!store.lockedVenue && store.venueCategory ? (
+            <div className="rounded-[20px] border border-white/10 bg-[#141418] px-4 py-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[11.5px] font-bold uppercase tracking-[0.06em] text-[#5e5e74]">
+                    Search by vibe
+                  </p>
+                  <p className="mt-1 text-[12px] text-[#7d7d90]">
+                    Find places in this group&apos;s category using vibe words.
+                  </p>
+                </div>
+                {store.isSearchModeActive ? (
+                  <button
+                    type="button"
+                    onClick={() => store.clearVenueSearch()}
+                    className="rounded-full border border-white/10 bg-[#1c1c22] px-3 py-1.5 text-[11px] font-semibold text-[#f0f0f5]"
+                  >
+                    Clear
+                  </button>
+                ) : null}
+              </div>
+              <div className="mt-3">
+                <input
+                  value={store.venueSearchQuery}
+                  onChange={(event) => store.setVenueSearchQuery(event.target.value)}
+                  placeholder={
+                    store.venueCategory === "cafe"
+                      ? "Try rustic, cozy, work friendly"
+                      : "Try rooftop, casual, live music"
+                  }
+                  className="w-full rounded-[14px] border border-white/10 bg-[#1c1c22] px-4 py-3 text-[14px] text-white placeholder:text-[#5e5e74] transition focus:border-white/20 focus:outline-none"
+                />
+              </div>
+              {store.isSearchingVenues ? (
+                <p className="mt-2 text-[12px] text-[#5e5e74]">Updating suggestions...</p>
+              ) : null}
+              {store.venueSearchError ? (
+                <p className="mt-2 text-[12px] text-rose-300">{store.venueSearchError}</p>
+              ) : null}
+              {store.isSearchModeActive && !store.isSearchingVenues && !store.venueSearchError ? (
+                <p className="mt-2 text-[12px] text-[#7d7d90]">
+                  Showing contextual suggestions for this group.
+                </p>
+              ) : null}
+            </div>
+          ) : null}
           {store.isLoadingGroup && (
             <Loader
               variant="dark"

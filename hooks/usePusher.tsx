@@ -50,9 +50,6 @@ export default function usePusher(
       if (!store.isLoadingGroup) {
         await store.loadGroup();
       }
-      if (!store.isLoadingSuggestions) {
-        await store.fetchSuggestions();
-      }
       if (data?.reason === "join" && data.userId) {
         onJoin?.(data.userId);
       }

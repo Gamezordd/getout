@@ -29,6 +29,7 @@ type Props = {
   savingCollectionVenueId?: string | null;
   savedCollectionVenueIds?: string[];
   onSaveToCollections?: (venue: Venue) => void;
+  displayMode?: "default" | "search";
 };
 
 const SKELETON_COUNT = 6;
@@ -129,6 +130,7 @@ export default function PlaceList({
   savingCollectionVenueId = null,
   savedCollectionVenueIds = [],
   onSaveToCollections,
+  displayMode = "default",
 }: Props) {
   const { mergedVenues: rankedVenues, suggestedRankById } = useMemo(
     () => mergeVenues(suggestedVenues, manualVenues),
@@ -166,6 +168,7 @@ export default function PlaceList({
   const voterIdsByVenue = useMemo(() => new Map(Object.entries(votes || {})), [votes]);
 
   const medalNoteByVenue = useMemo(() => {
+    if (displayMode === "search") return new Map<string, string>();
     const ranked = rankedVenues
       .map((venue) => ({
         venueId: venue.id,
@@ -258,15 +261,20 @@ export default function PlaceList({
   return (
     <div className="flex flex-col gap-4">
       {rankedVenues.map((venue) => {
-        const badge = suggestedRankById.get(venue.id)
-          ? { text: String(suggestedRankById.get(venue.id)), tone: "ranked" as const }
-          : { text: "M", tone: "manual" as const };
+        const badge =
+          displayMode === "search"
+            ? { text: "S", tone: "manual" as const }
+            : suggestedRankById.get(venue.id)
+              ? { text: String(suggestedRankById.get(venue.id)), tone: "ranked" as const }
+              : { text: "M", tone: "manual" as const };
         const sourceLabel =
-          badge.tone === "manual"
-            ? "Manual pick"
-            : venue.source === "collection"
-              ? "From collections"
-              : "Suggested";
+          displayMode === "search"
+            ? "Search result"
+            : badge.tone === "manual"
+              ? "Manual pick"
+              : venue.source === "collection"
+                ? "From collections"
+                : "Suggested";
 
         const voterIds = voterIdsByVenue.get(venue.id) || [];
 
@@ -280,15 +288,16 @@ export default function PlaceList({
             medalNote={medalNoteByVenue.get(venue.id)}
             addedByName={addedByNameByVenue.get(venue.id)}
             users={users}
-            etaByUser={etaMatrix?.[venue.id]}
+            etaByUser={displayMode === "search" ? undefined : etaMatrix?.[venue.id]}
             voteSummary={voteSummaryByVenue.get(venue.id)}
             totalUsers={users.length}
             isSelected={selectedVenueId === venue.id}
-            isWinner={mostEfficientVenueId === venue.id}
+            isWinner={displayMode === "search" ? false : mostEfficientVenueId === venue.id}
             hasCurrentUserVote={Boolean(currentUserId && voterIds.includes(currentUserId))}
             currentUserId={currentUserId}
             onSelect={() => onSelect(venue.id)}
             onVote={() => onVote(venue.id)}
+            displayMode={displayMode}
             showSaveToCollectionsAction={showSaveToCollectionsAction}
             isSavingToCollections={savingCollectionVenueId === venue.id}
             isSavedToCollections={savedCollectionVenueIds.includes(venue.id)}
@@ -298,7 +307,7 @@ export default function PlaceList({
           />
         );
       })}
-      {showRefreshAction && onRefresh && (
+      {displayMode === "default" && showRefreshAction && onRefresh && (
         <button
           type="button"
           onClick={onRefresh}

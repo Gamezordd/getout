@@ -53,7 +53,7 @@ type RecomputeOptions = {
   clearVotes?: boolean;
 };
 
-const buildSuggestionsResponse = (
+export const buildSuggestionsResponse = (
   payload: SuggestionsPayload,
   votes: SuggestionsResponse["votes"],
 ): SuggestionsResponse => ({
@@ -61,7 +61,7 @@ const buildSuggestionsResponse = (
   votes,
 });
 
-const computeCentroid = (points: LatLng[]): LatLng => {
+export const computeCentroid = (points: LatLng[]): LatLng => {
   const total = points.reduce(
     (acc, point) => {
       acc.lat += point.lat;
@@ -82,7 +82,7 @@ const buildCacheKey = (
 const buildRedisKey = (prefix: string, fingerprint: string) =>
   `${prefix}:${fingerprint}`;
 
-const dedupeVenues = (venues: Venue[]) => {
+export const dedupeVenues = (venues: Venue[]) => {
   const seen = new Set<string>();
   return venues.filter((venue) => {
     if (seen.has(venue.id)) return false;
@@ -265,7 +265,7 @@ const refreshSuggestionsCache = async (
   return payload;
 };
 
-const persistSuggestionsSnapshot = async (
+export const persistSuggestionsSnapshot = async (
   sessionId: string,
   group: GroupPayload,
   snapshot: SuggestionsSnapshot,
@@ -293,7 +293,7 @@ const hydrateSuggestionsFromGroup = async (
   rotateSuggestions: false,
 });
 
-const setSuggestionsStatus = async (
+export const setSuggestionsStatus = async (
   sessionId: string,
   group: GroupPayload,
   status: SuggestionsStatus,
@@ -315,7 +315,7 @@ const releaseSuggestionLock = async (sessionId: string) => {
   await redis.del(`${SUGGESTION_LOCK_PREFIX}:${sessionId}`);
 };
 
-const getGoogleMapsApiKey = () => {
+export const getGoogleMapsApiKey = () => {
   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
   if (!apiKey) {
     throw new Error("Missing Google Maps API key.");
@@ -425,7 +425,7 @@ const fetchDriveTimesInternal = async (
   return data.rows || [];
 };
 
-const fetchDriveTimes = async (
+export const fetchDriveTimes = async (
   apiKey: string,
   origins: LatLng[],
   destinations: LatLng[],
@@ -620,7 +620,7 @@ const getGoogleCandidates = async (params: {
   }));
 };
 
-const buildEtaData = (
+export const buildEtaData = (
   users: GroupPayload["users"],
   venues: Venue[],
   rows: DistanceMatrixRow[],

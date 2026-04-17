@@ -9,6 +9,8 @@
     "lint": "next lint",
     "cleanup:groups": "node scripts/delete-all-groups.mjs",
     "cleanup:vibes": "node scripts/delete-stale-vibe-indicators.mjs",
+    "build:place-vibes": "node scripts/build-place-vibe-profiles.mjs",
+    "build:place-vibes:driver": "node scripts/build-place-vibes-driver.mjs",
     "seed:dashboard-places": "node scripts/seed-dashboard-curated-places.mjs",
     "cap:sync": "cap sync android",
     "cap:android": "cap open android"
