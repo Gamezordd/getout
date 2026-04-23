@@ -20,10 +20,7 @@ import { resolveApproximateLocation } from "./location-utils";
 
 type ResponseBody = {
   results: Venue[];
-  normalizedQuery?: string;
-  tokens?: string[];
-  cityKey?: string | null;
-  cacheHit?: boolean;
+  vibes?: string[];
   message?: string;
 };
 
@@ -112,7 +109,7 @@ const generateQueryProfile = async (rawQuery: string, normalizedQuery: string, t
         "Return a single JSON object only. No markdown.",
         "Return one schema-shaped object for place_vibe_profile.",
         "For numeric fields, use values from 0.0 to 1.0.",
-        "Keep values conservative because the input is only a short query, not a review corpus.",
+        "For dimensions the query does not mention, use 0.0. Only assign non-zero values to dimensions the query directly implies.",
         "summary should be a short restatement of the inferred vibe.",
         "keywords should contain only the most relevant query-derived terms.",
         `Original query: ${JSON.stringify(rawQuery)}`,
@@ -172,17 +169,16 @@ export default async function handler(
     const tokens = normalizeQueryTokens(rawQuery);
     const normalizedQuery = buildWordSetCacheKey(rawQuery);
     if (!normalizedQuery || tokens.length === 0) {
-      return res.status(200).json({ results: [], normalizedQuery, tokens, cityKey: null });
+      return res.status(200).json({ results: [] });
     }
 
     const cityKey = await resolveCityKey(req);
     if (!cityKey) {
-      return res.status(200).json({ results: [], normalizedQuery, tokens, cityKey: null });
+      return res.status(200).json({ results: [] });
     }
 
     const cached = await getCachedQueryProfile(normalizedQuery);
     let profile = cached?.profile_json || null;
-    let cacheHit = Boolean(cached);
 
     if (!profile) {
       profile = await generateQueryProfile(rawQuery, normalizedQuery, tokens);
@@ -193,7 +189,6 @@ export default async function handler(
         vibeVector: buildPlaceVibeVector(profile),
         model: getOpenAIModel(),
       });
-      cacheHit = false;
     }
 
     const results = await searchPlacesByVibeVector({
@@ -205,10 +200,7 @@ export default async function handler(
 
     return res.status(200).json({
       results,
-      normalizedQuery,
-      tokens,
-      cityKey,
-      cacheHit,
+      vibes: profile.keywords,
     });
   } catch (error: any) {
     return res.status(500).json({

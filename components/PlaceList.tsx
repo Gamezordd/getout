@@ -8,6 +8,7 @@ import { mergeVenues } from "../lib/mergeVenues";
 import { getUserActivityLabel } from "../lib/userDisplay";
 import VenueCard from "./VenueCard";
 import type { EtaMatrix, TotalsByVenue, User, Venue, VotesByVenue } from "../lib/types";
+import type { UserQuery } from "../lib/groupStore";
 
 type Props = {
   suggestedVenues: Venue[];
@@ -21,10 +22,11 @@ type Props = {
   mostEfficientVenueId: string | null;
   onSelect: (venueId: string) => void;
   onVote: (venueId: string) => void;
-  onThumbsDown?: (venueId: string) => void;
+  onThumbsDown?: (venueId: string, selectedQueryKeys: string[]) => void;
   downvotedVenueIds?: string[];
   pendingDismissalVenueIds?: string[];
   onUndoDismissal?: (venueId: string) => void;
+  userQueries?: UserQuery[];
   showRefreshAction?: boolean;
   isRefreshing?: boolean;
   onRefresh?: () => void;
@@ -130,6 +132,7 @@ export default function PlaceList({
   downvotedVenueIds = [],
   pendingDismissalVenueIds = [],
   onUndoDismissal,
+  userQueries = [],
   showRefreshAction = false,
   isRefreshing = false,
   onRefresh,
@@ -175,31 +178,6 @@ export default function PlaceList({
 
   const voterIdsByVenue = useMemo(() => new Map(Object.entries(votes || {})), [votes]);
 
-  const medalNoteByVenue = useMemo(() => {
-    if (displayMode === "search") return new Map<string, string>();
-    const ranked = rankedVenues
-      .map((venue) => ({
-        venueId: venue.id,
-        total: totalsByVenue?.[venue.id],
-      }))
-      .filter((entry): entry is { venueId: string; total: number } =>
-        typeof entry.total === "number",
-      )
-      .slice(0, 3);
-    const noteByVenue = new Map<string, string>();
-    ranked.forEach((entry, index) => {
-      if (index === 0) {
-        noteByVenue.set(entry.venueId, "Best overall");
-        return;
-      }
-      if (index === 1) {
-        noteByVenue.set(entry.venueId, "Strong option");
-        return;
-      }
-      noteByVenue.set(entry.venueId, "Worth considering");
-    });
-    return noteByVenue;
-  }, [rankedVenues, totalsByVenue]);
 
   const addedByNameByVenue = useMemo(() => {
     const map = new Map<string, string>();
@@ -293,7 +271,7 @@ export default function PlaceList({
             badgeText={badge.text}
             badgeTone={badge.tone}
             sourceLabel={sourceLabel}
-            medalNote={medalNoteByVenue.get(venue.id)}
+            matchScore={venue.matchScore}
             addedByName={addedByNameByVenue.get(venue.id)}
             users={users}
             etaByUser={displayMode === "search" ? undefined : etaMatrix?.[venue.id]}
@@ -305,7 +283,8 @@ export default function PlaceList({
             currentUserId={currentUserId}
             onSelect={() => onSelect(venue.id)}
             onVote={() => onVote(venue.id)}
-            onThumbsDown={onThumbsDown ? () => onThumbsDown(venue.id) : undefined}
+            onThumbsDown={onThumbsDown ? (keys) => onThumbsDown(venue.id, keys) : undefined}
+            userQueries={userQueries}
             isDownvoted={downvotedVenueIds.includes(venue.id)}
             isPendingDismissal={pendingDismissalVenueIds.includes(venue.id)}
             onUndoDismissal={onUndoDismissal ? () => onUndoDismissal(venue.id) : undefined}

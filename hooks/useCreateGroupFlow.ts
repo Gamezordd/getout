@@ -13,15 +13,18 @@ type UseCreateGroupFlowOptions = {
   initialVenue?: Venue | null;
 };
 
+const EMPTY_INVITEES: PickAgainInviteeSummary[] = [];
+
 export function useCreateGroupFlow({
   initialCategory = "bar",
-  initialInvitees = [],
+  initialInvitees = EMPTY_INVITEES,
   initialVenue = null,
 }: UseCreateGroupFlowOptions = {}) {
   const store = useAppStore();
   const { authStatus, authenticatedUser, isNative } = useAuth();
   const router = useRouter();
   const [category, setCategory] = useState<VenueCategory>(initialCategory);
+  const [useSaves, setUseSaves] = useState(true);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -63,8 +66,13 @@ export function useCreateGroupFlow({
         venueCategory: category,
         closeVotingInHours,
         initialVenue: selectedVenue || undefined,
+        useSaves,
       });
-      void router.replace({ pathname: "/", query: { sessionId } });
+      if (store.slug) {
+        await router.replace({ pathname: "/[slug]", query: { slug: store.slug } });
+      } else {
+        await router.replace({ pathname: "/", query: { sessionId } });
+      }
     } catch (err: any) {
       setError(err.message || "Unable to create group.");
     } finally {
@@ -74,11 +82,13 @@ export function useCreateGroupFlow({
 
   return {
     category,
+    useSaves,
     error,
     handleCreate,
     inviteDialogOpen,
     selectedVenue,
     setCategory,
+    setUseSaves,
     setInviteDialogOpen,
     setSelectedVenue,
     submitting,

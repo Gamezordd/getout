@@ -31,10 +31,9 @@ type QueryCacheRow = {
 };
 
 let schemaReady: Promise<void> | null = null;
-const MIN_CONTEXTUAL_PLACE_RATING = 4.3;
-const MIN_CONTEXTUAL_USER_RATINGS_TOTAL = 2500;
-const MAX_CONTEXTUAL_VECTOR_DISTANCE = 0.35;
+export const MAX_CONTEXTUAL_VECTOR_DISTANCE = 0.15;
 const MAX_CONTEXTUAL_SEARCH_RADIUS_METERS = 40000;
+const CONFIDENCE_PENALTY = 0.1;
 
 const toPgVectorLiteral = (vector: number[]) =>
   `[${vector.map((value) => Number(value.toFixed(6))).join(",")}]`;
@@ -121,6 +120,10 @@ export const ensurePlaceVibeSchema = async () => {
       await (sql as any).query(`
         CREATE INDEX IF NOT EXISTS place_vibe_profiles_vector_idx
         ON place_vibe_profiles USING hnsw (vibe_vector vector_cosine_ops)
+      `);
+      await (sql as any).query(`
+        ALTER TABLE place_vibe_profiles
+        ADD COLUMN IF NOT EXISTS delta_vector VECTOR(${vectorDimension})
       `);
       await (sql as any).query(`
         CREATE TABLE IF NOT EXISTS place_vibe_token_cache (
@@ -341,26 +344,29 @@ const fetchContextualPlacesWithinRadius = async (params: {
           google_rating,
           user_ratings_total,
           ${distanceExpression} AS distance_meters,
-          vibe_vector <=> $1::vector AS vector_distance
+          CASE WHEN delta_vector IS NULL
+            THEN vibe_vector <=> $1::vector
+            ELSE (vibe_vector + delta_vector) <=> $1::vector
+          END AS vector_distance
         FROM place_vibe_profiles
         WHERE type = 'place'
           AND venue_type = $2
           AND place_id IS NOT NULL
           AND coordinates_json IS NOT NULL
-          AND google_rating > $3
-          AND user_ratings_total >= $4
-          AND ${distanceExpression} <= $5
+          AND ${distanceExpression} <= $3
         ORDER BY
-          vibe_vector <=> $1::vector ASC,
-          google_rating DESC NULLS LAST,
-          user_ratings_total DESC NULLS LAST
-        LIMIT $6
+          (
+            CASE WHEN delta_vector IS NULL
+              THEN vibe_vector <=> $1::vector
+              ELSE (vibe_vector + delta_vector) <=> $1::vector
+            END
+            + (1.0 - COALESCE((profile_json->>'profile_confidence')::float, 0.5)) * ${CONFIDENCE_PENALTY}
+          ) ASC
+        LIMIT $4
       `,
       [
         toPgVectorLiteral(params.vibeVector),
         params.venueType,
-        MIN_CONTEXTUAL_PLACE_RATING,
-        MIN_CONTEXTUAL_USER_RATINGS_TOTAL,
         params.radiusMeters,
         overfetchLimit,
       ],
@@ -388,19 +394,13 @@ const fetchContextualPlacesWithinRadius = async (params: {
         AND venue_type = $1
         AND place_id IS NOT NULL
         AND coordinates_json IS NOT NULL
-        AND google_rating > $2
-        AND user_ratings_total >= $3
-        AND ${distanceExpression} <= $4
+        AND ${distanceExpression} <= $2
       ORDER BY
-        google_rating DESC NULLS LAST,
-        user_ratings_total DESC NULLS LAST,
         distance_meters ASC
-      LIMIT $5
+      LIMIT $3
     `,
     [
       params.venueType,
-      MIN_CONTEXTUAL_PLACE_RATING,
-      MIN_CONTEXTUAL_USER_RATINGS_TOTAL,
       params.radiusMeters,
       overfetchLimit,
     ],
@@ -457,10 +457,7 @@ export const fetchContextualPlacesByRadiusLadder = async (params: {
             typeof right.vibeDistance === "number"
               ? right.vibeDistance
               : Number.POSITIVE_INFINITY;
-          if (leftDistance !== rightDistance) {
-            return leftDistance - rightDistance;
-          }
-          return (right.rating || 0) - (left.rating || 0);
+          return leftDistance - rightDistance;
         })
         .slice(0, params.limit);
 
@@ -480,38 +477,75 @@ export const fetchContextualPlacesByRadiusLadder = async (params: {
   }
 
   const sorted = Array.from(collected.values()).sort((left, right) => {
-    if (params.vibeVector) {
-      const leftDistance =
-        typeof left.vibeDistance === "number"
-          ? left.vibeDistance
-          : Number.POSITIVE_INFINITY;
-      const rightDistance =
-        typeof right.vibeDistance === "number"
-          ? right.vibeDistance
-          : Number.POSITIVE_INFINITY;
-      if (leftDistance !== rightDistance) {
-        return leftDistance - rightDistance;
-      }
-    }
-
-    const leftRating = left.rating || 0;
-    const rightRating = right.rating || 0;
-    if (leftRating !== rightRating) {
-      return rightRating - leftRating;
-    }
-
-    return (right.userRatingCount || 0) - (left.userRatingCount || 0);
+    const leftDistance =
+      typeof left.vibeDistance === "number"
+        ? left.vibeDistance
+        : Number.POSITIVE_INFINITY;
+    const rightDistance =
+      typeof right.vibeDistance === "number"
+        ? right.vibeDistance
+        : Number.POSITIVE_INFINITY;
+    return leftDistance - rightDistance;
   });
 
   return sorted.slice(0, params.limit);
 };
 
-const shiftTowardTarget = (current: number, target: number, magnitude: number) =>
-  Math.min(1, Math.max(0, current + Math.sign(target - current) * magnitude));
+export const fetchContextualPlacesForMultipleVectors = async (params: {
+  centroid: { lat: number; lng: number };
+  venueType: string;
+  radiusOptions: number[];
+  limitPerQuery: number;
+  vibeVectors: { normalizedKey: string; vector: number[] }[];
+  excludedVenueIds?: string[];
+}): Promise<Venue[]> => {
+  const byPlaceId = new Map<string, { venue: Venue; distanceByKey: Map<string, number> }>();
 
-const EXTREME_THRESHOLD = 0.15;
+  for (const { normalizedKey, vector } of params.vibeVectors) {
+    const results = await fetchContextualPlacesByRadiusLadder({
+      centroid: params.centroid,
+      venueType: params.venueType,
+      radiusOptions: params.radiusOptions,
+      limit: params.limitPerQuery,
+      vibeVector: vector,
+      excludedVenueIds: params.excludedVenueIds,
+    });
+    for (const venue of results) {
+      const existing = byPlaceId.get(venue.id);
+      if (existing) {
+        if (typeof venue.vibeDistance === "number") {
+          existing.distanceByKey.set(normalizedKey, venue.vibeDistance);
+        }
+      } else {
+        const distanceByKey = new Map<string, number>();
+        if (typeof venue.vibeDistance === "number") {
+          distanceByKey.set(normalizedKey, venue.vibeDistance);
+        }
+        byPlaceId.set(venue.id, { venue, distanceByKey });
+      }
+    }
+  }
 
-const fetchPlaceVector = async (placeId: string): Promise<number[] | null> => {
+  const totalQueries = params.vibeVectors.length;
+
+  const scored = Array.from(byPlaceId.values()).map(({ venue, distanceByKey }) => {
+    const foundInQueries = distanceByKey.size;
+    const avgFoundDist = foundInQueries > 0
+      ? Array.from(distanceByKey.values()).reduce((s, d) => s + d, 0) / foundInQueries
+      : 1;
+    const matchScore = Math.round(Math.max(0, (foundInQueries / totalQueries) * (1 - avgFoundDist)) * 100);
+    return { venue: { ...venue, matchScore }, foundInQueries, avgFoundDist };
+  });
+
+  scored.sort((a, b) => {
+    if (b.foundInQueries !== a.foundInQueries) return b.foundInQueries - a.foundInQueries;
+    return a.avgFoundDist - b.avgFoundDist;
+  });
+
+  return scored.map((s) => s.venue);
+};
+
+export const getPlaceVibeVector = async (placeId: string): Promise<number[] | null> => {
   await ensurePlaceVibeSchema();
   const sql = getSql();
   const rows = (await sql`
@@ -519,43 +553,81 @@ const fetchPlaceVector = async (placeId: string): Promise<number[] | null> => {
     FROM place_vibe_profiles
     WHERE place_id = ${placeId}
     LIMIT 1
-  `) as { vibe_vector: string }[];
+  `) as { vibe_vector: string | null }[];
   if (!rows[0]?.vibe_vector) return null;
   return JSON.parse(rows[0].vibe_vector) as number[];
 };
 
-const updatePlaceVector = async (placeId: string, vector: number[]) => {
+export const checkPlaceVibeProfileExists = async (placeId: string): Promise<boolean> => {
+  await ensurePlaceVibeSchema();
+  const sql = getSql();
+  const rows = (await sql`
+    SELECT 1 FROM place_vibe_profiles WHERE place_id = ${placeId} LIMIT 1
+  `) as unknown[];
+  return rows.length > 0;
+};
+
+const shiftTowardTarget = (current: number, target: number, magnitude: number) =>
+  Math.min(1, Math.max(0, current + Math.sign(target - current) * magnitude));
+
+const EXTREME_THRESHOLD = 0.15;
+
+const fetchDeltaVector = async (placeId: string): Promise<number[] | null> => {
+  await ensurePlaceVibeSchema();
+  const sql = getSql();
+  const rows = (await sql`
+    SELECT delta_vector::text AS delta_vector
+    FROM place_vibe_profiles
+    WHERE place_id = ${placeId}
+    LIMIT 1
+  `) as { delta_vector: string | null }[];
+  if (!rows[0]?.delta_vector) return null;
+  return JSON.parse(rows[0].delta_vector) as number[];
+};
+
+const updateDeltaVector = async (placeId: string, delta: number[]) => {
   await ensurePlaceVibeSchema();
   const sql = getSql();
   await (sql as any).query(
-    `UPDATE place_vibe_profiles SET vibe_vector = $1::vector, updated_at = NOW() WHERE place_id = $2`,
-    [toPgVectorLiteral(vector), placeId],
+    `UPDATE place_vibe_profiles SET delta_vector = $1::vector, updated_at = NOW() WHERE place_id = $2`,
+    [toPgVectorLiteral(delta), placeId],
   );
 };
 
-export const punishPlaceVector = async (params: {
+export const punishPlaceVectorMultiQuery = async (params: {
   placeId: string;
-  normalizedQueryKey: string;
+  normalizedQueryKeys: string[];
   shiftMagnitude?: number;
 }): Promise<void> => {
-  const { placeId, normalizedQueryKey, shiftMagnitude = 0.05 } = params;
+  const { placeId, normalizedQueryKeys, shiftMagnitude = 0.08 } = params;
 
-  const cached = await getCachedQueryProfile(normalizedQueryKey);
-  if (!cached?.vibe_vector) return;
-  const queryVec = JSON.parse(cached.vibe_vector) as number[];
+  const queryVecs: number[][] = [];
+  for (const key of normalizedQueryKeys) {
+    const cached = await getCachedQueryProfile(key);
+    if (cached?.vibe_vector) {
+      queryVecs.push(JSON.parse(cached.vibe_vector) as number[]);
+    }
+  }
+  if (queryVecs.length === 0) return;
 
-  const placeVec = await fetchPlaceVector(placeId);
-  if (!placeVec) return;
+  const dim = queryVecs[0].length;
+  const avgQueryVec = Array.from({ length: dim }, (_, i) =>
+    queryVecs.reduce((sum, vec) => sum + (vec[i] ?? 0.5), 0) / queryVecs.length,
+  );
+
+  const existingDelta = await fetchDeltaVector(placeId);
+  const delta = existingDelta ?? new Array(dim).fill(0);
 
   let changed = false;
-  const newVec = placeVec.map((value, i) => {
-    const queryVal = queryVec[i] ?? 0.5;
-    if (Math.abs(queryVal - 0.5) <= EXTREME_THRESHOLD) return value;
+  for (let i = 0; i < dim; i++) {
+    const avgVal = avgQueryVec[i] ?? 0.5;
+    if (Math.abs(avgVal - 0.5) <= EXTREME_THRESHOLD) continue;
+    const direction = Math.sign(0.5 - avgVal);
+    delta[i] = (delta[i] ?? 0) + direction * shiftMagnitude;
     changed = true;
-    return shiftTowardTarget(value, 0.5, shiftMagnitude);
-  });
+  }
 
-  if (changed) await updatePlaceVector(placeId, newVec);
+  if (changed) await updateDeltaVector(placeId, delta);
 };
 
 export const rewardPlaceVector = async (params: {
@@ -569,18 +641,20 @@ export const rewardPlaceVector = async (params: {
   if (!cached?.vibe_vector) return;
   const queryVec = JSON.parse(cached.vibe_vector) as number[];
 
-  const placeVec = await fetchPlaceVector(placeId);
-  if (!placeVec) return;
+  const dim = queryVec.length;
+  const existingDelta = await fetchDeltaVector(placeId);
+  const delta = existingDelta ?? new Array(dim).fill(0);
 
   let changed = false;
-  const newVec = placeVec.map((value, i) => {
+  for (let i = 0; i < dim; i++) {
     const queryVal = queryVec[i] ?? 0.5;
-    if (Math.abs(queryVal - 0.5) <= EXTREME_THRESHOLD) return value;
+    if (Math.abs(queryVal - 0.5) <= EXTREME_THRESHOLD) continue;
+    const direction = Math.sign(queryVal - 0.5);
+    delta[i] = (delta[i] ?? 0) + direction * shiftMagnitude;
     changed = true;
-    return shiftTowardTarget(value, queryVal, shiftMagnitude);
-  });
+  }
 
-  if (changed) await updatePlaceVector(placeId, newVec);
+  if (changed) await updateDeltaVector(placeId, delta);
 };
 
 export const upsertPlaceVibePlaceRow = async (params: {

@@ -43,6 +43,8 @@ import { prepareSuggestionImageEnrichmentForCurrentSuggestions } from "./suggest
 import { prepareSuggestionEnrichmentForCurrentSuggestions } from "./suggestion-enrichment-shared";
 import { safeTrigger } from "./utils";
 import { ensureVotingDeadlineState } from "./venue-lock";
+import { fetchContextualPlacesByRadiusLadder } from "../../lib/placeVibeStore";
+import { mapCategoryToSchemaVenueType } from "../../lib/placeVibeSchema";
 
 type SuggestionsPayload = Omit<SuggestionsResponse, "votes">;
 
@@ -695,28 +697,43 @@ export const recomputeSuggestionsForGroup = async (
     ),
   );
 
-  const collectionCandidates = await getCollectionCandidates({
-    userIds: collectionUserIds,
-    venueCategory: category,
-    excludedVenueIds,
-  }) ?? [];
+  const useSaves = group.useSaves !== false;
+
+  const collectionCandidates = useSaves
+    ? (await getCollectionCandidates({
+        userIds: collectionUserIds,
+        venueCategory: category,
+        excludedVenueIds,
+      })) ?? []
+    : [];
 
   collectionCandidates.forEach((venue) => excludedVenueIds.add(venue.id));
 
-  const googleCandidates = await getGoogleCandidates({
-    cacheLocationSeed: googleCacheLocationSeed,
-    centroid,
-    apiKey,
-    venueCategory: category,
-    excludedVenueIds,
-    limit: TARGET_SUGGESTION_COUNT,
-    isRelevantPlace,
-  });
-
+  let fillCandidates: Venue[];
+  if (!useSaves) {
+    const vibeResults = await fetchContextualPlacesByRadiusLadder({
+      centroid,
+      venueType: mapCategoryToSchemaVenueType(category as import("../../lib/types").VenueCategory),
+      radiusOptions: [15000],
+      limit: TARGET_SUGGESTION_COUNT,
+      excludedVenueIds: Array.from(excludedVenueIds),
+    });
+    fillCandidates = vibeResults.map((v) => ({ ...v, source: "google" as const }));
+  } else {
+    fillCandidates = await getGoogleCandidates({
+      cacheLocationSeed: googleCacheLocationSeed,
+      centroid,
+      apiKey,
+      venueCategory: category,
+      excludedVenueIds,
+      limit: TARGET_SUGGESTION_COUNT,
+      isRelevantPlace,
+    });
+  }
 
   const candidates = dedupeVenues([
     ...collectionCandidates,
-    ...googleCandidates,
+    ...fillCandidates,
   ]).slice(0, TARGET_SUGGESTION_COUNT);
 
   const manualVenues = group.manualVenues || [];
@@ -753,7 +770,7 @@ export const recomputeSuggestionsForGroup = async (
     group.users.length || 1,
   ).map((entry) => entry.venue);
   const rankedGoogleCandidates = scoreVenues(
-    googleCandidates,
+    fillCandidates,
     totalsByVenue,
     group.users.length || 1,
   ).map((entry) => entry.venue);

@@ -29,6 +29,8 @@ export const buildGroupResponse = (
   currentUserId,
   isOwner,
   dismissedPlaceIds: group.dismissedPlaceIds || [],
+  userQueries: group.userQueries || [],
+  slug: group.slug ?? null,
 });
 
 export const safeTrigger = async (

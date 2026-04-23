@@ -6,6 +6,7 @@ import {
 } from "../lib/userDisplay";
 import { collectPhotoAttributions } from "../lib/googleMapsAttribution";
 import type { User, Venue } from "../lib/types";
+import type { UserQuery } from "../lib/groupStore";
 import { PhotoAttributionLine, PlaceAttributionList } from "./GoogleMapsAttribution";
 import ImageLightbox from "./ImageLightbox";
 
@@ -20,7 +21,7 @@ type Props = {
   badgeText: string;
   badgeTone: "ranked" | "manual";
   sourceLabel?: string;
-  medalNote?: string;
+  matchScore?: number;
   addedByName?: string;
   users: User[];
   etaByUser?: Record<string, number>;
@@ -37,10 +38,11 @@ type Props = {
   isSavedToCollections?: boolean;
   onSaveToCollections?: () => void;
   isDownvoted?: boolean;
-  onThumbsDown?: () => void;
+  onThumbsDown?: (selectedQueryKeys: string[]) => void;
   isPendingDismissal?: boolean;
   onUndoDismissal?: () => void;
   displayMode?: "default" | "search";
+  userQueries?: UserQuery[];
 };
 
 type MetadataItem = {
@@ -130,7 +132,7 @@ export default function VenueCard({
   badgeText,
   badgeTone,
   sourceLabel,
-  medalNote,
+  matchScore,
   addedByName,
   users,
   etaByUser,
@@ -151,6 +153,7 @@ export default function VenueCard({
   isPendingDismissal = false,
   onUndoDismissal,
   displayMode = "default",
+  userQueries = [],
 }: Props) {
   const photos = Array.isArray(venue.photos) ? venue.photos.slice(0, 6) : [];
   const firstPhoto = photos[0] || null;
@@ -160,6 +163,8 @@ export default function VenueCard({
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [lightboxDirection, setLightboxDirection] = useState(0);
   const [heroLoaded, setHeroLoaded] = useState(false);
+  const [selectingQueries, setSelectingQueries] = useState(false);
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [loadedPhotos, setLoadedPhotos] = useState<Record<string, boolean>>({});
   const [isCardVisible, setIsCardVisible] = useState(false);
   const heroImageRef = useRef<HTMLImageElement | null>(null);
@@ -427,8 +432,77 @@ export default function VenueCard({
               : "border-white/10"
         }`}
       >
-        {isPendingDismissal && (
+        {(isPendingDismissal || selectingQueries) && (
           <div className="pointer-events-none absolute inset-0 z-10 rounded-[24px] backdrop-blur-sm bg-[#141418]/60" />
+        )}
+        {selectingQueries && (
+          <div className="absolute inset-0 z-20 flex flex-col rounded-[24px] p-5">
+            <p className="text-[11px] font-bold uppercase tracking-[0.06em] text-[#5e5e74]">
+              Why doesn&apos;t this fit?
+            </p>
+            <p className="mt-1 text-xs text-[#7d7d90]">Select the vibes this place misses.</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {userQueries.map((uq) => {
+                const checked = selectedKeys.has(uq.normalizedKey);
+                return (
+                  <button
+                    key={uq.userId}
+                    type="button"
+                    onClick={() =>
+                      setSelectedKeys((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(uq.normalizedKey)) next.delete(uq.normalizedKey);
+                        else next.add(uq.normalizedKey);
+                        return next;
+                      })
+                    }
+                    className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                      checked
+                        ? "border-rose-500/40 bg-rose-500/15 text-rose-300"
+                        : "border-white/10 bg-[#1c1c22] text-[#8b8b9c]"
+                    }`}
+                  >
+                    <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-white/10 text-[9px] font-bold text-[#8b8b9c]">
+                      {uq.rawQuery[0]?.toUpperCase() ?? "?"}
+                    </span>
+                    {uq.rawQuery}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mt-auto pt-4">
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectingQueries(false)}
+                  className="flex-1 rounded-full border border-white/10 bg-[#1c1c22] py-2 text-sm font-semibold text-[#8b8b9c] transition hover:border-white/20"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={selectedKeys.size === 0}
+                  onClick={() => {
+                    setSelectingQueries(false);
+                    onThumbsDown?.(Array.from(selectedKeys));
+                  }}
+                  className="flex-1 rounded-full bg-rose-500/90 py-2 text-sm font-semibold text-white transition hover:bg-rose-500 disabled:opacity-40 active:scale-[0.97]"
+                >
+                  Dismiss
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectingQueries(false);
+                  onThumbsDown?.([]);
+                }}
+                className="mt-2 w-full py-1.5 text-[11.5px] text-[#5e5e74] transition hover:text-[#8b8b9c]"
+              >
+                I just didn&apos;t like it
+              </button>
+            </div>
+          </div>
         )}
         {showPhotoHero && (
           <div
@@ -529,9 +603,9 @@ export default function VenueCard({
                     </div>
                   )}
                 </div>
-                {medalNote && (
-                  <span className="shrink-0 rounded-md bg-[#00e5a0] px-2 py-0.5 font-display text-[10px] font-bold uppercase tracking-[0.08em] text-black">
-                    {medalNote}
+                {matchScore !== undefined && (
+                  <span className={`shrink-0 rounded-md border px-2 py-0.5 text-[10px] font-bold tracking-[0.04em] ${matchScore >= 75 ? "border-[rgba(0,229,160,0.3)] bg-[rgba(0,229,160,0.15)] text-[#00e5a0]" : matchScore >= 50 ? "border-[rgba(61,142,245,0.3)] bg-[rgba(61,142,245,0.15)] text-[#80b0ff]" : "border-white/10 bg-white/5 text-[#8b8b9c]"}`}>
+                    {matchScore}% match
                   </span>
                 )}
               </div>
@@ -683,9 +757,9 @@ export default function VenueCard({
                     </div>
                   )}
                 </div>
-                {medalNote && (
-                  <span className="shrink-0 rounded-md bg-[#00e5a0] px-2 py-0.5 font-display text-[10px] font-bold uppercase tracking-[0.08em] text-black">
-                    {medalNote}
+                {matchScore !== undefined && (
+                  <span className={`shrink-0 rounded-md border px-2 py-0.5 text-[10px] font-bold tracking-[0.04em] ${matchScore >= 75 ? "border-[rgba(0,229,160,0.3)] bg-[rgba(0,229,160,0.15)] text-[#00e5a0]" : matchScore >= 50 ? "border-[rgba(61,142,245,0.3)] bg-[rgba(61,142,245,0.15)] text-[#80b0ff]" : "border-white/10 bg-white/5 text-[#8b8b9c]"}`}>
+                    {matchScore}% match
                   </span>
                 )}
               </div>
@@ -852,14 +926,21 @@ export default function VenueCard({
               ) : onThumbsDown ? (
                 <button
                   type="button"
-                  onClick={onThumbsDown}
+                  onClick={() => {
+                    if (userQueries.length > 0) {
+                      setSelectedKeys(new Set(userQueries.map((q) => q.normalizedKey)));
+                      setSelectingQueries(true);
+                    } else {
+                      onThumbsDown([]);
+                    }
+                  }}
                   aria-label="Not interested"
                   className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-[#1c1c22] text-[#8b8b9c] transition hover:border-white/20 active:scale-[0.97]"
                 >
                   <span aria-hidden="true" className="text-base leading-none">👎</span>
                 </button>
               ) : null}
-              {showSaveToCollectionsAction && onSaveToCollections ? (
+              {1 ? (
                 <button
                   type="button"
                   onClick={onSaveToCollections}

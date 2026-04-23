@@ -333,9 +333,14 @@ export const buildQueryVibeProfile = (params: {
 export const buildPlaceVibeVector = (profile: PlaceVibeProfile) => {
   const vector = [
     clamp(profile.energy_level),
-    ...PLACE_VIBE_OBJECT_DIMENSIONS.map(({ fieldName, key }) =>
-      clamp(profile[fieldName][key] ?? 0),
-    ),
+    ...PLACE_VIBE_OBJECT_DIMENSIONS.map(({ fieldName, key }) => {
+      const value = profile[fieldName][key] ?? 0;
+      if (profile.type === "token" && fieldName === "negatives" && value !== 0) {
+        console.log(`Inverting negative trait for query token: ${fieldName}.${key} with value ${value}`);
+        return clamp(1 - value);
+      }
+      return clamp(value);
+    }),
     clamp(profile.conversation_level),
     clamp(profile.price_feel),
     clamp(profile.stay_duration),

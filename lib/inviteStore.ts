@@ -34,6 +34,7 @@ type InviteRow = {
   seen_at: string | null;
   inviter_display_name: string;
   inviter_avatar_url: string | null;
+  slug: string | null;
 };
 
 const mapInvite = (row: InviteRow): InviteListItem => ({
@@ -45,7 +46,7 @@ const mapInvite = (row: InviteRow): InviteListItem => ({
     avatarUrl: row.inviter_avatar_url,
   },
   createdAt: row.created_at,
-  joinUrl: `/join?sessionId=${encodeURIComponent(row.session_id)}`,
+  joinUrl: row.slug ? `/${row.slug}` : `/join?sessionId=${encodeURIComponent(row.session_id)}`,
   status: row.status,
   seenAt: row.seen_at,
 });
@@ -318,9 +319,11 @@ export const listPendingInvitesForRecipient = async (recipientUserId: string) =>
       gi.expires_at,
       gi.seen_at,
       u.display_name AS inviter_display_name,
-      u.avatar_url AS inviter_avatar_url
+      u.avatar_url AS inviter_avatar_url,
+      gs.slug
     FROM group_invites gi
     INNER JOIN users u ON u.id = gi.inviter_user_id
+    LEFT JOIN group_slugs gs ON gs.session_id = gi.session_id
     WHERE gi.recipient_user_id = ${recipientUserId}
       AND gi.status = 'pending'
       AND gi.expires_at > NOW()
@@ -399,9 +402,11 @@ export const getAndMarkLatestUnreadInvite = async (recipientUserId: string) => {
       updated.expires_at,
       updated.seen_at,
       u.display_name AS inviter_display_name,
-      u.avatar_url AS inviter_avatar_url
+      u.avatar_url AS inviter_avatar_url,
+      gs.slug
     FROM updated
     INNER JOIN users u ON u.id = updated.inviter_user_id
+    LEFT JOIN group_slugs gs ON gs.session_id = updated.session_id
   `) as InviteRow[];
 
   return rows[0] ? mapInvite(rows[0]) : null;

@@ -30,6 +30,7 @@ export type Venue = {
   name: string;
   location: LatLng;
   vibeDistance?: number;
+  matchScore?: number;
   address?: string;
   area?: string;
   priceLabel?: string;

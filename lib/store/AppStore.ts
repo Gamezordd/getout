@@ -1,5 +1,5 @@
 import { makeAutoObservable, runInAction } from "mobx";
-import type { SuggestionsStatus } from "../groupStore";
+import type { SuggestionsStatus, UserQuery } from "../groupStore";
 import type {
   EtaMatrix,
   LatLng,
@@ -42,6 +42,8 @@ type GroupPayload = {
   currentUserId?: string;
   isOwner?: boolean;
   dismissedPlaceIds?: string[];
+  userQueries?: UserQuery[];
+  slug?: string | null;
 };
 
 type SuggestionsPayload = {
@@ -72,6 +74,7 @@ type PlaceVibeSearchPayload = {
   tokens?: string[];
   cacheHit?: boolean;
   message?: string;
+  userQueries?: UserQuery[];
 };
 
 const generateSessionId = () => {
@@ -90,6 +93,7 @@ const generateBrowserId = () => {
 
 export class AppStore {
   sessionId: string | null = null;
+  slug: string | null = null;
   browserId: string | null = null;
   currentUserId: string | null = null;
   isOwner = false;
@@ -104,6 +108,7 @@ export class AppStore {
   votes: VotesByVenue = {};
   downvotes: Record<string, string[]> = {};
   dismissedVenueIds: string[] = [];
+  userQueries: UserQuery[] = [];
   votingClosesAt: string | null = null;
   venueCategory: VenueCategory | null = null;
   contextQuery: string | null = null;
@@ -281,10 +286,18 @@ export class AppStore {
     return withTotals[0].venueId;
   }
 
+  setSlug(slug: string) {
+    this.slug = slug;
+    if (typeof window !== "undefined") {
+      this.shareUrl = `${window.location.origin}/${slug}`;
+    }
+  }
+
   setSession(sessionId: string, pathname = "/") {
     const isSameSession = this.sessionId === sessionId;
     this.sessionId = sessionId;
     if (!isSameSession) {
+      this.slug = null;
       this.venueCategory = null;
       this.contextQuery = null;
       this.venueSearchQuery = "";
@@ -345,15 +358,26 @@ export class AppStore {
         this.reconcileVotes(data.votes || {});
         this.votingClosesAt = data.votingClosesAt || null;
         this.venueCategory = data.venueCategory || null;
-        this.suggestionsStatus = data.suggestionsStatus || "idle";
-        this.contextQuery = data.contextQuery || null;
-        this.venueSearchQuery = data.contextQuery || "";
+        if (!this.venueSearchQuery) {
+          this.suggestionsStatus = data.suggestionsStatus || "idle";
+          this.contextQuery = data.contextQuery || null;
+          this.venueSearchQuery = data.contextQuery || "";
+        } else {
+          this.suggestionsStatus = this.suggestionsStatus === "ready" ? "ready" : (data.suggestionsStatus || "idle");
+        }
         this.lockedVenue = data.lockedVenue || null;
         this.currentUserId = data.currentUserId || null;
         this.isOwner = Boolean(data.isOwner);
         this.dismissedVenueIds = data.dismissedPlaceIds || [];
+        this.userQueries = data.userQueries || [];
         this.identityResolved = true;
         this.isLoadingGroup = false;
+        if (data.slug && !this.slug) {
+          this.slug = data.slug;
+          if (typeof window !== "undefined") {
+            this.shareUrl = `${window.location.origin}/${data.slug}`;
+          }
+        }
       });
     } catch (err: any) {
       runInAction(() => {
@@ -364,13 +388,40 @@ export class AppStore {
     }
   }
 
-  async fetchSuggestionsForActiveContext(options?: { refresh?: boolean }) {
+  async fetchSuggestionsForActiveContext(options?: { refresh?: boolean; silent?: boolean }) {
     const activeQuery = this.contextQuery?.trim() || this.venueSearchQuery.trim();
-    if (activeQuery.length >= 2) {
+    if (activeQuery.length >= 2 || this.userQueries.length > 0) {
       await this.searchVenuesByVibe(activeQuery, options);
       return;
     }
     await this.fetchSuggestions(options);
+  }
+
+  async refreshVibeContextSuggestions() {
+    if (!this.sessionId || !this.venueCategory) return;
+    runInAction(() => { this.isLoadingSuggestions = true; });
+    try {
+      const params = new URLSearchParams({ sessionId: this.sessionId! });
+      if (this.browserId) params.set("browserId", this.browserId);
+      const q = (this.contextQuery?.trim() || this.venueSearchQuery.trim());
+      if (q.length >= 2) params.set("q", q);
+      const response = await fetch(`/api/suggestions-with-context?${params.toString()}`);
+      const payload = (await response.json().catch(() => ({}))) as PlaceVibeSearchPayload;
+      if (!response.ok) throw new Error(payload.message || "Unable to fetch suggestions.");
+      runInAction(() => {
+        this.isLoadingSuggestions = false;
+        this.isSearchingVenues = false;
+        this.applySuggestionsPayload(payload);
+        if (payload.userQueries) this.userQueries = payload.userQueries;
+        this.venueSearchError = null;
+      });
+    } catch (err: any) {
+      runInAction(() => {
+        this.isLoadingSuggestions = false;
+        this.isSearchingVenues = false;
+        this.venueSearchError = err.message || "Unable to fetch suggestions.";
+      });
+    }
   }
 
   async fetchSuggestions(options?: { refresh?: boolean }) {
@@ -627,7 +678,7 @@ export class AppStore {
     }
   }
 
-  async confirmDismissal(venueId: string) {
+  async confirmDismissal(venueId: string, selectedQueryKeys: string[] = []) {
     if (!this.sessionId || !this.currentUserId) return;
 
     runInAction(() => {
@@ -635,16 +686,6 @@ export class AppStore {
       this.suggestedVenues = this.suggestedVenues.filter((v) => v.id !== venueId);
       this.venues = this.venues.filter((v) => v.id !== venueId);
     });
-
-    const query = this.contextQuery?.trim() || "";
-    const tokens =
-      query.length >= 2
-        ? Array.from(
-            new Set(
-              query.split(/[\s,]+/).map((t) => t.trim().toLowerCase()).filter(Boolean),
-            ),
-          )
-        : [];
 
     try {
       await fetch("/api/downvote", {
@@ -654,7 +695,7 @@ export class AppStore {
           sessionId: this.sessionId,
           userId: this.currentUserId,
           placeId: venueId,
-          queryTokens: tokens,
+          selectedQueryKeys,
         }),
       });
     } catch {
@@ -662,6 +703,77 @@ export class AppStore {
     }
 
     void this.fetchSuggestionsForActiveContext();
+  }
+
+  async submitMyQuery(rawQuery: string) {
+    if (!this.sessionId || !this.browserId || !this.currentUserId) return;
+    const trimmed = rawQuery.trim();
+
+    if (trimmed.length >= 2) {
+      runInAction(() => {
+        const alreadyExists = this.userQueries.some(
+          (q) => q.userId === this.currentUserId && q.rawQuery.trim().toLowerCase() === trimmed.toLowerCase(),
+        );
+        if (!alreadyExists) {
+          this.userQueries = [...this.userQueries, { userId: this.currentUserId!, rawQuery: trimmed, normalizedKey: "", tokens: [] }];
+        }
+        this.isSearchingVenues = true;
+      });
+    }
+
+    try {
+      const response = await fetch("/api/user-query", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId: this.sessionId, browserId: this.browserId, rawQuery, action: "add" }),
+      });
+      if (response.ok) {
+        const data = (await response.json()) as { userQueries?: UserQuery[] };
+        runInAction(() => { this.userQueries = data.userQueries || []; });
+      }
+    } catch {
+      runInAction(() => {
+        this.userQueries = this.userQueries.filter((q) => !(q.userId === this.currentUserId && q.normalizedKey === ""));
+        this.isSearchingVenues = false;
+      });
+    }
+  }
+
+  async removeMyVibe(normalizedKey: string) {
+    if (!this.sessionId || !this.browserId || !this.currentUserId) return;
+    runInAction(() => {
+      this.userQueries = this.userQueries.filter(
+        (q) => !(q.userId === this.currentUserId && q.normalizedKey === normalizedKey),
+      );
+    });
+    try {
+      const response = await fetch("/api/user-query", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId: this.sessionId, browserId: this.browserId, action: "remove", normalizedKey }),
+      });
+      if (response.ok) {
+        const data = (await response.json()) as { userQueries?: UserQuery[] };
+        runInAction(() => { this.userQueries = data.userQueries || []; });
+      }
+    } catch {
+      // non-critical, local state already updated
+    }
+  }
+
+  async clearMyQuery() {
+    runInAction(() => {
+      this.userQueries = this.userQueries.filter((q) => q.userId !== this.currentUserId);
+    });
+    try {
+      await fetch("/api/user-query", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId: this.sessionId, browserId: this.browserId, action: "clear" }),
+      });
+    } catch {
+      // non-critical
+    }
   }
 
   applyVote(userId: string, venueId: string) {
@@ -691,6 +803,7 @@ export class AppStore {
     venueCategory?: VenueCategory;
     closeVotingInHours?: number;
     initialVenue?: Venue;
+    useSaves?: boolean;
   }) {
     if (!this.sessionId || !this.browserId) {
       throw new Error("Missing session. Open this page from a group link.");
@@ -710,6 +823,7 @@ export class AppStore {
         venueCategory: options?.venueCategory,
         closeVotingInHours: options?.closeVotingInHours,
         initialVenue: options?.initialVenue,
+        useSaves: options?.useSaves,
       }),
     });
     if (!response.ok) {
@@ -729,6 +843,12 @@ export class AppStore {
       this.currentUserId = data.currentUserId || null;
       this.isOwner = Boolean(data.isOwner);
       this.identityResolved = true;
+      if (data.slug && !this.slug) {
+        this.slug = data.slug;
+        if (typeof window !== "undefined") {
+          this.shareUrl = `${window.location.origin}/${data.slug}`;
+        }
+      }
     });
   }
 
@@ -809,7 +929,7 @@ export class AppStore {
     this.isSearchingVenues = false;
   }
 
-  async searchVenuesByVibe(query: string, options?: { refresh?: boolean }) {
+  async searchVenuesByVibe(query: string, options?: { refresh?: boolean; silent?: boolean }) {
     const trimmed = query.trim();
     this.venueSearchQuery = query;
 
@@ -822,7 +942,7 @@ export class AppStore {
     }
 
     try {
-      this.isSearchingVenues = true;
+      if (!options?.silent) this.isSearchingVenues = true;
       this.venueSearchError = null;
       const params = new URLSearchParams({ sessionId: this.sessionId });
       if (this.browserId) {
@@ -844,17 +964,18 @@ export class AppStore {
       }
 
       runInAction(() => {
+        this.isSearchingVenues = false;
         if (this.venueSearchQuery.trim() !== trimmed) return;
         this.applySuggestionsPayload(payload);
         this.contextQuery = trimmed.length >= 2 ? trimmed : null;
+        if (payload.userQueries) this.userQueries = payload.userQueries;
         this.venueSearchError = null;
-        this.isSearchingVenues = false;
       });
     } catch (err: any) {
       runInAction(() => {
+        this.isSearchingVenues = false;
         if (this.venueSearchQuery.trim() !== trimmed) return;
         this.venueSearchError = err.message || "Unable to search places.";
-        this.isSearchingVenues = false;
       });
     }
   }

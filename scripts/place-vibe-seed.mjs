@@ -48,8 +48,8 @@ const DEFAULT_CATEGORIES = [
   "pub",
 ];
 const CATEGORY_DISCOVERY_THRESHOLDS = {
-  cafe: { minRating: 4.0, minReviewCount: 2000 },
-  bar: { minRating: 3.8, minReviewCount: 2500 },
+  cafe: { minRating: 4.0, minReviewCount: 700 },
+  bar: { minRating: 3.8, minReviewCount: 2000 },
   restaurant: { minRating: 3.8, minReviewCount: 2500 },
   brewery: { minRating: 3.8, minReviewCount: 2000 },
   pub: { minRating: 3.8, minReviewCount: 2500 },
@@ -574,6 +574,23 @@ const buildVibeVector = (profile, schema) =>
     schema,
   );
 
+const getAreaFromAddressComponents = (components) => {
+  if (!Array.isArray(components)) return null;
+  const priority = [
+    "sublocality_level_1",
+    "sublocality",
+    "neighborhood",
+    "administrative_area_level_2",
+    "administrative_area_level_1",
+  ];
+  for (const type of priority) {
+    const match = components.find((c) => Array.isArray(c.types) && c.types.includes(type));
+    const value = match?.long_name || match?.short_name;
+    if (value) return value;
+  }
+  return null;
+};
+
 const getAreaFromAddress = (address) => {
   if (typeof address !== "string") return null;
   const parts = address
@@ -668,6 +685,7 @@ const fetchLegacyPlaceDetails = async ({ placeId, reviewSort }) => {
       "place_id",
       "name",
       "formatted_address",
+      "address_components",
       "geometry/location",
       "rating",
       "user_ratings_total",
@@ -831,6 +849,9 @@ const fetchPlaceReviewPacket = async ({
       "Google Place Details returns up to 5 reviews per request. This packet merges one most_relevant slice and one newest slice, then de-duplicates them.",
     reviews_sort: "most_relevant + newest",
     google_review_summary: reviewSummary,
+    address_components: Array.isArray(baseResult?.address_components)
+      ? baseResult.address_components
+      : null,
     fetchedAt: new Date().toISOString(),
     reviews: reviewPackets,
   };
@@ -1445,7 +1466,7 @@ const processCandidate = async ({
     source: packet,
   });
   const vibeVector = buildVibeVector(generatedProfile, schema);
-  const area = getAreaFromAddress(packet.address);
+  const area = getAreaFromAddressComponents(packet.address_components) || getAreaFromAddress(packet.address);
 
   const vectorPath = saveArtifacts
     ? path.join(

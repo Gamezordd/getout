@@ -23,8 +23,10 @@ import {
 import { lockVenueForGroup } from "./venue-lock";
 import { ALLOWED_CATEGORIES } from "./constants";
 import { buildAvatarUrl, buildGroupResponse, safeTrigger } from "./utils";
-import { punishPlaceVector, rewardPlaceVector } from "../../lib/placeVibeStore";
+import { createSlugForSession } from "../../lib/slugStore";
+import { rewardPlaceVector } from "../../lib/placeVibeStore";
 import { buildWordSetCacheKey } from "../../lib/placeVibeSchema";
+import { enrichPlaceVibeIfMissing } from "../../lib/placeVibeVectorEnrichment";
 import {
   resolveApproximateLocation,
   reverseGeocodeLocation,
@@ -203,6 +205,12 @@ export const groupActions = (
     }
 
     const isOwner = group.sessionMembers.length === 0 && group.users.length === 0;
+    if (isOwner && !group.slug) {
+      group.slug = await createSlugForSession(payload.sessionId).catch(() => null);
+    }
+    if (isOwner && typeof payload.useSaves === "boolean") {
+      group.useSaves = payload.useSaves;
+    }
     if (isOwner && payload.initialVenue) {
       const nextVenue = normalizeInitialVenue(payload.initialVenue);
       const existingManualVenue = group.manualVenues.find(
@@ -328,6 +336,12 @@ export const groupActions = (
       await prepareSuggestionEnrichmentForCurrentSuggestions(payload.sessionId);
       await prepareSuggestionImageEnrichmentForCurrentSuggestions(payload.sessionId);
       await safeTrigger(channel, "group-updated", { reason: "manual-venues" });
+      void enrichPlaceVibeIfMissing(
+        hydratedVenue.id,
+        hydratedVenue.name,
+        group.venueCategory ?? "bar",
+        hydratedVenue.location,
+      );
     }
     return res.status(200).json(buildGroupResponse(group));
   },
@@ -495,14 +509,12 @@ export const groupActions = (
       organizerId: actingMember.userId,
     });
 
-    const contextQuery = group.contextQuery?.trim() || null;
-    if (contextQuery && contextQuery.length >= 2) {
-      const normalizedQueryKey = buildWordSetCacheKey(contextQuery);
-      const downvotedIds = group.downvotes?.[normalizedQueryKey] || [];
-      for (const id of downvotedIds) {
-        void punishPlaceVector({ placeId: id, normalizedQueryKey }).catch(() => undefined);
-      }
-      void rewardPlaceVector({ placeId: payload.venueId, normalizedQueryKey }).catch(() => undefined);
+    const contextQuery = group.contextQuery?.trim() || "";
+    const rewardKey =
+      group.userQueries?.[0]?.normalizedKey ||
+      (contextQuery.length >= 2 ? buildWordSetCacheKey(contextQuery) : null);
+    if (rewardKey) {
+      void rewardPlaceVector({ placeId: payload.venueId, normalizedQueryKey: rewardKey }).catch(() => undefined);
     }
 
     return res.status(200).json(buildGroupResponse(group));

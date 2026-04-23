@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import type { VenueCategory } from "../../lib/types";
+import type { Venue, VenueCategory } from "../../lib/types";
 import placeVibeMap from "../../data/place-vibe-map.json";
 import { findGroup, saveGroup } from "../../lib/groupStore";
 import {
@@ -11,9 +11,12 @@ import {
 } from "../../lib/placeVibeSchema";
 import {
   fetchContextualPlacesByRadiusLadder,
+  fetchContextualPlacesForMultipleVectors,
   getCachedQueryProfile,
+  getPlaceVibeVector,
   upsertCachedQueryProfile,
 } from "../../lib/placeVibeStore";
+import { listCollectionsForUsers } from "../../lib/collectionStore";
 import {
   buildEtaData,
   buildSuggestionsPayloadFromGroup,
@@ -36,10 +39,22 @@ type ResponseBody = ReturnType<typeof buildSuggestionsPayloadFromGroup> & {
   tokens?: string[];
   cacheHit?: boolean;
   message?: string;
+  userQueries?: import("../../lib/groupStore").UserQuery[];
 };
 
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 const CONTEXTUAL_START_RADIUS_METERS = 15000;
+
+const cosineDistance = (a: number[], b: number[]): number => {
+  let dot = 0, normA = 0, normB = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    normA += a[i] * a[i];
+    normB += b[i] * b[i];
+  }
+  const denom = Math.sqrt(normA) * Math.sqrt(normB);
+  return denom === 0 ? 1 : 1 - dot / denom;
+};
 
 const getOpenAIApiKey = () => {
   const apiKey = process.env.OPENAI_API_KEY;
@@ -79,7 +94,7 @@ const generateQueryProfile = async (
         "Return a single JSON object only. No markdown.",
         "Return one schema-shaped object for place_vibe_profile.",
         "For numeric fields, use values from 0.0 to 1.0.",
-        "Keep values conservative because the input is only a short query, not a review corpus.",
+        "For dimensions the query does not mention, use 0.0. Only assign non-zero values to dimensions the query directly implies.",
         "summary should be a short restatement of the inferred vibe.",
         "keywords should contain only the most relevant query-derived terms.",
         `Original query: ${JSON.stringify(rawQuery)}`,
@@ -116,8 +131,6 @@ const generateQueryProfile = async (
   });
 };
 
-const matchesContextQuery = (current: string | null | undefined, next: string | null) =>
-  (current || null) === (next || null);
 
 export default async function handler(
   req: NextApiRequest,
@@ -167,69 +180,179 @@ export default async function handler(
   }
 
   try {
-    const rawQuery = typeof req.query.q === "string" ? req.query.q : "";
-    const trimmedQuery = rawQuery.trim();
-    const activeQuery = trimmedQuery.length >= 2 ? trimmedQuery : null;
     const category = (group.venueCategory || "bar") as VenueCategory;
 
     if (!ALLOWED_CATEGORIES.has(category)) {
       return res.status(400).json({ message: "Unsupported category." });
     }
 
-    group.contextQuery = activeQuery;
+    const activeQueries = (group.userQueries || []).filter((q) => q.tokens.length > 0);
+    const isMultiQuery = activeQueries.length > 0;
+
+    // Backward-compat: single query mode via ?q= param when no userQueries
+    const rawQuery = typeof req.query.q === "string" ? req.query.q : "";
+    const trimmedQuery = rawQuery.trim();
+    const legacyActiveQuery = !isMultiQuery && trimmedQuery.length >= 2 ? trimmedQuery : null;
+
+    group.contextQuery = legacyActiveQuery;
     group.suggestionsStatus = "generating";
     await saveGroup(sessionId, group);
-
-    let normalizedQuery: string | undefined;
-    let tokens: string[] | undefined;
-    let cacheHit: boolean | undefined;
-    let vibeVector: number[] | undefined;
-
-    if (activeQuery) {
-      tokens = normalizeQueryTokens(activeQuery);
-      normalizedQuery = buildWordSetCacheKey(activeQuery);
-      if (!normalizedQuery || tokens.length === 0) {
-        return res.status(200).json({
-          ...buildSuggestionsResponse(buildSuggestionsPayloadFromGroup(group), group.votes || {}),
-          normalizedQuery,
-          tokens,
-        });
-      }
-
-      const cached = await getCachedQueryProfile(normalizedQuery);
-      const profile =
-        cached?.profile_json ||
-        (await generateQueryProfile(activeQuery, normalizedQuery, tokens));
-
-      if (!cached) {
-        await upsertCachedQueryProfile({
-          normalizedQuery,
-          tokens,
-          profile,
-          vibeVector: buildPlaceVibeVector(profile),
-          model: getOpenAIModel(),
-        });
-        cacheHit = false;
-      } else {
-        cacheHit = true;
-      }
-
-      vibeVector = buildPlaceVibeVector(profile);
-    }
 
     const centroid = computeCentroid(group.users.map((user) => user.location));
     const excludedVenueIds = [
       ...(group.manualVenues || []).map((venue) => venue.id),
       ...(group.dismissedPlaceIds || []),
     ];
-    const contextualCandidates = await fetchContextualPlacesByRadiusLadder({
-      centroid,
-      venueType: mapCategoryToSchemaVenueType(category),
-      radiusOptions: [CONTEXTUAL_START_RADIUS_METERS],
-      limit: TARGET_SUGGESTION_COUNT,
-      vibeVector,
-      excludedVenueIds,
-    });
+    const venueType = mapCategoryToSchemaVenueType(category);
+
+    let contextualCandidates;
+    let cacheHit: boolean | undefined;
+    let normalizedQuery: string | undefined;
+    let tokens: string[] | undefined;
+
+    const fetchCollectionSaves = async (excludedSet: Set<string>): Promise<Venue[]> => {
+      if (group.useSaves === false) return [];
+      const collectionUserIds = group.users
+        .map((u) => u.authenticatedUserId)
+        .filter((id): id is string => Boolean(id));
+      if (collectionUserIds.length === 0) return [];
+      const rawSaves = await listCollectionsForUsers({ userIds: collectionUserIds, venueCategory: category });
+      return dedupeVenues(
+        rawSaves
+          .filter((item) => !excludedSet.has(item.placeId))
+          .map<Venue>((item) => ({
+            id: item.placeId,
+            name: item.name,
+            address: item.address || undefined,
+            area: item.area || undefined,
+            priceLabel: item.priceLabel || undefined,
+            closingTimeLabel: item.closingTimeLabel || undefined,
+            photos: item.photos || [],
+            googleMapsAttributionRequired: item.googleMapsAttributionRequired ?? false,
+            placeAttributions: item.placeAttributions || [],
+            photoAttributions: item.photoAttributions || [],
+            rating: typeof item.rating === "number" ? item.rating : undefined,
+            userRatingCount: typeof item.userRatingCount === "number" ? item.userRatingCount : undefined,
+            location: item.location,
+            source: "collection" as const,
+          })),
+      );
+    };
+
+    const attachCollectionDistances = async (saves: Venue[], avgVector: number[] | null): Promise<Venue[]> => {
+      if (!avgVector) return saves;
+      return Promise.all(
+        saves.map(async (save) => {
+          const saveVector = await getPlaceVibeVector(save.id);
+          if (!saveVector) return save;
+          return { ...save, vibeDistance: Number(cosineDistance(avgVector, saveVector).toFixed(4)) };
+        }),
+      );
+    };
+
+    const mergeAndRankByVibeDistance = (dbVenues: Venue[], saves: Venue[]): Venue[] =>
+      dedupeVenues([...dbVenues, ...saves]).sort(
+        (a, b) => (a.vibeDistance ?? 1) - (b.vibeDistance ?? 1),
+      );
+
+    if (isMultiQuery) {
+      const vibeVectors: { normalizedKey: string; vector: number[] }[] = [];
+      let anyMiss = false;
+
+      for (const uq of activeQueries) {
+        const cached = await getCachedQueryProfile(uq.normalizedKey);
+        const profile =
+          cached?.profile_json ||
+          (await generateQueryProfile(uq.rawQuery, uq.normalizedKey, uq.tokens));
+
+        if (!cached) {
+          await upsertCachedQueryProfile({
+            normalizedQuery: uq.normalizedKey,
+            tokens: uq.tokens,
+            profile,
+            vibeVector: buildPlaceVibeVector(profile),
+            model: getOpenAIModel(),
+          });
+          anyMiss = true;
+        }
+        vibeVectors.push({ normalizedKey: uq.normalizedKey, vector: buildPlaceVibeVector(profile) });
+      }
+      cacheHit = !anyMiss;
+
+      const dbCandidates = await fetchContextualPlacesForMultipleVectors({
+        centroid,
+        venueType,
+        radiusOptions: [CONTEXTUAL_START_RADIUS_METERS],
+        limitPerQuery: 10,
+        vibeVectors,
+        excludedVenueIds,
+      });
+
+      const excludedAfterDb = new Set([...excludedVenueIds, ...dbCandidates.map((v) => v.id)]);
+      const rawSaves = await fetchCollectionSaves(excludedAfterDb);
+      const dim = vibeVectors[0]?.vector.length ?? 0;
+      const avgVector = dim > 0
+        ? vibeVectors.reduce<number[]>(
+            (acc, { vector }) => acc.map((v, i) => v + vector[i] / vibeVectors.length),
+            new Array(dim).fill(0),
+          )
+        : null;
+      const savesWithDistance = await attachCollectionDistances(rawSaves, avgVector);
+      contextualCandidates = mergeAndRankByVibeDistance(dbCandidates, savesWithDistance).slice(0, TARGET_SUGGESTION_COUNT);
+    } else {
+      let vibeVector: number[] | undefined;
+
+      if (legacyActiveQuery) {
+        tokens = normalizeQueryTokens(legacyActiveQuery);
+        normalizedQuery = buildWordSetCacheKey(legacyActiveQuery);
+        if (!normalizedQuery || tokens.length === 0) {
+          return res.status(200).json({
+            ...buildSuggestionsResponse(buildSuggestionsPayloadFromGroup(group), group.votes || {}),
+            normalizedQuery,
+            tokens,
+            userQueries: group.userQueries || [],
+          });
+        }
+
+        const cached = await getCachedQueryProfile(normalizedQuery);
+        const profile =
+          cached?.profile_json ||
+          (await generateQueryProfile(legacyActiveQuery, normalizedQuery, tokens));
+
+        if (!cached) {
+          await upsertCachedQueryProfile({
+            normalizedQuery,
+            tokens,
+            profile,
+            vibeVector: buildPlaceVibeVector(profile),
+            model: getOpenAIModel(),
+          });
+          cacheHit = false;
+        } else {
+          cacheHit = true;
+        }
+        vibeVector = buildPlaceVibeVector(profile);
+      }
+
+      const dbCandidates = (await fetchContextualPlacesByRadiusLadder({
+        centroid,
+        venueType,
+        radiusOptions: [CONTEXTUAL_START_RADIUS_METERS],
+        limit: TARGET_SUGGESTION_COUNT,
+        vibeVector,
+        excludedVenueIds,
+      })).map((v) => ({
+        ...v,
+        matchScore: typeof v.vibeDistance === "number"
+          ? Math.round(Math.max(0, 1 - v.vibeDistance) * 100)
+          : undefined,
+      }));
+
+      const excludedAfterDb = new Set([...excludedVenueIds, ...dbCandidates.map((v) => v.id)]);
+      const rawSaves = await fetchCollectionSaves(excludedAfterDb);
+      const savesWithDistance = await attachCollectionDistances(rawSaves, vibeVector ?? null);
+      contextualCandidates = mergeAndRankByVibeDistance(dbCandidates, savesWithDistance).slice(0, TARGET_SUGGESTION_COUNT);
+    }
 
     const combinedDestinations = dedupeVenues([
       ...(group.manualVenues || []),
@@ -253,15 +376,6 @@ export default async function handler(
     if (!latestGroup) {
       return res.status(404).json({ message: "Group not found." });
     }
-    if (!matchesContextQuery(latestGroup.contextQuery, activeQuery)) {
-      const payload = buildSuggestionsPayloadFromGroup(latestGroup);
-      return res.status(200).json({
-        ...buildSuggestionsResponse(payload, latestGroup.votes || {}),
-        normalizedQuery,
-        tokens,
-        cacheHit,
-      });
-    }
 
     const allowedVenueIds = new Set(
       dedupeVenues([...(latestGroup.manualVenues || []), ...contextualCandidates]).map(
@@ -274,6 +388,7 @@ export default async function handler(
       ),
     );
 
+    const noMatch = contextualCandidates.length === 0;
     const payload = await persistSuggestionsSnapshot(
       sessionId,
       latestGroup,
@@ -284,12 +399,13 @@ export default async function handler(
         })),
         etaMatrix,
         totalsByVenue,
-        warning:
-          contextualCandidates.length === 0
-            ? activeQuery
+        warning: noMatch
+          ? isMultiQuery
+            ? "No nearby places matched these vibe queries."
+            : legacyActiveQuery
               ? "No nearby places matched this vibe query."
               : "No nearby places matched this category."
-            : undefined,
+          : undefined,
         seenVenueIds: latestGroup.suggestions?.seenVenueIds || [],
       },
       "ready",
@@ -314,6 +430,7 @@ export default async function handler(
       normalizedQuery,
       tokens,
       cacheHit,
+      userQueries: latestPersistedGroup?.userQueries || group.userQueries || [],
     });
   } catch (error: any) {
     group.suggestionsStatus = "error";
