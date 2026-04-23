@@ -940,7 +940,7 @@ export default function VenueCard({
                   <span aria-hidden="true" className="text-base leading-none">👎</span>
                 </button>
               ) : null}
-              {1 ? (
+              {showSaveToCollectionsAction ? (
                 <button
                   type="button"
                   onClick={onSaveToCollections}
