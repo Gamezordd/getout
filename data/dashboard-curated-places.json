@@ -13,7 +13,16 @@
           "placeName": "Toast & Tonic"
         }
       ],
-      "cafes": []
+      "cafes": [
+        {
+          "placeId": "ChIJV_4DltwVrjsR5UKJo7zvk58",
+          "placeName": "North Star Café"
+        },
+        {
+          "placeId": "ChIJ_xOtZNYVrjsRwT6S5amoF98",
+          "placeName": "Blue Tokai Coffee Roasters"
+        }
+      ]
     }
   ]
 }

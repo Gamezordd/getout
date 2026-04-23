@@ -15,14 +15,22 @@ export const buildGroupResponse = (
   users: group.users,
   venues: group.venues,
   manualVenues: group.manualVenues,
+  suggestedVenues: group.suggestions?.suggestedVenues || [],
+  etaMatrix: group.suggestions?.etaMatrix || {},
+  totalsByVenue: group.suggestions?.totalsByVenue || {},
+  warning: group.suggestions?.warning,
   sessionMembers: group.sessionMembers,
   votes: group.votes,
   votingClosesAt: group.votingClosesAt,
   venueCategory: group.venueCategory,
   suggestionsStatus: group.suggestionsStatus,
+  contextQuery: group.contextQuery || null,
   lockedVenue: group.lockedVenue,
   currentUserId,
   isOwner,
+  dismissedPlaceIds: group.dismissedPlaceIds || [],
+  userQueries: group.userQueries || [],
+  slug: group.slug ?? null,
 });
 
 export const safeTrigger = async (

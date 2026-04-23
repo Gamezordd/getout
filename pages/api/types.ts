@@ -8,7 +8,7 @@ import {
   VenueCategory,
   VotesByVenue,
 } from "../../lib/types";
-import type { SuggestionsStatus } from "../../lib/groupStore";
+import type { SuggestionsStatus, UserQuery } from "../../lib/groupStore";
 
 export type SuggestionsResponse = {
   venues: Venue[];
@@ -70,6 +70,7 @@ export type JoinRequest = {
   venueCategory?: VenueCategory;
   closeVotingInHours?: number;
   initialVenue?: Venue;
+  useSaves?: boolean;
 };
 
 export type SetManualVenuesRequest = {
@@ -127,6 +128,10 @@ export type GroupResponse = {
   users: User[];
   venues: Venue[];
   manualVenues: Venue[];
+  suggestedVenues: Venue[];
+  etaMatrix: EtaMatrix;
+  totalsByVenue: TotalsByVenue;
+  warning?: string;
   sessionMembers: Array<{
     browserId: string;
     userId: string;
@@ -136,7 +141,11 @@ export type GroupResponse = {
   votingClosesAt?: string | null;
   venueCategory: VenueCategory | null;
   suggestionsStatus?: SuggestionsStatus;
+  contextQuery?: string | null;
   lockedVenue: LockedVenue | null;
   currentUserId?: string;
   isOwner?: boolean;
+  dismissedPlaceIds?: string[];
+  userQueries?: UserQuery[];
+  slug?: string | null;
 };

@@ -7,6 +7,7 @@ import {
   revokeUserNotificationEndpointByToken,
 } from "./inviteStore";
 import type { GroupPayload } from "./groupStore";
+import { findSlugBySession } from "./slugStore";
 
 type SendResult = {
   staleUserIds: string[];
@@ -189,7 +190,8 @@ export const sendInviteNotification = async (params: {
 
   const title = "Group invite";
   const body = `${params.inviterDisplayName} invited you to contribute to a group.`;
-  const route = `/join?sessionId=${encodeURIComponent(params.sessionId)}`;
+  const slug = await findSlugBySession(params.sessionId).catch(() => null);
+  const route = slug ? `/${slug}` : `/join?sessionId=${encodeURIComponent(params.sessionId)}`;
   const payload = JSON.stringify({
     title,
     body,

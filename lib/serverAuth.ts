@@ -73,6 +73,17 @@ export const ensureAuthSchema = async () => {
         CREATE INDEX IF NOT EXISTS user_sessions_user_id_idx
         ON user_sessions (user_id)
       `;
+      await sql`
+        CREATE TABLE IF NOT EXISTS group_slugs (
+          slug TEXT PRIMARY KEY,
+          session_id TEXT NOT NULL UNIQUE,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `;
+      await sql`
+        CREATE INDEX IF NOT EXISTS group_slugs_session_id_idx
+        ON group_slugs (session_id)
+      `;
     })();
   }
   await schemaReady;

@@ -43,6 +43,8 @@ import { prepareSuggestionImageEnrichmentForCurrentSuggestions } from "./suggest
 import { prepareSuggestionEnrichmentForCurrentSuggestions } from "./suggestion-enrichment-shared";
 import { safeTrigger } from "./utils";
 import { ensureVotingDeadlineState } from "./venue-lock";
+import { fetchContextualPlacesByRadiusLadder } from "../../lib/placeVibeStore";
+import { mapCategoryToSchemaVenueType } from "../../lib/placeVibeSchema";
 
 type SuggestionsPayload = Omit<SuggestionsResponse, "votes">;
 
@@ -53,7 +55,7 @@ type RecomputeOptions = {
   clearVotes?: boolean;
 };
 
-const buildSuggestionsResponse = (
+export const buildSuggestionsResponse = (
   payload: SuggestionsPayload,
   votes: SuggestionsResponse["votes"],
 ): SuggestionsResponse => ({
@@ -61,7 +63,7 @@ const buildSuggestionsResponse = (
   votes,
 });
 
-const computeCentroid = (points: LatLng[]): LatLng => {
+export const computeCentroid = (points: LatLng[]): LatLng => {
   const total = points.reduce(
     (acc, point) => {
       acc.lat += point.lat;
@@ -82,7 +84,7 @@ const buildCacheKey = (
 const buildRedisKey = (prefix: string, fingerprint: string) =>
   `${prefix}:${fingerprint}`;
 
-const dedupeVenues = (venues: Venue[]) => {
+export const dedupeVenues = (venues: Venue[]) => {
   const seen = new Set<string>();
   return venues.filter((venue) => {
     if (seen.has(venue.id)) return false;
@@ -265,7 +267,7 @@ const refreshSuggestionsCache = async (
   return payload;
 };
 
-const persistSuggestionsSnapshot = async (
+export const persistSuggestionsSnapshot = async (
   sessionId: string,
   group: GroupPayload,
   snapshot: SuggestionsSnapshot,
@@ -293,7 +295,7 @@ const hydrateSuggestionsFromGroup = async (
   rotateSuggestions: false,
 });
 
-const setSuggestionsStatus = async (
+export const setSuggestionsStatus = async (
   sessionId: string,
   group: GroupPayload,
   status: SuggestionsStatus,
@@ -315,7 +317,7 @@ const releaseSuggestionLock = async (sessionId: string) => {
   await redis.del(`${SUGGESTION_LOCK_PREFIX}:${sessionId}`);
 };
 
-const getGoogleMapsApiKey = () => {
+export const getGoogleMapsApiKey = () => {
   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
   if (!apiKey) {
     throw new Error("Missing Google Maps API key.");
@@ -425,7 +427,7 @@ const fetchDriveTimesInternal = async (
   return data.rows || [];
 };
 
-const fetchDriveTimes = async (
+export const fetchDriveTimes = async (
   apiKey: string,
   origins: LatLng[],
   destinations: LatLng[],
@@ -620,7 +622,7 @@ const getGoogleCandidates = async (params: {
   }));
 };
 
-const buildEtaData = (
+export const buildEtaData = (
   users: GroupPayload["users"],
   venues: Venue[],
   rows: DistanceMatrixRow[],
@@ -670,6 +672,7 @@ export const recomputeSuggestionsForGroup = async (
   const apiKey = getGoogleMapsApiKey();
   const excludedVenueIds = new Set<string>();
   (group.manualVenues || []).forEach((venue) => excludedVenueIds.add(venue.id));
+  (group.dismissedPlaceIds || []).forEach((id) => excludedVenueIds.add(id));
   if (options.rotateSuggestions) {
     (group.suggestions.seenVenueIds || []).forEach((id) => excludedVenueIds.add(id));
     (group.suggestions.suggestedVenues || []).forEach((venue) =>
@@ -694,28 +697,43 @@ export const recomputeSuggestionsForGroup = async (
     ),
   );
 
-  const collectionCandidates = await getCollectionCandidates({
-    userIds: collectionUserIds,
-    venueCategory: category,
-    excludedVenueIds,
-  }) ?? [];
+  const useSaves = group.useSaves !== false;
+
+  const collectionCandidates = useSaves
+    ? (await getCollectionCandidates({
+        userIds: collectionUserIds,
+        venueCategory: category,
+        excludedVenueIds,
+      })) ?? []
+    : [];
 
   collectionCandidates.forEach((venue) => excludedVenueIds.add(venue.id));
 
-  const googleCandidates = await getGoogleCandidates({
-    cacheLocationSeed: googleCacheLocationSeed,
-    centroid,
-    apiKey,
-    venueCategory: category,
-    excludedVenueIds,
-    limit: TARGET_SUGGESTION_COUNT,
-    isRelevantPlace,
-  });
-
+  let fillCandidates: Venue[];
+  if (!useSaves) {
+    const vibeResults = await fetchContextualPlacesByRadiusLadder({
+      centroid,
+      venueType: mapCategoryToSchemaVenueType(category as import("../../lib/types").VenueCategory),
+      radiusOptions: [15000],
+      limit: TARGET_SUGGESTION_COUNT,
+      excludedVenueIds: Array.from(excludedVenueIds),
+    });
+    fillCandidates = vibeResults.map((v) => ({ ...v, source: "google" as const }));
+  } else {
+    fillCandidates = await getGoogleCandidates({
+      cacheLocationSeed: googleCacheLocationSeed,
+      centroid,
+      apiKey,
+      venueCategory: category,
+      excludedVenueIds,
+      limit: TARGET_SUGGESTION_COUNT,
+      isRelevantPlace,
+    });
+  }
 
   const candidates = dedupeVenues([
     ...collectionCandidates,
-    ...googleCandidates,
+    ...fillCandidates,
   ]).slice(0, TARGET_SUGGESTION_COUNT);
 
   const manualVenues = group.manualVenues || [];
@@ -752,7 +770,7 @@ export const recomputeSuggestionsForGroup = async (
     group.users.length || 1,
   ).map((entry) => entry.venue);
   const rankedGoogleCandidates = scoreVenues(
-    googleCandidates,
+    fillCandidates,
     totalsByVenue,
     group.users.length || 1,
   ).map((entry) => entry.venue);

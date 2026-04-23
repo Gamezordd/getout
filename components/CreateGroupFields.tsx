@@ -18,6 +18,7 @@ export default function CreateGroupFields({
     additionalSelectedInvitees,
     authStatus,
     category,
+    useSaves,
     emailLookupLoading,
     emailLookupResult,
     error,
@@ -30,6 +31,8 @@ export default function CreateGroupFields({
     selectedVenue,
     selectedInvitees,
     setCategory,
+    setSelectedVenue,
+    setUseSaves,
     setInviteDialogOpen,
     setInviteSearchValue,
     setSelectedInvitees,
@@ -57,9 +60,13 @@ export default function CreateGroupFields({
                   {selectedVenue.area || selectedVenue.address || "Curated pick"}
                 </div>
               </div>
-              <div className="rounded-full border border-[#00e5a033] bg-[#00e5a012] px-2.5 py-1 text-[11px] font-semibold text-[#00e5a0]">
-                Locked
-              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedVenue(null)}
+                className="rounded-full border border-[#00e5a033] bg-[#00e5a012] px-2.5 py-1 text-[11px] font-semibold text-[#00e5a0]"
+              >
+                Clear
+              </button>
             </div>
             <p className="mt-3 text-[12px] leading-5 text-[#5e5e74]">
               This place will be added to the new group before the rest of the suggestions load.
@@ -95,6 +102,40 @@ export default function CreateGroupFields({
             })}
           </div>
         )}
+
+        <div className="mt-4">
+          <button
+            type="button"
+            onClick={() => setUseSaves(!useSaves)}
+            className="flex w-full items-center gap-3 text-left"
+          >
+            <div
+              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-[5px] border-[1.5px] transition ${
+                useSaves
+                  ? "border-[#00e5a0] bg-[rgba(0,229,160,0.15)]"
+                  : "border-white/20 bg-transparent"
+              }`}
+            >
+              {useSaves && (
+                <svg width="11" height="8" viewBox="0 0 11 8" fill="none" aria-hidden="true">
+                  <path
+                    d="M1 4l3 3 6-6"
+                    stroke="#00e5a0"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              )}
+            </div>
+            <span className="text-[13px] font-medium text-white/80">
+              Include saves from group members
+            </span>
+          </button>
+          <p className="mt-1 ml-8 text-[12px] leading-5 text-[#5e5e74]">
+            Shows places your group has saved before, filtered to match your vibe.
+          </p>
+        </div>
 
         {!isSheetVariant && isNative && authStatus === "signed_in" ? (
           <div className={isSheetVariant ? "mb-5 mt-5" : "mb-5 mt-8"}>

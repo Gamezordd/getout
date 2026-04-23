@@ -73,25 +73,7 @@ const DrawerContent = observer(function DrawerContent({
     () => mergeVenues(suggestedVenues, manualVenues),
     [manualVenues, suggestedVenues],
   );
-  const medalNote = useMemo(() => {
-    if (!selectedVenue) return null;
-    const ranked = mergedVenues
-      .map((venue) => ({
-        venueId: venue.id,
-        total: totalsByVenue?.[venue.id],
-      }))
-      .filter((entry): entry is { venueId: string; total: number } =>
-        typeof entry.total === "number",
-      )
-      .slice(0, 3);
-    const index = ranked.findIndex(
-      (entry) => entry.venueId === selectedVenue.id,
-    );
-    if (index === -1) return null;
-    if (index === 0) return "Best based on ratings and travel time";
-    if (index === 1) return "Second best based on ratings and travel time";
-    return "Third best based on ratings and travel time";
-  }, [mergedVenues, selectedVenue, totalsByVenue]);
+  const matchScore = selectedVenue?.matchScore;
 
   const formatVoterNames = (names: string[], maxVisible = 4) => {
     if (names.length === 0) return "";
@@ -173,9 +155,9 @@ const DrawerContent = observer(function DrawerContent({
                   <h2 className="line-clamp-2 w-full text-sm font-semibold text-ink">
                     {selectedVenue.name}
                   </h2>
-                  {medalNote && (
-                    <p className="mt-0.5 text-[11px] font-semibold text-slate-500">
-                      {medalNote}
+                  {matchScore !== undefined && (
+                    <p className={`mt-0.5 text-[11px] font-semibold ${matchScore >= 75 ? "text-[#00e5a0]" : matchScore >= 50 ? "text-[#80b0ff]" : "text-slate-500"}`}>
+                      {matchScore}% match
                     </p>
                   )}
                 </div>

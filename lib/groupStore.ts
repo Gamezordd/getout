@@ -10,6 +10,13 @@ import type {
 } from "./types";
 import { redis } from "./redis";
 
+export type UserQuery = {
+  userId: string;
+  rawQuery: string;
+  normalizedKey: string;
+  tokens: string[];
+};
+
 type SessionMember = {
   browserId: string;
   userId: string;
@@ -27,7 +34,9 @@ type SuggestionsSnapshot = {
 type SuggestionsStatus = "idle" | "pending" | "generating" | "ready" | "error";
 
 type GroupPayload = {
+  slug?: string | null;
   createdAt: string | null;
+  contextQuery?: string | null;
   users: User[];
   venues: Venue[];
   manualVenues: Venue[];
@@ -41,6 +50,10 @@ type GroupPayload = {
   suggestionsStatus: SuggestionsStatus;
   venueCategory: VenueCategory | null;
   lockedVenue: LockedVenue | null;
+  downvotes?: Record<string, string[]>;
+  dismissedPlaceIds?: string[];
+  userQueries?: UserQuery[];
+  useSaves?: boolean;
 };
 
 const GROUP_PREFIX = "group:";
@@ -53,7 +66,9 @@ const createEmptySuggestionsSnapshot = (): SuggestionsSnapshot => ({
 });
 
 const createEmptyGroup = (): GroupPayload => ({
+  slug: null,
   createdAt: null,
+  contextQuery: null,
   users: [],
   venues: [],
   manualVenues: [],
@@ -67,6 +82,9 @@ const createEmptyGroup = (): GroupPayload => ({
   suggestionsStatus: "idle",
   venueCategory: null,
   lockedVenue: null,
+  downvotes: {},
+  dismissedPlaceIds: [],
+  userQueries: [],
 });
 
 const hydrateGroup = async (sessionId: string, group: GroupPayload) => {
@@ -76,6 +94,9 @@ const hydrateGroup = async (sessionId: string, group: GroupPayload) => {
   if (!Array.isArray(hydrated.users)) hydrated.users = [];
   if (!Array.isArray(hydrated.venues)) hydrated.venues = [];
   if (!hydrated.votes) hydrated.votes = {};
+  if (!hydrated.downvotes || typeof hydrated.downvotes !== "object") hydrated.downvotes = {};
+  if (!Array.isArray(hydrated.dismissedPlaceIds)) hydrated.dismissedPlaceIds = [];
+  if (!Array.isArray(hydrated.userQueries)) hydrated.userQueries = [];
   if (typeof hydrated.votingClosesAt !== "string") hydrated.votingClosesAt = null;
   if (
     !hydrated.defaultApproximateLocation ||
@@ -90,6 +111,7 @@ const hydrateGroup = async (sessionId: string, group: GroupPayload) => {
   if (!hydrated.pushSubscriptions) hydrated.pushSubscriptions = {};
   if (!Array.isArray(hydrated.sessionMembers)) hydrated.sessionMembers = [];
   if (typeof hydrated.createdAt !== "string") hydrated.createdAt = null;
+  if (typeof hydrated.contextQuery !== "string") hydrated.contextQuery = null;
   if (
     hydrated.suggestionsStatus !== "idle" &&
     hydrated.suggestionsStatus !== "pending" &&
@@ -166,6 +188,12 @@ const saveGroup = async (sessionId: string, group: GroupPayload) => {
         ? group.createdAt
         : typeof existingGroup?.createdAt === "string"
           ? existingGroup.createdAt
+          : null,
+    contextQuery:
+      typeof group.contextQuery === "string"
+        ? group.contextQuery
+        : typeof existingGroup?.contextQuery === "string"
+          ? existingGroup.contextQuery
           : null,
   };
   await redis.set(key, nextGroup);

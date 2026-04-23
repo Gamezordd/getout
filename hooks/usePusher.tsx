@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { runInAction } from "mobx";
 import { Channel } from "pusher-js";
 import type { VotesByVenue } from "../lib/types";
 import { createPusherClient } from "../lib/pusherClient";
@@ -6,6 +7,10 @@ import { useAppStore } from "../lib/store/AppStoreProvider";
 
 type GroupUpdatedPayload = {
   reason?: string;
+  userId?: string;
+};
+
+type SearchStartedPayload = {
   userId?: string;
 };
 
@@ -50,14 +55,18 @@ export default function usePusher(
       if (!store.isLoadingGroup) {
         await store.loadGroup();
       }
-      if (!store.isLoadingSuggestions) {
-        await store.fetchSuggestions();
-      }
       if (data?.reason === "join" && data.userId) {
         onJoin?.(data.userId);
       }
+      if (data?.reason === "user-query-updated") {
+        void store.refreshVibeContextSuggestions();
+      }
     };
 
+    channel.bind("search-started", (data?: SearchStartedPayload) => {
+      if (data?.userId && data.userId === store.currentUserId) return;
+      runInAction(() => { store.isSearchingVenues = true; });
+    });
     channel.bind("group-updated", refresh);
     channel.bind("venue-locked", async () => {
       await store.loadGroup();
