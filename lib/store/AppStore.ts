@@ -1041,15 +1041,21 @@ export class AppStore {
   }
 
   buildShareUrl() {
-    if (!this.shareUrl || !this.sessionId) return null;
-    const url = new URL(this.shareUrl);
-    url.searchParams.set("sessionId", this.sessionId);
+    if (!this.sessionId) return null;
+    const base =
+      this.slug && typeof window !== "undefined"
+        ? new URL(`${window.location.origin}/${this.slug}`)
+        : this.shareUrl
+          ? new URL(this.shareUrl)
+          : null;
+    if (!base) return null;
+    if (!this.slug) base.searchParams.set("sessionId", this.sessionId);
     if (this.selectedVenueId) {
-      url.searchParams.set("venueId", this.selectedVenueId);
+      base.searchParams.set("venueId", this.selectedVenueId);
     } else {
-      url.searchParams.delete("venueId");
+      base.searchParams.delete("venueId");
     }
-    return url;
+    return base;
   }
 
   buildShareText() {
