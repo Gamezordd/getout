@@ -191,16 +191,23 @@ export const ensurePlaceVibeSchema = async () => {
   await schemaReady;
 };
 
-export const getCachedQueryProfile = async (normalizedQuery: string, category: string) => {
+export const getCachedQueryProfile = async (normalizedQuery: string, category?: string) => {
   await ensurePlaceVibeSchema();
   const sql = getSql();
-  const rows = (await sql`
-    SELECT normalized_query, category, tokens_json, profile_json, vibe_vector::text AS vibe_vector, synonyms_json, model
-    FROM place_vibe_query_cache
-    WHERE normalized_query = ${normalizedQuery}
-      AND category = ${category}
-    LIMIT 1
-  `) as QueryCacheRow[];
+  const rows = category
+    ? (await sql`
+        SELECT normalized_query, category, tokens_json, profile_json, vibe_vector::text AS vibe_vector, synonyms_json, model
+        FROM place_vibe_query_cache
+        WHERE normalized_query = ${normalizedQuery}
+          AND category = ${category}
+        LIMIT 1
+      `) as QueryCacheRow[]
+    : (await sql`
+        SELECT normalized_query, category, tokens_json, profile_json, vibe_vector::text AS vibe_vector, synonyms_json, model
+        FROM place_vibe_query_cache
+        WHERE normalized_query = ${normalizedQuery}
+        LIMIT 1
+      `) as QueryCacheRow[];
   return rows[0] || null;
 };
 
