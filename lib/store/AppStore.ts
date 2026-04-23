@@ -372,7 +372,7 @@ export class AppStore {
         this.userQueries = data.userQueries || [];
         this.identityResolved = true;
         this.isLoadingGroup = false;
-        if (data.slug && !this.slug) {
+        if (data.slug) {
           this.slug = data.slug;
           if (typeof window !== "undefined") {
             this.shareUrl = `${window.location.origin}/${data.slug}`;

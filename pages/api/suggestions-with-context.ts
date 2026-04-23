@@ -370,7 +370,7 @@ export default async function handler(
         centroid,
         venueType,
         radiusOptions: [CONTEXTUAL_START_RADIUS_METERS],
-        limitPerQuery: 10,
+        limitPerQuery: 30,
         vibeVectors,
         excludedVenueIds,
       });

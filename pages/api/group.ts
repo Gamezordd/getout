@@ -1,9 +1,10 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { createGroup, findGroup } from "../../lib/groupStore";
+import { createGroup, findGroup, saveGroup } from "../../lib/groupStore";
 import { GroupRequest } from "./types";
 import { groupActions } from "./group-actions";
 import { buildGroupResponse } from "./utils";
 import { ensureVotingDeadlineState } from "./venue-lock";
+import { findSlugBySession, createSlugForSession } from "../../lib/slugStore";
 
 export default async function handler(
   req: NextApiRequest,
@@ -21,6 +22,17 @@ export default async function handler(
       return res.status(404).json({ message: "Group not found." });
     }
     await ensureVotingDeadlineState({ sessionId, group });
+
+    if (!group.slug) {
+      const slug =
+        (await findSlugBySession(sessionId).catch(() => null)) ??
+        (await createSlugForSession(sessionId).catch(() => null));
+      if (slug) {
+        group.slug = slug;
+        void saveGroup(sessionId, group).catch(() => undefined);
+      }
+    }
+
     const sessionMember = browserId
       ? group.sessionMembers.find((member) => member.browserId === browserId)
       : null;
