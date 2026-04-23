@@ -93,7 +93,17 @@ const resolveCityKey = async (req: NextApiRequest) => {
   return normalizeCityLabel(approximate.locationLabel);
 };
 
-const generateQueryProfile = async (rawQuery: string, normalizedQuery: string, tokens: string[]) => {
+const parseSynonyms = (parsed: unknown): string[] => {
+  if (!parsed || typeof parsed !== "object") return [];
+  const raw = (parsed as Record<string, unknown>).synonyms;
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((s): s is string => typeof s === "string" && s.trim().length > 0)
+    .map((s) => s.trim().toLowerCase())
+    .slice(0, 16);
+};
+
+const generateQueryProfile = async (rawQuery: string, normalizedQuery: string, tokens: string[], category: string) => {
   const response = await fetch(OPENAI_RESPONSES_URL, {
     method: "POST",
     headers: {
@@ -104,19 +114,16 @@ const generateQueryProfile = async (rawQuery: string, normalizedQuery: string, t
       model: getOpenAIModel(),
       reasoning: { effort: "medium" },
       input: [
-        "You are mapping a short venue-vibe search query into a strict JSON schema.",
-        "Treat the full user query as the source of meaning.",
+        `The user is searching for a ${category} with these qualities: ${JSON.stringify(rawQuery)}.`,
+        `Infer the vibe of a ${category} that matches these qualities and return how they map to the schema below.`,
         "Return a single JSON object only. No markdown.",
-        "Return one schema-shaped object for place_vibe_profile.",
+        `Return an object with two keys: "place_vibe_profile" (the schema-shaped object) and "synonyms" (an array of synonym and related-concept strings for the search query, max 16 items, lowercase).`,
         "For numeric fields, use values from 0.0 to 1.0.",
-        "For dimensions the query does not mention, use 0.0. Only assign non-zero values to dimensions the query directly implies.",
-        "summary should be a short restatement of the inferred vibe.",
-        "keywords should contain only the most relevant query-derived terms.",
-        `Original query: ${JSON.stringify(rawQuery)}`,
-        `Normalized word-set cache key: "${normalizedQuery}"`,
+        `Only assign non-zero values to dimensions the query directly implies for a ${category}.`,
+        `summary should be a short restatement of the inferred vibe for this ${category}.`,
+        `keywords should contain only the most relevant query-derived terms for a ${category}.`,
         `Tokens: ${JSON.stringify(tokens)}`,
         `Schema:\n${JSON.stringify(placeVibeMap, null, 2)}`,
-        "Return only the JSON object for place_vibe_profile.",
       ].join("\n"),
       text: {
         format: {
@@ -141,9 +148,11 @@ const generateQueryProfile = async (rawQuery: string, normalizedQuery: string, t
             .find((item: { text?: string }) => typeof item?.text === "string")?.text || ""
         : "";
 
-  return buildQueryVibeProfile({
-    generatedProfile: parseOpenAIJson(rawText),
-  });
+  const parsed = parseOpenAIJson(rawText);
+  return {
+    profile: buildQueryVibeProfile({ generatedProfile: parsed }),
+    synonyms: parseSynonyms(parsed),
+  };
 };
 
 export default async function handler(
@@ -177,19 +186,26 @@ export default async function handler(
       return res.status(200).json({ results: [] });
     }
 
-    const cached = await getCachedQueryProfile(normalizedQuery);
+    const cached = await getCachedQueryProfile(normalizedQuery, category);
     let profile = cached?.profile_json || null;
+    let synonyms: string[] = cached?.synonyms_json || [];
 
     if (!profile) {
-      profile = await generateQueryProfile(rawQuery, normalizedQuery, tokens);
+      const generated = await generateQueryProfile(rawQuery, normalizedQuery, tokens, category);
+      profile = generated.profile;
+      synonyms = generated.synonyms;
       await upsertCachedQueryProfile({
         normalizedQuery,
+        category,
         tokens,
+        synonyms,
         profile,
         vibeVector: buildPlaceVibeVector(profile),
         model: getOpenAIModel(),
       });
     }
+
+    const queryKeywords = Array.from(new Set([...profile.keywords, ...synonyms]));
 
     const results = await searchPlacesByVibeVector({
       cityKey,
@@ -200,7 +216,7 @@ export default async function handler(
 
     return res.status(200).json({
       results,
-      vibes: profile.keywords,
+      vibes: queryKeywords,
     });
   } catch (error: any) {
     return res.status(500).json({

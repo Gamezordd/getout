@@ -74,10 +74,21 @@ const parseOpenAIJson = (rawText: string) => {
   return JSON.parse(trimmed);
 };
 
+const parseSynonyms = (parsed: unknown): string[] => {
+  if (!parsed || typeof parsed !== "object") return [];
+  const raw = (parsed as Record<string, unknown>).synonyms;
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((s): s is string => typeof s === "string" && s.trim().length > 0)
+    .map((s) => s.trim().toLowerCase())
+    .slice(0, 16);
+};
+
 const generateQueryProfile = async (
   rawQuery: string,
   normalizedQuery: string,
   tokens: string[],
+  category: string,
 ) => {
   const response = await fetch(OPENAI_RESPONSES_URL, {
     method: "POST",
@@ -89,19 +100,17 @@ const generateQueryProfile = async (
       model: getOpenAIModel(),
       reasoning: { effort: "medium" },
       input: [
-        "You are mapping a short venue-vibe search query into a strict JSON schema.",
-        "Treat the full user query as the source of meaning.",
+        `The user is searching for a ${category} with these qualities: ${JSON.stringify(rawQuery)}.`,
+        `Infer the vibe of a ${category} that matches these qualities and return how they map to the schema below.`,
         "Return a single JSON object only. No markdown.",
-        "Return one schema-shaped object for place_vibe_profile.",
+        `Return an object with two keys: "place_vibe_profile" (the schema-shaped object) and "synonyms" (an array of synonym and related-concept strings for the search query, max 16 items, lowercase).`,
         "For numeric fields, use values from 0.0 to 1.0.",
-        "For dimensions the query does not mention, use 0.0. Only assign non-zero values to dimensions the query directly implies.",
-        "summary should be a short restatement of the inferred vibe.",
-        "keywords should contain only the most relevant query-derived terms.",
-        `Original query: ${JSON.stringify(rawQuery)}`,
-        `Normalized word-set cache key: "${normalizedQuery}"`,
+        `Only assign non-zero values to dimensions the query directly implies for a ${category}.`,
+        `summary should be a short restatement of the inferred vibe for this ${category}.`,
+        `keywords should contain only the most relevant query-derived terms for a ${category}.`,
         `Tokens: ${JSON.stringify(tokens)}`,
         `Schema:\n${JSON.stringify(placeVibeMap, null, 2)}`,
-        "Return only the JSON object for place_vibe_profile.",
+        "Do not miss any fields in the schema, even if they are zero.",
       ].join("\n"),
       text: {
         format: {
@@ -126,9 +135,11 @@ const generateQueryProfile = async (
             .find((item: { text?: string }) => typeof item?.text === "string")?.text || ""
         : "";
 
-  return buildQueryVibeProfile({
-    generatedProfile: parseOpenAIJson(rawText),
-  });
+  const parsed = parseOpenAIJson(rawText);
+  return {
+    profile: buildQueryVibeProfile({ generatedProfile: parsed }),
+    synonyms: parseSynonyms(parsed),
+  };
 };
 
 
@@ -256,26 +267,31 @@ export default async function handler(
       );
 
     if (isMultiQuery) {
-      const vibeVectors: { normalizedKey: string; vector: number[] }[] = [];
+      const vibeVectors: { normalizedKey: string; vector: number[]; keywords?: string[] }[] = [];
       let anyMiss = false;
 
       for (const uq of activeQueries) {
-        const cached = await getCachedQueryProfile(uq.normalizedKey);
-        const profile =
-          cached?.profile_json ||
-          (await generateQueryProfile(uq.rawQuery, uq.normalizedKey, uq.tokens));
+        const cached = await getCachedQueryProfile(uq.normalizedKey, category);
+        let profile = cached?.profile_json;
+        let synonyms: string[] = cached?.synonyms_json || [];
 
-        if (!cached) {
+        if (!profile) {
+          const generated = await generateQueryProfile(uq.rawQuery, uq.normalizedKey, uq.tokens, category);
+          profile = generated.profile;
+          synonyms = generated.synonyms;
           await upsertCachedQueryProfile({
             normalizedQuery: uq.normalizedKey,
+            category,
             tokens: uq.tokens,
+            synonyms,
             profile,
             vibeVector: buildPlaceVibeVector(profile),
             model: getOpenAIModel(),
           });
           anyMiss = true;
         }
-        vibeVectors.push({ normalizedKey: uq.normalizedKey, vector: buildPlaceVibeVector(profile) });
+        const queryKeywords = Array.from(new Set([...profile.keywords, ...synonyms]));
+        vibeVectors.push({ normalizedKey: uq.normalizedKey, vector: buildPlaceVibeVector(profile), keywords: queryKeywords });
       }
       cacheHit = !anyMiss;
 
@@ -301,6 +317,8 @@ export default async function handler(
       contextualCandidates = mergeAndRankByVibeDistance(dbCandidates, savesWithDistance).slice(0, TARGET_SUGGESTION_COUNT);
     } else {
       let vibeVector: number[] | undefined;
+      let queryProfile: import("../../lib/placeVibeSchema").PlaceVibeProfile | undefined;
+      let querySynonyms: string[] = [];
 
       if (legacyActiveQuery) {
         tokens = normalizeQueryTokens(legacyActiveQuery);
@@ -314,24 +332,27 @@ export default async function handler(
           });
         }
 
-        const cached = await getCachedQueryProfile(normalizedQuery);
-        const profile =
-          cached?.profile_json ||
-          (await generateQueryProfile(legacyActiveQuery, normalizedQuery, tokens));
-
-        if (!cached) {
+        const cached = await getCachedQueryProfile(normalizedQuery, category);
+        if (cached) {
+          queryProfile = cached.profile_json;
+          querySynonyms = cached.synonyms_json || [];
+          cacheHit = true;
+        } else {
+          const generated = await generateQueryProfile(legacyActiveQuery, normalizedQuery, tokens, category);
+          queryProfile = generated.profile;
+          querySynonyms = generated.synonyms;
           await upsertCachedQueryProfile({
             normalizedQuery,
+            category,
             tokens,
-            profile,
-            vibeVector: buildPlaceVibeVector(profile),
+            synonyms: querySynonyms,
+            profile: queryProfile,
+            vibeVector: buildPlaceVibeVector(queryProfile),
             model: getOpenAIModel(),
           });
           cacheHit = false;
-        } else {
-          cacheHit = true;
         }
-        vibeVector = buildPlaceVibeVector(profile);
+        vibeVector = buildPlaceVibeVector(queryProfile);
       }
 
       const dbCandidates = (await fetchContextualPlacesByRadiusLadder({
@@ -340,6 +361,7 @@ export default async function handler(
         radiusOptions: [CONTEXTUAL_START_RADIUS_METERS],
         limit: TARGET_SUGGESTION_COUNT,
         vibeVector,
+        queryKeywords: queryProfile ? Array.from(new Set([...queryProfile.keywords, ...querySynonyms])) : undefined,
         excludedVenueIds,
       })).map((v) => ({
         ...v,

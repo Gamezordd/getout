@@ -24,9 +24,11 @@ type PlaceVibeRow = {
 
 type QueryCacheRow = {
   normalized_query: string;
+  category: string;
   tokens_json: string[] | null;
   profile_json: PlaceVibeProfile;
   vibe_vector: string | null;
+  synonyms_json: string[] | null;
   model: string;
 };
 
@@ -123,6 +125,14 @@ export const ensurePlaceVibeSchema = async () => {
       `);
       await (sql as any).query(`
         ALTER TABLE place_vibe_profiles
+        ADD COLUMN IF NOT EXISTS keywords TEXT[] NOT NULL DEFAULT '{}'
+      `);
+      await (sql as any).query(`
+        CREATE INDEX IF NOT EXISTS place_vibe_profiles_keywords_idx
+        ON place_vibe_profiles USING GIN (keywords)
+      `);
+      await (sql as any).query(`
+        ALTER TABLE place_vibe_profiles
         ADD COLUMN IF NOT EXISTS delta_vector VECTOR(${vectorDimension})
       `);
       await (sql as any).query(`
@@ -146,18 +156,49 @@ export const ensurePlaceVibeSchema = async () => {
           updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )
       `);
+      await (sql as any).query(`
+        ALTER TABLE place_vibe_query_cache
+        ADD COLUMN IF NOT EXISTS category TEXT NOT NULL DEFAULT 'bar'
+      `);
+      await (sql as any).query(`
+        DO $$
+        BEGIN
+          IF EXISTS (
+            SELECT 1 FROM pg_constraint
+            WHERE conname = 'place_vibe_query_cache_pkey' AND contype = 'p'
+          ) THEN
+            ALTER TABLE place_vibe_query_cache DROP CONSTRAINT place_vibe_query_cache_pkey;
+          END IF;
+        END $$
+      `);
+      await (sql as any).query(`
+        DO $$
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM pg_constraint
+            WHERE conname = 'place_vibe_query_cache_pkey' AND contype = 'p'
+          ) THEN
+            ALTER TABLE place_vibe_query_cache ADD PRIMARY KEY (normalized_query, category);
+          END IF;
+        END $$
+      `);
+      await (sql as any).query(`
+        ALTER TABLE place_vibe_query_cache
+        ADD COLUMN IF NOT EXISTS synonyms_json TEXT[] NOT NULL DEFAULT '{}'
+      `);
     })();
   }
   await schemaReady;
 };
 
-export const getCachedQueryProfile = async (normalizedQuery: string) => {
+export const getCachedQueryProfile = async (normalizedQuery: string, category: string) => {
   await ensurePlaceVibeSchema();
   const sql = getSql();
   const rows = (await sql`
-    SELECT normalized_query, tokens_json, profile_json, vibe_vector::text AS vibe_vector, model
+    SELECT normalized_query, category, tokens_json, profile_json, vibe_vector::text AS vibe_vector, synonyms_json, model
     FROM place_vibe_query_cache
     WHERE normalized_query = ${normalizedQuery}
+      AND category = ${category}
     LIMIT 1
   `) as QueryCacheRow[];
   return rows[0] || null;
@@ -165,7 +206,9 @@ export const getCachedQueryProfile = async (normalizedQuery: string) => {
 
 export const upsertCachedQueryProfile = async (params: {
   normalizedQuery: string;
+  category: string;
   tokens: string[];
+  synonyms: string[];
   profile: PlaceVibeProfile;
   vibeVector: number[];
   model: string;
@@ -175,24 +218,29 @@ export const upsertCachedQueryProfile = async (params: {
   await sql`
     INSERT INTO place_vibe_query_cache (
       normalized_query,
+      category,
       tokens_json,
       profile_json,
       vibe_vector,
+      synonyms_json,
       model,
       updated_at
     )
     VALUES (
       ${params.normalizedQuery},
+      ${params.category},
       ${JSON.stringify(params.tokens)}::jsonb,
       ${JSON.stringify(params.profile)}::jsonb,
       ${toPgVectorLiteral(params.vibeVector)}::vector,
+      ${params.synonyms},
       ${params.model},
       NOW()
     )
-    ON CONFLICT (normalized_query) DO UPDATE SET
+    ON CONFLICT (normalized_query, category) DO UPDATE SET
       tokens_json = EXCLUDED.tokens_json,
       profile_json = EXCLUDED.profile_json,
       vibe_vector = EXCLUDED.vibe_vector,
+      synonyms_json = EXCLUDED.synonyms_json,
       model = EXCLUDED.model,
       updated_at = NOW()
   `;
@@ -316,12 +364,15 @@ const buildExpandedRadiusOptions = (radiusOptions: number[]) => {
   return expanded;
 };
 
+const KEYWORD_MATCH_WEIGHT = 0.1;
+
 const fetchContextualPlacesWithinRadius = async (params: {
   centroid: { lat: number; lng: number };
   venueType: string;
   radiusMeters: number;
   limit: number;
   vibeVector?: number[];
+  queryKeywords?: string[];
 }) => {
   await ensurePlaceVibeSchema();
   const sql = getSql();
@@ -329,6 +380,10 @@ const fetchContextualPlacesWithinRadius = async (params: {
   const overfetchLimit = Math.max(params.limit * 3, params.limit + 12);
 
   if (params.vibeVector) {
+    const hasKeywords = Array.isArray(params.queryKeywords) && params.queryKeywords.length > 0;
+    const keywordBonus = hasKeywords
+      ? `- ${KEYWORD_MATCH_WEIGHT} * COALESCE(cardinality(ARRAY(SELECT unnest(keywords) INTERSECT SELECT unnest($5::text[]))), 0)`
+      : "";
     const rows = (await (sql as any).query(
       `
         SELECT
@@ -361,15 +416,13 @@ const fetchContextualPlacesWithinRadius = async (params: {
               ELSE (vibe_vector + delta_vector) <=> $1::vector
             END
             + (1.0 - COALESCE((profile_json->>'profile_confidence')::float, 0.5)) * ${CONFIDENCE_PENALTY}
+            ${keywordBonus}
           ) ASC
         LIMIT $4
       `,
-      [
-        toPgVectorLiteral(params.vibeVector),
-        params.venueType,
-        params.radiusMeters,
-        overfetchLimit,
-      ],
+      hasKeywords
+        ? [toPgVectorLiteral(params.vibeVector), params.venueType, params.radiusMeters, overfetchLimit, params.queryKeywords]
+        : [toPgVectorLiteral(params.vibeVector), params.venueType, params.radiusMeters, overfetchLimit],
     )) as PlaceVibeRow[];
     return rows;
   }
@@ -415,6 +468,7 @@ export const fetchContextualPlacesByRadiusLadder = async (params: {
   radiusOptions: number[];
   limit: number;
   vibeVector?: number[];
+  queryKeywords?: string[];
   excludedVenueIds?: string[];
 }): Promise<Venue[]> => {
   const excludedIds = new Set(params.excludedVenueIds || []);
@@ -428,6 +482,7 @@ export const fetchContextualPlacesByRadiusLadder = async (params: {
       radiusMeters,
       limit: params.limit,
       vibeVector: params.vibeVector,
+      queryKeywords: params.queryKeywords,
     });
 
     for (const row of rows) {
@@ -496,18 +551,19 @@ export const fetchContextualPlacesForMultipleVectors = async (params: {
   venueType: string;
   radiusOptions: number[];
   limitPerQuery: number;
-  vibeVectors: { normalizedKey: string; vector: number[] }[];
+  vibeVectors: { normalizedKey: string; vector: number[]; keywords?: string[] }[];
   excludedVenueIds?: string[];
 }): Promise<Venue[]> => {
   const byPlaceId = new Map<string, { venue: Venue; distanceByKey: Map<string, number> }>();
 
-  for (const { normalizedKey, vector } of params.vibeVectors) {
+  for (const { normalizedKey, vector, keywords } of params.vibeVectors) {
     const results = await fetchContextualPlacesByRadiusLadder({
       centroid: params.centroid,
       venueType: params.venueType,
       radiusOptions: params.radiusOptions,
       limit: params.limitPerQuery,
       vibeVector: vector,
+      queryKeywords: keywords,
       excludedVenueIds: params.excludedVenueIds,
     });
     for (const venue of results) {
@@ -698,6 +754,7 @@ export const upsertPlaceVibePlaceRow = async (params: {
       packet_file_path,
       profile_json,
       vibe_vector,
+      keywords,
       model,
       updated_at
     )
@@ -720,6 +777,7 @@ export const upsertPlaceVibePlaceRow = async (params: {
       ${params.packetFilePath || null},
       ${JSON.stringify(params.profile)}::jsonb,
       ${toPgVectorLiteral(params.vibeVector)}::vector,
+      ${params.profile.keywords},
       ${params.model},
       NOW()
     )
@@ -740,6 +798,7 @@ export const upsertPlaceVibePlaceRow = async (params: {
       packet_file_path = EXCLUDED.packet_file_path,
       profile_json = EXCLUDED.profile_json,
       vibe_vector = EXCLUDED.vibe_vector,
+      keywords = EXCLUDED.keywords,
       model = EXCLUDED.model,
       updated_at = NOW()
   `;
