@@ -106,6 +106,7 @@ function GroupSession({ onBack, onLockedVenue }: Props) {
     if (!store.sessionId) return;
     await store.loadGroup();
     if (store.users.length === 0) return;
+    if (store.suggestionsStatus === "ready" && store.suggestedVenues.length > 0) return;
     await store.fetchSuggestionsForActiveContext();
   });
 

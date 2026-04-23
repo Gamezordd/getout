@@ -1,7 +1,9 @@
+import { createHash } from "crypto";
 import type { NextApiRequest, NextApiResponse } from "next";
 import type { Venue, VenueCategory } from "../../lib/types";
 import placeVibeMap from "../../data/place-vibe-map.json";
 import { findGroup, saveGroup } from "../../lib/groupStore";
+import { redis } from "../../lib/redis";
 import {
   buildPlaceVibeVector,
   buildQueryVibeProfile,
@@ -16,7 +18,7 @@ import {
   getPlaceVibeVector,
   upsertCachedQueryProfile,
 } from "../../lib/placeVibeStore";
-import { listCollectionsForUsers } from "../../lib/collectionStore";
+import { getCollectionVersionTokens, listCollectionsForUsers } from "../../lib/collectionStore";
 import {
   buildEtaData,
   buildSuggestionsPayloadFromGroup,
@@ -27,7 +29,7 @@ import {
   getGoogleMapsApiKey,
   persistSuggestionsSnapshot,
 } from "./suggestions";
-import { ALLOWED_CATEGORIES, TARGET_SUGGESTION_COUNT } from "./constants";
+import { ALLOWED_CATEGORIES, CACHE_TTL_MS, TARGET_SUGGESTION_COUNT } from "./constants";
 import { prepareSuggestionImageEnrichmentForCurrentSuggestions } from "./suggestion-image-enrichment-shared";
 import { prepareSuggestionEnrichmentForCurrentSuggestions } from "./suggestion-enrichment-shared";
 import { safeTrigger } from "./utils";
@@ -143,6 +145,51 @@ const generateQueryProfile = async (
 };
 
 
+const CONTEXT_CACHE_PREFIX = "suggestions:context";
+const CONTEXT_CACHE_TTL_SECONDS = Math.max(60, Math.round(CACHE_TTL_MS / 1000));
+
+type ContextCacheEntry = {
+  timestamp: number;
+  response: ResponseBody;
+};
+
+const buildContextCacheKey = async (
+  sessionId: string,
+  group: import("../../lib/groupStore").GroupPayload,
+  category: string,
+  activeQueryKeys: string[],
+  legacyQuery: string | null,
+): Promise<string> => {
+  const collectionUserIds = Array.from(
+    new Set(
+      group.users
+        .map((u) => u.authenticatedUserId)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ).sort();
+  const collectionVersions = await getCollectionVersionTokens(collectionUserIds);
+  return createHash("sha1")
+    .update(
+      JSON.stringify({
+        sessionId,
+        category,
+        userLocations: group.users.map((u) => ({
+          id: u.id,
+          lat: Number(u.location.lat.toFixed(5)),
+          lng: Number(u.location.lng.toFixed(5)),
+        })),
+        activeQueryKeys: [...activeQueryKeys].sort(),
+        legacyQuery,
+        excludedVenueIds: [
+          ...(group.manualVenues || []).map((v) => v.id),
+          ...(group.dismissedPlaceIds || []),
+        ].sort(),
+        collectionVersions,
+      }),
+    )
+    .digest("hex");
+};
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<ResponseBody | { message: string }>,
@@ -206,6 +253,30 @@ export default async function handler(
     const legacyActiveQuery = !isMultiQuery && trimmedQuery.length >= 2 ? trimmedQuery : null;
 
     group.contextQuery = legacyActiveQuery;
+
+    // Check response cache — skip full recompute if nothing relevant has changed
+    const cacheRedisKey = !refresh
+      ? `${CONTEXT_CACHE_PREFIX}:${await buildContextCacheKey(
+          sessionId,
+          group,
+          category,
+          activeQueries.map((q) => q.normalizedKey),
+          legacyActiveQuery,
+        )}`
+      : null;
+
+    if (cacheRedisKey) {
+      const cached = await redis.get<ContextCacheEntry>(cacheRedisKey);
+      if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+        const freshGroup = await findGroup(sessionId);
+        return res.status(200).json({
+          ...cached.response,
+          votes: freshGroup?.votes || {},
+          userQueries: freshGroup?.userQueries || group.userQueries || [],
+        });
+      }
+    }
+
     group.suggestionsStatus = "generating";
     await saveGroup(sessionId, group);
 
@@ -435,16 +506,13 @@ export default async function handler(
 
     await prepareSuggestionEnrichmentForCurrentSuggestions(sessionId);
     await prepareSuggestionImageEnrichmentForCurrentSuggestions(sessionId);
-    await safeTrigger(`private-group-${sessionId}`, "group-updated", {
-      reason: "context-query-updated",
-    });
 
     const latestPersistedGroup = await findGroup(sessionId);
     const responsePayload = latestPersistedGroup
       ? buildSuggestionsPayloadFromGroup(latestPersistedGroup)
       : payload;
 
-    return res.status(200).json({
+    const responseBody: ResponseBody = {
       ...buildSuggestionsResponse(
         responsePayload,
         latestPersistedGroup?.votes || latestGroup.votes || {},
@@ -453,7 +521,21 @@ export default async function handler(
       tokens,
       cacheHit,
       userQueries: latestPersistedGroup?.userQueries || group.userQueries || [],
+    };
+
+    if (cacheRedisKey) {
+      await redis.set(
+        cacheRedisKey,
+        { timestamp: Date.now(), response: responseBody } satisfies ContextCacheEntry,
+        { ex: CONTEXT_CACHE_TTL_SECONDS },
+      );
+    }
+
+    await safeTrigger(`private-group-${sessionId}`, "group-updated", {
+      reason: "context-query-updated",
     });
+
+    return res.status(200).json(responseBody);
   } catch (error: any) {
     group.suggestionsStatus = "error";
     await saveGroup(sessionId, group);
