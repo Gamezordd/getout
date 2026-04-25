@@ -371,7 +371,8 @@ const buildExpandedRadiusOptions = (radiusOptions: number[]) => {
   return expanded;
 };
 
-const KEYWORD_MATCH_WEIGHT = 0.1;
+const KEYWORD_MATCH_WEIGHT = 0.15;
+const NAME_MATCH_WEIGHT = 0.25;
 
 const fetchContextualPlacesWithinRadius = async (params: {
   centroid: { lat: number; lng: number };
@@ -389,7 +390,19 @@ const fetchContextualPlacesWithinRadius = async (params: {
   if (params.vibeVector) {
     const hasKeywords = Array.isArray(params.queryKeywords) && params.queryKeywords.length > 0;
     const keywordBonus = hasKeywords
-      ? `- ${KEYWORD_MATCH_WEIGHT} * COALESCE(cardinality(ARRAY(SELECT unnest(keywords) INTERSECT SELECT unnest($5::text[]))), 0)`
+      ? `- ${KEYWORD_MATCH_WEIGHT} * COALESCE((
+          SELECT COUNT(*)::int
+          FROM unnest(keywords) AS pk
+          WHERE EXISTS (
+            SELECT 1 FROM unnest($5::text[]) AS qk
+            WHERE LOWER(REPLACE(pk, '_', ' ')) LIKE '%' || LOWER(REPLACE(qk, '_', ' ')) || '%'
+               OR LOWER(REPLACE(qk, '_', ' ')) LIKE '%' || LOWER(REPLACE(pk, '_', ' ')) || '%'
+          )
+        ), 0)
+        - CASE WHEN EXISTS (
+            SELECT 1 FROM unnest($5::text[]) AS qk
+            WHERE LOWER(place_name) LIKE '%' || LOWER(REPLACE(qk, '_', ' ')) || '%'
+          ) THEN ${NAME_MATCH_WEIGHT} ELSE 0 END`
       : "";
     const rows = (await (sql as any).query(
       `

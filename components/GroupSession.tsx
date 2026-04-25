@@ -24,6 +24,15 @@ import {
   setPreciseLocationBannerDismissed,
 } from "../lib/nativePreciseLocation";
 import { getUserActivityLabel } from "../lib/userDisplay";
+import type { VenueCategory } from "../lib/types";
+
+const VIBE_SUGGESTIONS: Record<VenueCategory, string[]> = {
+  bar: ["cozy", "craft cocktails", "rooftop", "lively", "dive bar", "outdoor seating", "late night", "happy hour"],
+  restaurant: ["romantic", "outdoor seating", "group friendly", "date night", "quiet", "trendy", "scenic view", "family friendly"],
+  cafe: ["cozy", "work friendly", "quiet", "good coffee", "aesthetic", "brunch", "laptop friendly"],
+  night_club: ["dance floor", "live DJ", "late night", "dress code", "VIP", "energetic"],
+  brewery: ["craft beer", "dog friendly", "casual", "outdoor seating", "trivia night", "local brews"],
+};
 
 const CHIP_COLORS = [
   { wrap: "bg-[rgba(124,92,191,0.12)] border-[rgba(124,92,191,0.3)] text-[#b08cff]", av: "bg-[#7c5cbf]" },
@@ -548,6 +557,23 @@ function GroupSession({ onBack, onLockedVenue }: Props) {
                       </svg>
                     </button>
                   </div>
+
+                  {store.venueCategory && VIBE_SUGGESTIONS[store.venueCategory] && (
+                    <div className="flex flex-wrap gap-1.5 px-3.5 pb-3">
+                      {VIBE_SUGGESTIONS[store.venueCategory]
+                        .filter((v) => !store.userQueries.some((q) => q.userId === store.currentUserId && q.rawQuery.toLowerCase() === v.toLowerCase()))
+                        .map((vibe) => (
+                          <button
+                            key={vibe}
+                            type="button"
+                            onClick={() => store.setVenueSearchQuery(vibe)}
+                            className="rounded-full border border-white/10 bg-[#1c1c22] px-2.5 py-1 text-[11.5px] text-[#8b8b9c] transition hover:border-[rgba(0,229,160,0.3)] hover:text-[#00e5a0] active:scale-95"
+                          >
+                            {vibe}
+                          </button>
+                        ))}
+                    </div>
+                  )}
 
                   {store.isSearchingVenues && (
                     <div className="mx-3.5 mb-3 flex items-center gap-2.5 rounded-[12px] border border-[rgba(0,229,160,0.15)] bg-[#1c1c22] px-3 py-2.5">

@@ -358,13 +358,8 @@ export class AppStore {
         this.reconcileVotes(data.votes || {});
         this.votingClosesAt = data.votingClosesAt || null;
         this.venueCategory = data.venueCategory || null;
-        if (!this.venueSearchQuery) {
-          this.suggestionsStatus = data.suggestionsStatus || "idle";
-          this.contextQuery = data.contextQuery || null;
-          this.venueSearchQuery = data.contextQuery || "";
-        } else {
-          this.suggestionsStatus = this.suggestionsStatus === "ready" ? "ready" : (data.suggestionsStatus || "idle");
-        }
+        this.suggestionsStatus = this.suggestionsStatus === "ready" ? "ready" : (data.suggestionsStatus || "idle");
+        this.contextQuery = data.contextQuery || null;
         this.lockedVenue = data.lockedVenue || null;
         this.currentUserId = data.currentUserId || null;
         this.isOwner = Boolean(data.isOwner);
@@ -931,7 +926,6 @@ export class AppStore {
 
   async searchVenuesByVibe(query: string, options?: { refresh?: boolean; silent?: boolean }) {
     const trimmed = query.trim();
-    this.venueSearchQuery = query;
 
     if (!this.sessionId || !this.venueCategory) {
       runInAction(() => {
