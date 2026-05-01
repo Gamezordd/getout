@@ -300,10 +300,12 @@ export const groupActions = (
       await prepareSuggestionEnrichmentForCurrentSuggestions(payload.sessionId);
       await prepareSuggestionImageEnrichmentForCurrentSuggestions(payload.sessionId);
     }
-    void safeTrigger(channel, "group-updated", {
-      reason: "join",
-      userId: user.id,
-    });
+    if (resolvedLocationSource !== "ip") {
+      void safeTrigger(channel, "group-updated", {
+        reason: "join",
+        userId: user.id,
+      });
+    }
     return res.status(200).json(buildGroupResponse(group, user.id, isOwner));
   },
   setManualVenues: async (payload: SetManualVenuesRequest, group: GroupPayload) => {

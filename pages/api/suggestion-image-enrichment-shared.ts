@@ -53,6 +53,20 @@ const getVisibleSuggestedVenues = (group: GroupPayload) =>
     group.manualVenues || [],
   ).visibleSuggestedVenues.slice(0, TARGET_VISIBLE_SUGGESTION_COUNT);
 
+const getTargetSuggestedVenues = (
+  group: GroupPayload,
+  targetVenueIds?: string[],
+) => {
+  if (!targetVenueIds || targetVenueIds.length === 0) {
+    return getVisibleSuggestedVenues(group);
+  }
+
+  const requestedIds = new Set(targetVenueIds);
+  return (group.suggestions?.suggestedVenues || []).filter((venue) =>
+    requestedIds.has(venue.id),
+  );
+};
+
 const getCacheKey = (placeId: string) =>
   `${IMAGE_CACHE_PREFIX}:${IMAGE_CACHE_VERSION}:${placeId}`;
 
@@ -432,12 +446,13 @@ export const processSuggestionImageEnrichmentJob = async (
 
 export const prepareSuggestionImageEnrichmentForCurrentSuggestions = async (
   sessionId: string,
+  targetVenueIds?: string[],
 ) => {
   const group = await findGroup(sessionId);
   if (!group) return;
 
-  const visibleSuggestedVenues = getVisibleSuggestedVenues(group);
-  if (visibleSuggestedVenues.length === 0) return;
+  const targetSuggestedVenues = getTargetSuggestedVenues(group, targetVenueIds);
+  if (targetSuggestedVenues.length === 0) return;
 
   const updates = new Map<
     string,
@@ -450,7 +465,7 @@ export const prepareSuggestionImageEnrichmentForCurrentSuggestions = async (
   >();
   const uncachedPlaceIds: string[] = [];
 
-  for (const venue of visibleSuggestedVenues) {
+  for (const venue of targetSuggestedVenues) {
     const existingPhotos = normalizePhotos(venue.photos);
     if (existingPhotos.length > 0) {
       updates.set(venue.id, {
@@ -488,7 +503,7 @@ export const prepareSuggestionImageEnrichmentForCurrentSuggestions = async (
   }
 
   const requestedPlaceIds = [...uncachedPlaceIds].sort();
-  const visiblePlaceIds = visibleSuggestedVenues.map((venue) => venue.id).sort();
+  const visiblePlaceIds = targetSuggestedVenues.map((venue) => venue.id).sort();
   const fingerprint = buildFingerprint({
     visiblePlaceIds,
     requestedPlaceIds,

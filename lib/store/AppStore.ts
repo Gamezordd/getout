@@ -75,6 +75,9 @@ type PlaceVibeSearchPayload = {
   cacheHit?: boolean;
   message?: string;
   userQueries?: UserQuery[];
+  nextPage?: string | null;
+  querySignature?: string;
+  isFirstPage?: boolean;
 };
 
 const generateSessionId = () => {
@@ -127,6 +130,9 @@ export class AppStore {
   mapError: string | null = null;
   isLoadingGroup = false;
   isLoadingSuggestions = false;
+  isFetchingNextPage = false;
+  nextPageKey: string | null = null;
+  lastQuerySignature: string | null = null;
   _activeSuggestionsRequestKey: string | null = null;
   _activeSuggestionsPromise: Promise<void> | null = null;
 
@@ -307,6 +313,9 @@ export class AppStore {
       this.currentUserId = null;
       this.isOwner = false;
       this.identityResolved = false;
+      this.nextPageKey = null;
+      this.lastQuerySignature = null;
+      this.isFetchingNextPage = false;
     }
     if (typeof window !== "undefined") {
       this.shareUrl = `${window.location.origin}${pathname}?sessionId=${sessionId}`;
@@ -350,10 +359,14 @@ export class AppStore {
         this.users = data.users || [];
         this.sessionMembers = data.sessionMembers || [];
         this.manualVenues = data.manualVenues || [];
-        this.venues = mergedVenueState.mergedVenues;
-        this.suggestedVenues = nextSuggestedVenues;
-        this.etaMatrix = data.etaMatrix || {};
-        this.totalsByVenue = data.totalsByVenue || {};
+        // Don't overwrite the client's accumulated paginated list during an active vibe session.
+        const isActivePagination = this.nextPageKey !== null;
+        if (!isActivePagination) {
+          this.venues = mergedVenueState.mergedVenues;
+          this.suggestedVenues = nextSuggestedVenues;
+          this.etaMatrix = data.etaMatrix || {};
+          this.totalsByVenue = data.totalsByVenue || {};
+        }
         this.suggestionWarning = data.warning || null;
         this.reconcileVotes(data.votes || {});
         this.votingClosesAt = data.votingClosesAt || null;
@@ -385,11 +398,7 @@ export class AppStore {
 
   async fetchSuggestionsForActiveContext(options?: { refresh?: boolean; silent?: boolean }) {
     const activeQuery = this.contextQuery?.trim() || this.venueSearchQuery.trim();
-    if (activeQuery.length >= 2 || this.userQueries.length > 0) {
-      await this.searchVenuesByVibe(activeQuery, options);
-      return;
-    }
-    await this.fetchSuggestions(options);
+    await this.searchVenuesByVibe(activeQuery, options);
   }
 
   async refreshVibeContextSuggestions() {
@@ -484,13 +493,10 @@ export class AppStore {
   }
 
   async refreshSuggestions() {
-    if ((this.contextQuery?.trim() || this.venueSearchQuery.trim()).length >= 2) {
-      await this.fetchSuggestionsForActiveContext({ refresh: true });
-      return;
-    }
     this.votes = {};
-    await this.fetchSuggestions({ refresh: true });
-    await this.fetchSuggestions();
+    this.nextPageKey = null;
+    this.lastQuerySignature = null;
+    await this.fetchSuggestionsForActiveContext({ refresh: true });
   }
 
   async fetchSuggestionEnrichment() {
@@ -724,7 +730,12 @@ export class AppStore {
       });
       if (response.ok) {
         const data = (await response.json()) as { userQueries?: UserQuery[] };
-        runInAction(() => { this.userQueries = data.userQueries || []; });
+        runInAction(() => {
+          this.userQueries = data.userQueries || [];
+          this.nextPageKey = null;
+          this.lastQuerySignature = null;
+        });
+        void this.fetchSuggestionsForActiveContext();
       }
     } catch {
       runInAction(() => {
@@ -749,7 +760,12 @@ export class AppStore {
       });
       if (response.ok) {
         const data = (await response.json()) as { userQueries?: UserQuery[] };
-        runInAction(() => { this.userQueries = data.userQueries || []; });
+        runInAction(() => {
+          this.userQueries = data.userQueries || [];
+          this.nextPageKey = null;
+          this.lastQuerySignature = null;
+        });
+        void this.fetchSuggestionsForActiveContext();
       }
     } catch {
       // non-critical, local state already updated
@@ -759,6 +775,8 @@ export class AppStore {
   async clearMyQuery() {
     runInAction(() => {
       this.userQueries = this.userQueries.filter((q) => q.userId !== this.currentUserId);
+      this.nextPageKey = null;
+      this.lastQuerySignature = null;
     });
     try {
       await fetch("/api/user-query", {
@@ -959,8 +977,22 @@ export class AppStore {
 
       runInAction(() => {
         this.isSearchingVenues = false;
-        if (this.venueSearchQuery.trim() !== trimmed) return;
-        this.applySuggestionsPayload(payload);
+        // Only discard a stale typed-query response; background userQuery fetches use trimmed=""
+        if (trimmed.length >= 2 && this.venueSearchQuery.trim() !== trimmed) return;
+        const querySignatureChanged =
+          payload.querySignature !== undefined &&
+          payload.querySignature !== this.lastQuerySignature;
+        if (querySignatureChanged) {
+          // Query (not centroid) changed — full replace.
+          this.applySuggestionsPayload(payload);
+          this.lastQuerySignature = payload.querySignature ?? null;
+        } else if (payload.isFirstPage) {
+          // Centroid changed, same query — append new page to existing list.
+          this.appendVenuePage(payload);
+        } else {
+          this.applySuggestionsPayload(payload);
+        }
+        this.nextPageKey = payload.nextPage ?? null;
         this.contextQuery = trimmed.length >= 2 ? trimmed : null;
         if (payload.userQueries) this.userQueries = payload.userQueries;
         this.venueSearchError = null;
@@ -971,6 +1003,38 @@ export class AppStore {
         if (this.venueSearchQuery.trim() !== trimmed) return;
         this.venueSearchError = err.message || "Unable to search places.";
       });
+    }
+  }
+
+  private appendVenuePage(data: PlaceVibeSearchPayload) {
+    const existingIds = new Set(this.suggestedVenues.map((v) => v.id));
+    const newVenues = (data.suggestedVenues || []).filter((v) => !existingIds.has(v.id));
+    this.suggestedVenues = [...this.suggestedVenues, ...newVenues];
+    this.venues = mergeVenues(this.suggestedVenues, this.manualVenues).mergedVenues;
+    this.etaMatrix = { ...this.etaMatrix, ...(data.etaMatrix || {}) };
+    this.totalsByVenue = { ...this.totalsByVenue, ...(data.totalsByVenue || {}) };
+    this.reconcileVotes(data.votes || {});
+    if (data.votingClosesAt !== undefined) this.votingClosesAt = data.votingClosesAt || null;
+  }
+
+  async fetchNextPage() {
+    if (!this.nextPageKey || this.isFetchingNextPage || !this.sessionId || !this.venueCategory) return;
+    try {
+      runInAction(() => { this.isFetchingNextPage = true; });
+      const params = new URLSearchParams({ sessionId: this.sessionId! });
+      params.set("nextPage", this.nextPageKey);
+      if (this.browserId) params.set("browserId", this.browserId);
+      const response = await fetch(`/api/suggestions-with-context?${params.toString()}`);
+      const payload = (await response.json().catch(() => ({}))) as PlaceVibeSearchPayload;
+      if (!response.ok) throw new Error(payload.message || "Unable to fetch next page.");
+      runInAction(() => {
+        this.appendVenuePage(payload);
+        this.nextPageKey = payload.nextPage ?? null;
+        if (payload.userQueries) this.userQueries = payload.userQueries;
+        this.isFetchingNextPage = false;
+      });
+    } catch {
+      runInAction(() => { this.isFetchingNextPage = false; });
     }
   }
 

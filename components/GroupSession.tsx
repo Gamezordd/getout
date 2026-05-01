@@ -63,6 +63,7 @@ function GroupSession({ onBack, onLockedVenue }: Props) {
   const [dismissedNamePrompt, setDismissedNamePrompt] = useState(false);
   const [isDetectingPreciseLocation, setIsDetectingPreciseLocation] = useState(false);
   const pushInitRef = useRef(false);
+  const sentinelRef = useRef<HTMLDivElement>(null);
   const [vibeOpen, setVibeOpen] = useState(false);
   const [vibeProgress, setVibeProgress] = useState(0);
   const vibeProgressRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -199,6 +200,19 @@ function GroupSession({ onBack, onLockedVenue }: Props) {
     }
   }, [store.lockedVenue, onLockedVenue]);
 
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !store.nextPageKey || store.isFetchingNextPage) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) void store.fetchNextPage();
+      },
+      { threshold: 0.1 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [store, store.nextPageKey, store.isFetchingNextPage]);
+
   const [pendingDismissals, setPendingDismissals] = useState<Set<string>>(new Set());
   const dismissalTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const pendingQueryKeys = useRef<Map<string, string[]>>(new Map());
@@ -294,7 +308,7 @@ function GroupSession({ onBack, onLockedVenue }: Props) {
         locationLabel: locationResult.cachedLocation.locationLabel,
         locationSource: "precise",
       });
-      await store.fetchSuggestions();
+      await store.fetchSuggestionsForActiveContext();
     } catch (err: any) {
       store.setMapError(err.message || "Unable to detect address.");
     } finally {
@@ -363,13 +377,6 @@ function GroupSession({ onBack, onLockedVenue }: Props) {
     [store.groupError, store.mapError, store.suggestionWarning],
   );
 
-  const handleRefreshSuggestions = useCallback(() => {
-    if (store.isLoadingSuggestions) return;
-    const shouldRefresh = window.confirm(
-      "This will replace the current suggestions and clear all votes.",
-    );
-    if (shouldRefresh) store.refreshSuggestions();
-  }, [store]);
 
   const showFinalizeCta = store.isCurrentUserOrganizer && store.hasFinalizeQuorum && !store.lockedVenue;
   const showPreciseLocationBanner = store.currentUserNeedsPreciseLocation && !dismissedPreciseBanner;
@@ -399,6 +406,8 @@ function GroupSession({ onBack, onLockedVenue }: Props) {
   if (!store.currentUser && !store.isLoadingGroup) {
     return null;
   }
+
+  console.log("nextPageKeuy", store.nextPageKey);
 
   return (
     <div className="min-h-full bg-[#0a0a0d] text-[#f0f0f5]">
@@ -637,9 +646,6 @@ function GroupSession({ onBack, onLockedVenue }: Props) {
               downvotedVenueIds={downvotedVenueIds}
               pendingDismissalVenueIds={Array.from(pendingDismissals)}
               onUndoDismissal={handleUndoDismissal}
-              showRefreshAction={store.isCurrentUserOrganizer}
-              isRefreshing={store.isLoadingSuggestions}
-              onRefresh={handleRefreshSuggestions}
               loadingState={showSuggestionSkeletons ? "skeleton" : "idle"}
               showSaveToCollectionsAction={isNative && authStatus === "signed_in"}
               savingCollectionVenueId={savingCollectionVenueId}
@@ -647,6 +653,16 @@ function GroupSession({ onBack, onLockedVenue }: Props) {
               onSaveToCollections={handleSaveVenueToCollections}
               userQueries={store.userQueries}
             />
+          )}
+          {store.nextPageKey && (
+            <>
+              {store.isFetchingNextPage && (
+                <div className="flex justify-center py-4">
+                  <Loader variant="dark" />
+                </div>
+              )}
+              <div ref={sentinelRef} className="h-4" />
+            </>
           )}
         </section>
       </main>

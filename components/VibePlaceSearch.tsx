@@ -11,7 +11,6 @@ type Props = {
 
 type SearchResponse = {
   results: Venue[];
-  vibes?: string[];
 };
 
 export default function VibePlaceSearch({
@@ -22,7 +21,6 @@ export default function VibePlaceSearch({
   const store = useAppStore();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Venue[]>([]);
-  const [vibes, setVibes] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const isSheet = variant === "sheet";
@@ -30,7 +28,6 @@ export default function VibePlaceSearch({
   useEffect(() => {
     setQuery("");
     setResults([]);
-    setVibes([]);
     setError(null);
     setLoading(false);
   }, [category]);
@@ -38,7 +35,6 @@ export default function VibePlaceSearch({
   useEffect(() => {
     if (query.trim().length < 2) {
       setResults([]);
-      setVibes([]);
       setError(null);
       setLoading(false);
       return;
@@ -59,7 +55,7 @@ export default function VibePlaceSearch({
         if (store.browserId) {
           params.set("browserId", store.browserId);
         }
-        const response = await fetch(`/api/place-vibe-search?${params.toString()}`, {
+        const response = await fetch(`/api/place-deep-search?${params.toString()}`, {
           signal: controller.signal,
         });
         if (!response.ok) {
@@ -68,7 +64,6 @@ export default function VibePlaceSearch({
         }
         const payload = (await response.json()) as SearchResponse;
         setResults(Array.isArray(payload.results) ? payload.results : []);
-        setVibes(Array.isArray(payload.vibes) ? payload.vibes : []);
       } catch (err: any) {
         if (err?.name === "AbortError") return;
         setError(err?.message || "Search failed.");
@@ -104,18 +99,6 @@ export default function VibePlaceSearch({
       />
       {loading ? <p className="text-[12px] text-[#5e5e74]">Matching places...</p> : null}
       {error ? <p className="text-[12px] text-rose-300">{error}</p> : null}
-      {vibes.length > 0 ? (
-        <div className="flex flex-wrap gap-1.5">
-          {vibes.map((vibe) => (
-            <span
-              key={vibe}
-              className="rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-[11px] text-[#a0a0b8]"
-            >
-              {vibe}
-            </span>
-          ))}
-        </div>
-      ) : null}
       {results.length > 0 ? (
         <div className="space-y-2">
           {results.map((place) => (

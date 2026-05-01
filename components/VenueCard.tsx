@@ -173,6 +173,9 @@ export default function VenueCard({
   const thumbnailButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const photoSetKey = useMemo(() => photos.join("|"), [photos]);
 
+  console.log("photos:", photos);
+  console.log("photoSetKey:", photoSetKey);
+
   useEffect(() => {
     setActivePhoto(firstPhoto);
   }, [venue.id, firstPhoto]);
@@ -568,12 +571,12 @@ export default function VenueCard({
                     {venue.rating ? (
                       <span className="inline-flex items-center gap-1 text-[#ffbe3d]">
                         <svg
-                          viewBox="0 0 20 20"
+                          viewBox="0 0 24 24"
                           fill="currentColor"
                           aria-hidden="true"
                           className="h-3.5 w-3.5"
                         >
-                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.539 1.118l-2.8-2.034a1 1 0 0 00-1.176 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.462a1 1 0 0 00.95-.69l1.07-3.292z" />
+                          <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
                         </svg>
                         {venue.rating}
                         <span className="text-white/60">
@@ -582,6 +585,11 @@ export default function VenueCard({
                       </span>
                     ) : null}
                     <span>{resolvedSourceLabel}</span>
+                    {formattedVibeDistance ? (
+                      <span className="font-mono text-[10px] text-[#6fefc6]/80">
+                        dist {formattedVibeDistance}
+                      </span>
+                    ) : null}
                   </div>
                   {(isAiLoading || showAiCharacteristics) && (
                     <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -722,12 +730,12 @@ export default function VenueCard({
                     {venue.rating && (
                       <span className="inline-flex items-center gap-1 text-[#ffbe3d]">
                         <svg
-                          viewBox="0 0 20 20"
+                          viewBox="0 0 24 24"
                           fill="currentColor"
                           aria-hidden="true"
                           className="h-3.5 w-3.5"
                         >
-                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.539 1.118l-2.8-2.034a1 1 0 0 00-1.176 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.462a1 1 0 0 00.95-.69l1.07-3.292z" />
+                          <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
                         </svg>
                         {venue.rating}{" "}
                         <span className="text-[#7d7d90]">
@@ -736,6 +744,11 @@ export default function VenueCard({
                       </span>
                     )}
                     <span>{resolvedSourceLabel}</span>
+                    {formattedVibeDistance ? (
+                      <span className="font-mono text-[10px] text-[#6fefc6]/80">
+                        dist {formattedVibeDistance}
+                      </span>
+                    ) : null}
                   </div>
                   {(isAiLoading || showAiCharacteristics) && (
                     <div className="mt-3 flex flex-wrap items-center gap-2">

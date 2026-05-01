@@ -27,9 +27,6 @@ type Props = {
   pendingDismissalVenueIds?: string[];
   onUndoDismissal?: (venueId: string) => void;
   userQueries?: UserQuery[];
-  showRefreshAction?: boolean;
-  isRefreshing?: boolean;
-  onRefresh?: () => void;
   loadingState?: "idle" | "skeleton";
   showSaveToCollectionsAction?: boolean;
   savingCollectionVenueId?: string | null;
@@ -133,9 +130,6 @@ export default function PlaceList({
   pendingDismissalVenueIds = [],
   onUndoDismissal,
   userQueries = [],
-  showRefreshAction = false,
-  isRefreshing = false,
-  onRefresh,
   loadingState = "idle",
   showSaveToCollectionsAction = false,
   savingCollectionVenueId = null,
@@ -206,32 +200,6 @@ export default function PlaceList({
         {Array.from({ length: SKELETON_COUNT }).map((_, index) => (
           <SuggestionCardSkeleton key={`suggestion-skeleton-${index}`} index={index} />
         ))}
-        {showRefreshAction && (
-          <button
-            type="button"
-            disabled
-            className="flex items-center justify-between rounded-[24px] border border-white/10 bg-[#141418] px-5 py-4 text-left opacity-60"
-          >
-            <div>
-              <p className="font-display text-base font-bold tracking-[-0.02em] text-[#f0f0f5]">
-                Refresh suggestions
-              </p>
-              <p className="mt-1 text-sm text-[#7d7d90]">
-                Regenerating the ranked list.
-              </p>
-            </div>
-            <span className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-[#1c1c22] text-[#00e5a0]">
-              <svg
-                viewBox="0 0 22 22"
-                fill="currentColor"
-                aria-hidden="true"
-                className="h-5 w-5 animate-spin [animation-direction:reverse]"
-              >
-                <path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8m0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4z" />
-              </svg>
-            </span>
-          </button>
-        )}
       </div>
     );
   }
@@ -298,33 +266,6 @@ export default function PlaceList({
           />
         );
       })}
-      {displayMode === "default" && showRefreshAction && onRefresh && (
-        <button
-          type="button"
-          onClick={onRefresh}
-          disabled={isRefreshing}
-          className="flex items-center justify-between rounded-[24px] border border-white/10 bg-[#141418] px-5 py-4 text-left transition hover:border-white/20 disabled:opacity-60"
-        >
-          <div>
-            <p className="font-display text-base font-bold tracking-[-0.02em] text-[#f0f0f5]">
-              Refresh suggestions
-            </p>
-            <p className="mt-1 text-sm text-[#7d7d90]">
-              Replace the current ranked list and clear votes.
-            </p>
-          </div>
-          <span className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-[#1c1c22] text-[#00e5a0]">
-            <svg
-              viewBox="0 0 22 22"
-              fill="currentColor"
-              aria-hidden="true"
-              className={`h-5 w-5 ${isRefreshing ? "animate-spin [animation-direction:reverse]" : ""}`}
-            >
-              <path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8m0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4z" />
-            </svg>
-          </span>
-        </button>
-      )}
       {showGoogleMapsAttribution ? (
         <div className="px-1 pt-1">
           <GoogleMapsAttribution />
