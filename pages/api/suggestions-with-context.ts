@@ -115,7 +115,8 @@ const saveMasterList = (sessionId: string, queryHash: string, list: MasterList) 
 
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 const OPENAI_EMBEDDINGS_URL = "https://api.openai.com/v1/embeddings";
-const OPENAI_EMBEDDING_MODEL = "text-embedding-3-small";
+const OPENAI_EMBEDDING_MODEL = "text-embedding-3-large";
+const ANTI_PENALTY_WEIGHT = 0.5;
 
 const cosineDistance = (a: number[], b: number[]): number => {
   let dot = 0, normA = 0, normB = 0;
@@ -145,12 +146,25 @@ const expandQueryWithLLM = async (rawQuery: string, category: string): Promise<s
     },
     body: JSON.stringify({
       model: getOpenAIModel(),
-      reasoning: { effort: "low" },
+      reasoning: { effort: "medium" },
       input: [
-        `The user wants a ${category} matching: "${rawQuery}".`,
-        `Write 2-4 sentences describing what the ideal ${category} for this search looks, feels, and sounds like.`,
-        "Be specific: atmosphere, crowd, lighting, noise level, decor, time of day.",
-        "No lists. Plain prose only. Return only the description, no extra keys or JSON.",
+        `Query: "${rawQuery}"`,
+        `Category: "${category}"`,
+        "",
+        "Write a short, dense description (1–2 sentences) that strongly represents this query as it would appear in a real place.",
+        "",
+        "Rules:",
+        "- Explicitly include and reinforce the core term (repeat it if needed)",
+        "- Add 2–4 closely related or clarifying terms (synonyms, variants, or associated concepts)",
+        "- Use concrete, direct language — avoid vague or generic phrasing",
+        "- Include both:",
+        "  - what the place is (e.g., pizza restaurant, cafe, bar)",
+        "  - what defines it (e.g., romantic, upscale, lively, specialty coffee)",
+        "- Keep it tight and focused — do not add unnecessary detail",
+        "- Do not use lists or meta phrases",
+        "",
+        "Goal:",
+        "Create a sharp semantic representation that aligns with how a real place matching this query would be described.",
       ].join("\n"),
     }),
   });
@@ -171,6 +185,53 @@ const expandQueryWithLLM = async (rawQuery: string, category: string): Promise<s
         : "";
 
   if (!expanded.trim()) throw new Error("LLM expansion returned empty text.");
+  return expanded.trim();
+};
+
+const expandAntiQueryWithLLM = async (rawQuery: string, category: string): Promise<string> => {
+  const response = await fetch(OPENAI_RESPONSES_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${getOpenAIApiKey()}`,
+    },
+    body: JSON.stringify({
+      model: getOpenAIModel(),
+      reasoning: { effort: "low" },
+      input: [
+        `Query: "${rawQuery}"`,
+        `Category: "${category}"`,
+        "",
+        "Write a short, dense description (3-4 sentences) of a place that is the OPPOSITE of this query — a place that would be a poor match for someone searching for this.",
+        "",
+        "Rules:",
+        "- Describe traits that are contrary to, absent from, or incompatible with the query",
+        "- Include what type of place it is and what makes it a poor match",
+        "- Use concrete, direct language — avoid vague or generic phrasing",
+        "- Do not use lists or meta phrases",
+        "",
+        "Goal:",
+        "Create a description that would match places a user does NOT want when searching for this query.",
+      ].join("\n"),
+    }),
+  });
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    throw new Error(`LLM anti-expansion failed: ${text || response.status}`);
+  }
+
+  const data = await response.json().catch(() => null);
+  const expanded: string =
+    typeof data?.output_text === "string"
+      ? data.output_text
+      : Array.isArray(data?.output)
+        ? data.output
+            .flatMap((item: { content?: Array<{ text?: string }> }) => item?.content || [])
+            .find((item: { text?: string }) => typeof item?.text === "string")?.text || ""
+        : "";
+
+  if (!expanded.trim()) throw new Error("LLM anti-expansion returned empty text.");
   return expanded.trim();
 };
 
@@ -195,29 +256,44 @@ const fetchSemanticEmbedding = async (text: string): Promise<number[]> => {
   return embedding as number[];
 };
 
-const resolveSemanticVector = async (
+const resolveSemanticVectors = async (
   rawQuery: string,
   category: string,
-): Promise<number[]> => {
+): Promise<{ pro: number[]; anti: number[] }> => {
   const normalizedKey = buildWordSetCacheKey(rawQuery);
   if (!normalizedKey) throw new Error("Empty query after normalization.");
 
   const cached = await getCachedDeepQueryVector(normalizedKey, category);
-  if (cached) return cached.semanticVector;
+  if (cached?.antiSemanticVector) {
+    return { pro: cached.semanticVector, anti: cached.antiSemanticVector };
+  }
 
-  const expandedQuery = await expandQueryWithLLM(rawQuery, category);
-  const semanticVector = await fetchSemanticEmbedding(expandedQuery);
+  const [expandedQuery, antiExpandedQuery] = cached
+    ? [cached.expandedQuery, await expandAntiQueryWithLLM(rawQuery, category)]
+    : await Promise.all([
+        expandQueryWithLLM(rawQuery, category),
+        expandAntiQueryWithLLM(rawQuery, category),
+      ]);
+
+  const [pro, anti] = cached
+    ? [cached.semanticVector, await fetchSemanticEmbedding(antiExpandedQuery)]
+    : await Promise.all([
+        fetchSemanticEmbedding(expandedQuery),
+        fetchSemanticEmbedding(antiExpandedQuery),
+      ]);
 
   await upsertCachedDeepQueryVector({
     normalizedQuery: normalizedKey,
     category,
     expandedQuery,
-    semanticVector,
+    semanticVector: pro,
     embeddingModel: OPENAI_EMBEDDING_MODEL,
     llmModel: getOpenAIModel(),
+    antiExpandedQuery,
+    antiSemanticVector: anti,
   });
 
-  return semanticVector;
+  return { pro, anti };
 };
 
 // ─── Response type ───────────────────────────────────────────────────────────
@@ -384,8 +460,8 @@ export default async function handler(
     // ── Build the master-list fetch batch closure ────────────────────────────
 
     // Resolve semantic vectors once; fetchBatch uses them via closure.
-    let semanticVectors: number[][] = [];
-    let singleSemanticVector: number[] | undefined;
+    let semanticVectors: Array<{ pro: number[]; anti: number[] }> = [];
+    let singleSemanticVectors: { pro: number[]; anti: number[] } | undefined;
 
     if (isMultiQuery) {
       let anyMiss = false;
@@ -393,11 +469,11 @@ export default async function handler(
         const normalizedKey = buildWordSetCacheKey(uq.rawQuery);
         if (!normalizedKey) continue;
         const cached = await getCachedDeepQueryVector(normalizedKey, category);
-        if (cached) {
-          semanticVectors.push(cached.semanticVector);
+        if (cached?.antiSemanticVector) {
+          semanticVectors.push({ pro: cached.semanticVector, anti: cached.antiSemanticVector });
         } else {
-          const vector = await resolveSemanticVector(uq.rawQuery, category);
-          semanticVectors.push(vector);
+          const vectors = await resolveSemanticVectors(uq.rawQuery, category);
+          semanticVectors.push(vectors);
           anyMiss = true;
         }
       }
@@ -417,14 +493,19 @@ export default async function handler(
         });
       }
       const cachedVec = await getCachedDeepQueryVector(normalizedQuery, category);
-      if (cachedVec) {
-        singleSemanticVector = cachedVec.semanticVector;
+      if (cachedVec?.antiSemanticVector) {
+        singleSemanticVectors = { pro: cachedVec.semanticVector, anti: cachedVec.antiSemanticVector };
         cacheHit = true;
       } else {
-        singleSemanticVector = await resolveSemanticVector(legacyActiveQuery, category);
+        singleSemanticVectors = await resolveSemanticVectors(legacyActiveQuery, category);
         cacheHit = false;
       }
     }
+
+    const applyAntiPenalty = (proDistance: number, antiDistance: number | null): number =>
+      antiDistance !== null
+        ? proDistance + ANTI_PENALTY_WEIGHT * Math.max(0, 1 - antiDistance)
+        : proDistance;
 
     // fetchBatch fetches one batch of MASTER_BATCH_SIZE from the DB at a given offset.
     const fetchBatch = async (batchIndex: number): Promise<Venue[]> => {
@@ -433,11 +514,12 @@ export default async function handler(
 
       if (isMultiQuery && semanticVectors.length > 0) {
         const chipResults = await Promise.all(
-          semanticVectors.map((semanticVector) =>
+          semanticVectors.map(({ pro, anti }) =>
             searchDeepPlacesBySemantic({
               cityKey,
               category,
-              semanticVector,
+              semanticVector: pro,
+              antiSemanticVector: anti,
               limit: MASTER_BATCH_SIZE,
               offset,
             }),
@@ -446,12 +528,13 @@ export default async function handler(
         const bestDistance = new Map<string, number>();
         const venueByPlaceId = new Map<string, Venue>();
         for (const results of chipResults) {
-          for (const { placeId, vectorDistance, venue } of results) {
+          for (const { placeId, vectorDistance, antiVectorDistance, venue } of results) {
             if (excludedVenueIds.includes(placeId)) continue;
+            const adjusted = applyAntiPenalty(vectorDistance, antiVectorDistance);
             const current = bestDistance.get(placeId) ?? Infinity;
-            if (vectorDistance < current) {
-              bestDistance.set(placeId, vectorDistance);
-              venueByPlaceId.set(placeId, { ...venue, vibeDistance: Number(vectorDistance.toFixed(4)) });
+            if (adjusted < current) {
+              bestDistance.set(placeId, adjusted);
+              venueByPlaceId.set(placeId, { ...venue, vibeDistance: Number(adjusted.toFixed(4)) });
             }
           }
         }
@@ -460,21 +543,26 @@ export default async function handler(
           .map(([placeId]) => venueByPlaceId.get(placeId)!);
       }
 
-      const vector = singleSemanticVector ?? new Array(1536).fill(0);
+      const pro = singleSemanticVectors?.pro ?? new Array(1536).fill(0);
+      const anti = singleSemanticVectors?.anti;
       const results = await searchDeepPlacesBySemantic({
         cityKey,
         category,
-        semanticVector: vector,
+        semanticVector: pro,
+        antiSemanticVector: anti,
         limit: MASTER_BATCH_SIZE,
         offset,
       });
       return results
         .filter((r) => !excludedVenueIds.includes(r.placeId))
-        .map((r) => ({
-          ...r.venue,
-          vibeDistance: Number(r.vectorDistance.toFixed(4)),
-          matchScore: Math.round(Math.max(0, 1 - r.vectorDistance) * 100),
-        }));
+        .map((r) => {
+          const adjusted = applyAntiPenalty(r.vectorDistance, r.antiVectorDistance);
+          return {
+            ...r.venue,
+            vibeDistance: Number(adjusted.toFixed(4)),
+            matchScore: Math.round(Math.max(0, 1 - adjusted) * 100),
+          };
+        });
     };
 
     // ── Populate master list until we have enough for this page ───────────────
@@ -514,13 +602,14 @@ export default async function handler(
     // Merge collection saves on first page only (they go at the start of the master list).
     if (isFirstPage && masterList.fetchedBatches <= 1) {
       const dbIds = new Set(masterList.venues.map((v) => v.id));
+      const proVectors = semanticVectors.map((v) => v.pro);
       const avgVector =
-        semanticVectors.length > 0
-          ? semanticVectors.reduce<number[]>(
-              (acc, vec) => acc.map((v, i) => v + vec[i] / semanticVectors.length),
-              new Array(semanticVectors[0].length).fill(0),
+        proVectors.length > 0
+          ? proVectors.reduce<number[]>(
+              (acc, vec) => acc.map((v, i) => v + vec[i] / proVectors.length),
+              new Array(proVectors[0].length).fill(0),
             )
-          : singleSemanticVector ?? null;
+          : singleSemanticVectors?.pro ?? null;
       const rawSaves = await fetchCollectionSaves(new Set([...excludedVenueIds, ...dbIds]));
       const savesWithDistance = await attachCollectionDistances(rawSaves, avgVector);
       // Prepend saves to master list (highest priority).

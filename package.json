@@ -14,6 +14,7 @@
     "build:place-vibes:driver": "node scripts/build-place-vibes-driver.mjs",
     "seed:dashboard-places": "node scripts/seed-dashboard-curated-places.mjs",
     "seed:deep-profiles": "node scripts/seed-place-deep-profiles.mjs",
+    "reembed:deep-profiles": "node scripts/re-embed-place-deep-profiles.mjs",
     "delete:deep-profiles": "node scripts/delete-deep-profiles.mjs",
     "cap:sync": "cap sync android",
     "cap:android": "cap open android"

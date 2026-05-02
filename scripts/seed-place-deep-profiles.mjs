@@ -21,8 +21,8 @@ const MAX_NEARBY_SEARCH_RESULTS = 20;
 const APIFY_REVIEWS_TO_FETCH = 80;
 const APIFY_POLL_INTERVAL_MS = 5000;
 const APIFY_MAX_POLL_MS = 600000;
-const OPENAI_EMBEDDING_MODEL = "text-embedding-3-small";
-const SEMANTIC_VECTOR_DIMENSION = 1536;
+const OPENAI_EMBEDDING_MODEL = "text-embedding-3-large";
+const SEMANTIC_VECTOR_DIMENSION = 3072;
 
 const DEFAULT_COORDINATES_FILE = path.join(repoRoot, "data", "place-vibe-seed-coordinates.json");
 const DEFAULT_SCHEMA_FILE = path.join(repoRoot, "data", "place-vibe-map.json");
@@ -824,6 +824,16 @@ const ensureDeepSchema = async (sql) => {
     CREATE INDEX IF NOT EXISTS place_deep_profiles_semantic_idx
     ON place_deep_profiles USING hnsw (semantic_vector vector_cosine_ops)
   `);
+  await (sql).query(
+    `ALTER TABLE place_deep_profiles ADD COLUMN IF NOT EXISTS semantic_vector_large halfvec(3072)`,
+  );
+  await (sql).query(
+    `ALTER TABLE place_deep_profiles ALTER COLUMN semantic_vector DROP NOT NULL`,
+  );
+  await (sql).query(`
+    CREATE INDEX IF NOT EXISTS place_deep_profiles_semantic_large_idx
+    ON place_deep_profiles USING hnsw (semantic_vector_large halfvec_cosine_ops)
+  `);
   await (sql).query(`
     CREATE INDEX IF NOT EXISTS place_deep_profiles_city_category_idx
     ON place_deep_profiles (city_key, category)
@@ -845,7 +855,7 @@ const upsertPlaceDeepProfile = async (sql, row) => {
       address, area, coordinates_json, google_rating, user_ratings_total,
       reviews_fetched_count, reviews_filtered_count,
       semantic_description, profile_json,
-      semantic_vector, embedding_model, llm_model, updated_at
+      semantic_vector_large, embedding_model, llm_model, updated_at
     )
     VALUES (
       ${randomUUID()},
@@ -863,7 +873,7 @@ const upsertPlaceDeepProfile = async (sql, row) => {
       ${row.reviewsFilteredCount},
       ${row.semanticDescription},
       ${JSON.stringify(row.profile)}::jsonb,
-      ${vectorLiteral}::vector,
+      ${vectorLiteral}::halfvec,
       ${row.embeddingModel},
       ${row.llmModel},
       NOW()
@@ -882,7 +892,7 @@ const upsertPlaceDeepProfile = async (sql, row) => {
       reviews_filtered_count = EXCLUDED.reviews_filtered_count,
       semantic_description = EXCLUDED.semantic_description,
       profile_json = EXCLUDED.profile_json,
-      semantic_vector = EXCLUDED.semantic_vector,
+      semantic_vector_large = EXCLUDED.semantic_vector_large,
       embedding_model = EXCLUDED.embedding_model,
       llm_model = EXCLUDED.llm_model,
       updated_at = NOW()

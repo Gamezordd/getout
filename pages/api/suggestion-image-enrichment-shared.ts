@@ -356,8 +356,9 @@ export const processSuggestionImageEnrichmentJob = async (
     const group = await findGroup(sessionId);
     if (!group) return;
 
-    const currentVisibleVenues = getVisibleSuggestedVenues(group).filter((venue) =>
-      requestedPlaceIds.includes(venue.id),
+    const requestedIdSet = new Set(requestedPlaceIds);
+    const currentVisibleVenues = (group.suggestions?.suggestedVenues || []).filter(
+      (venue) => requestedIdSet.has(venue.id),
     );
     if (currentVisibleVenues.length === 0) return;
 
@@ -426,9 +427,11 @@ export const processSuggestionImageEnrichmentJob = async (
       return;
     }
 
-    const stillVisibleIds = new Set(getVisibleSuggestedVenues(latestGroup).map((venue) => venue.id));
+    const stillPresentIds = new Set(
+      (latestGroup.suggestions?.suggestedVenues || []).map((venue) => venue.id),
+    );
     const visibleUpdates = new Map(
-      Array.from(updates.entries()).filter(([placeId]) => stillVisibleIds.has(placeId)),
+      Array.from(updates.entries()).filter(([placeId]) => stillPresentIds.has(placeId)),
     );
     if (visibleUpdates.size === 0) return;
 
