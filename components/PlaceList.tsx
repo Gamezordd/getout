@@ -33,6 +33,10 @@ type Props = {
   savedCollectionVenueIds?: string[];
   onSaveToCollections?: (venue: Venue) => void;
   displayMode?: "default" | "search";
+  onPin?: (venueId: string) => void;
+  pinnedVenueIds?: string[];
+  pinnedByNameByVenueId?: Map<string, string>;
+  onUnpin?: (venueId: string) => void;
 };
 
 const SKELETON_COUNT = 6;
@@ -136,6 +140,10 @@ export default function PlaceList({
   savedCollectionVenueIds = [],
   onSaveToCollections,
   displayMode = "default",
+  onPin,
+  pinnedVenueIds = [],
+  pinnedByNameByVenueId,
+  onUnpin,
 }: Props) {
   const { mergedVenues: rankedVenues, suggestedRankById } = useMemo(
     () => mergeVenues(suggestedVenues, manualVenues),
@@ -263,6 +271,10 @@ export default function PlaceList({
             onSaveToCollections={
               onSaveToCollections ? () => onSaveToCollections(venue) : undefined
             }
+            onPin={onPin ? () => onPin(venue.id) : undefined}
+            isPinned={pinnedVenueIds.includes(venue.id)}
+            pinnedByName={pinnedByNameByVenueId?.get(venue.id)}
+            onUnpin={onUnpin ? () => onUnpin(venue.id) : undefined}
           />
         );
       })}

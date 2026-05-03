@@ -43,6 +43,10 @@ type Props = {
   onUndoDismissal?: () => void;
   displayMode?: "default" | "search";
   userQueries?: UserQuery[];
+  onPin?: () => void;
+  isPinned?: boolean;
+  pinnedByName?: string;
+  onUnpin?: () => void;
 };
 
 type MetadataItem = {
@@ -154,6 +158,10 @@ export default function VenueCard({
   onUndoDismissal,
   displayMode = "default",
   userQueries = [],
+  onPin,
+  isPinned = false,
+  pinnedByName,
+  onUnpin,
 }: Props) {
   const photos = Array.isArray(venue.photos) ? venue.photos.slice(0, 6) : [];
   const firstPhoto = photos[0] || null;
@@ -430,11 +438,19 @@ export default function VenueCard({
         className={`relative overflow-hidden rounded-[24px] border bg-[#141418] shadow-[0_18px_40px_rgba(0,0,0,0.22)] transition ${
           isSelected
             ? "border-[#00e5a0]/60"
-            : isWinner
-              ? "border-[#00e5a0]/25"
-              : "border-white/10"
+            : isPinned
+              ? "border-[#ffbe3d]/30"
+              : isWinner
+                ? "border-[#00e5a0]/25"
+                : "border-white/10"
         }`}
       >
+        {pinnedByName && (
+          <div className="flex items-center gap-1.5 px-4 pb-0 pt-3 text-xs text-[#5a5a70]">
+            <span className="text-[#ffbe3d]">📌</span>
+            <span>Pinned by <strong className="font-semibold text-[#f0f0f5]">{pinnedByName}</strong></span>
+          </div>
+        )}
         {(isPendingDismissal || selectingQueries) && (
           <div className="pointer-events-none absolute inset-0 z-10 rounded-[24px] backdrop-blur-sm bg-[#141418]/60" />
         )}
@@ -907,17 +923,25 @@ export default function VenueCard({
           <div className="mb-3 h-1.5 overflow-hidden rounded-full bg-[#1c1c22]">
             <div
               className="h-full rounded-full bg-[#00e5a0] transition-all duration-500"
-              style={{ width: `${voteFill}%` }}
+              style={{ width: `${onPin ? 0 : voteFill}%` }}
             />
           </div>
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-[#f0f0f5]">
-                {voteCount} {voteCount == 1 ? "vote" : "votes"}
-              </p>
-              <p className="mt-1 truncate text-xs text-[#8b8b9c]">
-                {voteSummary?.label || "No votes yet"}
-              </p>
+              {onPin ? (
+                <p className="text-xs text-[#5a5a70]">
+                  {isPinned ? "📌 Group can now vote on this" : "Tap to put up for a group vote"}
+                </p>
+              ) : (
+                <>
+                  <p className="text-sm font-semibold text-[#f0f0f5]">
+                    {voteCount} {voteCount === 1 ? "vote" : "votes"}
+                  </p>
+                  <p className="mt-1 truncate text-xs text-[#8b8b9c]">
+                    {voteSummary?.label || "No votes yet"}
+                  </p>
+                </>
+              )}
             </div>
             <div className="flex shrink-0 items-center gap-2">
               {isPendingDismissal ? (
@@ -971,17 +995,42 @@ export default function VenueCard({
                       : "Save"}
                 </button>
               ) : null}
-              <button
-                type="button"
-                onClick={onVote}
-                className={`rounded-full px-4 py-2 text-sm font-bold transition active:scale-[0.98] ${
-                  hasCurrentUserVote
-                    ? "border border-[#00e5a0]/20 bg-[#00e5a0]/12 text-[#00e5a0]"
-                    : "bg-[#00e5a0] text-black"
-                }`}
-              >
-                {hasCurrentUserVote ? "Picked" : "👉 Pick"}
-              </button>
+              {onPin ? (
+                <button
+                  type="button"
+                  onClick={onPin}
+                  className={`rounded-full px-4 py-2 text-sm font-bold transition active:scale-[0.98] ${
+                    isPinned
+                      ? "border border-[#ffbe3d]/30 bg-[rgba(255,190,61,0.12)] text-[#ffbe3d]"
+                      : "border border-white/10 bg-[#1c1c22] text-[#8b8b9c] hover:border-[#ffbe3d]/30 hover:text-[#ffbe3d]"
+                  }`}
+                >
+                  {isPinned ? "📌 Pinned" : "📌 Pin"}
+                </button>
+              ) : (
+                <>
+                  {onUnpin && (
+                    <button
+                      type="button"
+                      onClick={onUnpin}
+                      className="rounded-full border border-[#ffbe3d]/22 bg-[rgba(255,190,61,0.1)] px-3 py-2 text-xs font-semibold text-[#ffbe3d] transition active:scale-[0.97]"
+                    >
+                      Unpin
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={onVote}
+                    className={`rounded-full px-4 py-2 text-sm font-bold transition active:scale-[0.98] ${
+                      hasCurrentUserVote
+                        ? "border border-[#00e5a0]/20 bg-[#00e5a0]/12 text-[#00e5a0]"
+                        : "bg-[#00e5a0] text-black"
+                    }`}
+                  >
+                    {hasCurrentUserVote ? "Picked" : "👉 Pick"}
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>

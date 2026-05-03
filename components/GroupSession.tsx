@@ -1,6 +1,7 @@
 import { observer } from "mobx-react-lite";
 import { toast } from "sonner";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Headroom from "react-headroom";
 import AuthResolvingScreen from "./AuthResolvingScreen";
 import { useAuth } from "../lib/auth/AuthProvider";
 import { useAppStore } from "../lib/store/AppStoreProvider";
@@ -24,7 +25,7 @@ import {
   setPreciseLocationBannerDismissed,
 } from "../lib/nativePreciseLocation";
 import { getUserActivityLabel } from "../lib/userDisplay";
-import type { VenueCategory } from "../lib/types";
+import type { Venue, VenueCategory } from "../lib/types";
 
 const VIBE_SUGGESTIONS: Record<VenueCategory, string[]> = {
   bar: ["cozy", "craft cocktails", "rooftop", "lively", "dive bar", "outdoor seating", "late night", "happy hour"],
@@ -67,6 +68,10 @@ function GroupSession({ onBack, onLockedVenue }: Props) {
   const [vibeOpen, setVibeOpen] = useState(false);
   const [vibeProgress, setVibeProgress] = useState(0);
   const vibeProgressRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [activeTab, setActiveTab] = useState<"discover" | "pinned">("discover");
+  const [pinnedItems, setPinnedItems] = useState<Array<{ venueId: string; pinnedByUserId: string }>>([]);
+  const [scrollEl, setScrollEl] = useState<HTMLDivElement | null>(null);
+  const [tabMargin, setTabMargin] = useState(0);
 
   const namePromptKey = store.sessionId
     ? `getout-name-prompt-dismissed:${store.sessionId}`
@@ -212,6 +217,7 @@ function GroupSession({ onBack, onLockedVenue }: Props) {
     observer.observe(el);
     return () => observer.disconnect();
   }, [store, store.nextPageKey, store.isFetchingNextPage]);
+
 
   const [pendingDismissals, setPendingDismissals] = useState<Set<string>>(new Set());
   const dismissalTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
@@ -363,6 +369,17 @@ function GroupSession({ onBack, onLockedVenue }: Props) {
     [savedCollectionVenueIds, savingCollectionVenueId, store],
   );
 
+  const handlePin = useCallback((venueId: string) => {
+    setPinnedItems((prev) => {
+      if (prev.some((p) => p.venueId === venueId)) return prev;
+      return [...prev, { venueId, pinnedByUserId: store.currentUserId || "" }];
+    });
+  }, [store.currentUserId]);
+
+  const handleUnpin = useCallback((venueId: string) => {
+    setPinnedItems((prev) => prev.filter((p) => p.venueId !== venueId));
+  }, []);
+
   const handleSkipName = useCallback(() => {
     if (typeof window !== "undefined" && namePromptKey) {
       window.sessionStorage.setItem(namePromptKey, "1");
@@ -391,6 +408,30 @@ function GroupSession({ onBack, onLockedVenue }: Props) {
       store.suggestionsStatus === "pending" ||
       store.suggestionsStatus === "generating");
 
+  const pinnedVenueIds = useMemo(() => pinnedItems.map((p) => p.venueId), [pinnedItems]);
+
+  const pinnedVenues = useMemo(
+    () =>
+      pinnedItems
+        .map((item) => store.venues.find((v) => v.id === item.venueId))
+        .filter((v): v is Venue => Boolean(v)),
+    [pinnedItems, store.venues],
+  );
+
+  const pinnedByNameByVenueId = useMemo(() => {
+    const map = new Map<string, string>();
+    pinnedItems.forEach((item) => {
+      const isCurrentUser = item.pinnedByUserId === store.currentUserId;
+      if (isCurrentUser) {
+        map.set(item.venueId, "you");
+      } else {
+        const user = store.users.find((u) => u.id === item.pinnedByUserId);
+        map.set(item.venueId, getUserActivityLabel(user));
+      }
+    });
+    return map;
+  }, [pinnedItems, store.users, store.currentUserId]);
+
   const vibePillSub = store.isSearchingVenues
     ? "Finding your vibe…"
     : store.userQueries.length > 0
@@ -407,19 +448,69 @@ function GroupSession({ onBack, onLockedVenue }: Props) {
     return null;
   }
 
-  console.log("nextPageKeuy", store.nextPageKey);
-
   return (
-    <div className="min-h-full bg-[#0a0a0d] text-[#f0f0f5]">
-      <Header
-        showNativeBackButton={isNative}
-        onBackClick={onBack}
-        onInviteClick={() => {
-          setInviteDialogTitle("Leave no one behind!");
-          setShowInviteDialog(true);
-        }}
-      />
-      <ActivityStrip />
+    <div
+      ref={setScrollEl}
+      className="h-full overflow-y-auto bg-[#0a0a0d] text-[#f0f0f5]"
+    >
+      {scrollEl && <Headroom
+        parent={() => scrollEl}
+        upTolerance={0}
+        style={{ zIndex: 20 }}
+        wrapperStyle={{ zIndex: 20 }}
+        onPin={() => setTabMargin(108)}
+        onUnpin={() => setTabMargin(0)}
+        onUnfix={() => setTabMargin(0)}
+      >
+        <div className="bg-[#0a0a0d]">
+          <Header
+            showNativeBackButton={isNative}
+            onBackClick={onBack}
+            onInviteClick={() => {
+              setInviteDialogTitle("Leave no one behind!");
+              setShowInviteDialog(true);
+            }}
+          />
+          <ActivityStrip />
+        </div>
+      </Headroom>}
+
+      {/* Tab bar — sticky: scrolls with page until it hits top, then stays */}
+      <div className="sticky z-20 bg-[#0a0a0d]" style={{ top: tabMargin, transition: `top ${tabMargin > 0 ? 210 : 100}ms ease-in-out` }}>
+        <div className="mx-auto flex w-full max-w-[430px] border-b border-white/10">
+          <button
+            type="button"
+            onClick={() => setActiveTab("discover")}
+            className={`flex flex-1 items-center justify-center gap-2 pb-4 pt-3.5 text-[14px] font-semibold transition-colors border-b-[2.5px] -mb-px ${
+              activeTab === "discover"
+                ? "text-[#f0f0f5] border-[#00e5a0]"
+                : "text-[#5a5a70] border-transparent"
+            }`}
+          >
+            Discover
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("pinned")}
+            className={`flex flex-1 items-center justify-center gap-2 pb-4 pt-3.5 text-[14px] font-semibold transition-colors border-b-[2.5px] -mb-px ${
+              activeTab === "pinned"
+                ? "text-[#f0f0f5] border-[#00e5a0]"
+                : "text-[#5a5a70] border-transparent"
+            }`}
+          >
+            Pinned
+            <span
+              className={`flex h-[19px] min-w-[19px] items-center justify-center rounded-full px-1 font-display text-[10px] font-bold transition-colors ${
+                activeTab === "pinned"
+                  ? "bg-[#00e5a0] text-black"
+                  : "border border-white/10 bg-[#1c1c22] text-[#5a5a70]"
+              }`}
+            >
+              {pinnedItems.length}
+            </span>
+          </button>
+        </div>
+      </div>
 
       {errorBanner && (
         <div className="mx-auto mt-3 max-w-[430px] rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-xs text-amber-100">
@@ -427,247 +518,300 @@ function GroupSession({ onBack, onLockedVenue }: Props) {
         </div>
       )}
 
-      <main className="mx-auto flex w-full max-w-[430px] flex-1 flex-col px-4 pb-28 pt-4">
-        <VotingCountdown />
-        <SessionSummary />
-        {showPreciseLocationBanner && (
-          <div className="mt-4 flex flex-wrap items-center gap-3 rounded-[18px] border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-[#a7acb8]">
-            <p className="min-w-0 flex-1 leading-5">
-              Share your precise location for closer suggestions and travel times.
-            </p>
-            {isDetectingPreciseLocation ? (
-              <div className="flex items-center gap-2 text-xs font-medium text-[#d7f7ea]">
-                <span className="h-2 w-2 rounded-full bg-[#00e5a0] animate-pulse" />
-                Detecting...
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleAllowPreciseLocation}
-                  disabled={isDetectingPreciseLocation}
-                  className="rounded-full bg-[#00e5a0] px-4 py-2 text-xs font-bold text-black disabled:opacity-60"
-                >
-                  Allow
-                </button>
-                <button
-                  type="button"
-                  onClick={handleDenyPreciseLocation}
-                  disabled={isDetectingPreciseLocation}
-                  aria-label="Dismiss precise location prompt"
-                  className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 text-[#8b8b9c] transition hover:text-white disabled:opacity-60"
-                >
-                  <svg viewBox="0 0 16 16" fill="none" aria-hidden="true" className="h-4 w-4">
-                    <path d="M4 4l8 8M12 4 4 12" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-                  </svg>
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-        <section className="mt-4 space-y-4">
-          {!store.lockedVenue && store.venueCategory ? (
-            <div className={`relative rounded-[18px] bg-[#141418] p-[1.5px]${store.isSearchingVenues ? " vibe-searching" : ""}`}>
-              <div className="vibe-border-layer" />
-              <div className="overflow-hidden rounded-[17px] bg-[#141418]">
-                <button
-                  type="button"
-                  onClick={() => setVibeOpen((o) => !o)}
-                  className="flex w-full items-center gap-2.5 px-3.5 py-[11px] active:opacity-70"
-                >
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-[rgba(0,229,160,0.2)] bg-[rgba(0,229,160,0.11)] text-[15px]">
-                    ✦
-                  </div>
-                  <div className="min-w-0 flex-1 text-left">
-                    <p className="font-display text-[13px] font-bold leading-tight tracking-[-0.01em] text-[#f0f0f5]">
-                      Search by vibe
-                    </p>
-                    <p className="mt-0.5 truncate text-[11px] text-[#5a5a70]">{vibePillSub}</p>
-                  </div>
-                  <div
-                    className={`flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-[8px] border border-white/10 bg-[#1c1c22] text-[#5a5a70] transition-transform duration-[250ms]${vibeOpen ? " rotate-180" : ""}`}
-                  >
-                    <svg width="12" height="12" fill="none" viewBox="0 0 12 12" aria-hidden="true">
-                      <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  </div>
-                </button>
-
-                <div className={`overflow-hidden transition-[max-height] duration-[350ms] ease-[cubic-bezier(.16,1,.3,1)]${vibeOpen ? " max-h-[460px]" : " max-h-0"}`}>
-                  {store.userQueries.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 px-3.5 pb-2.5">
-                      {(() => {
-                        const userColorIndex = new Map<string, number>();
-                        store.userQueries.forEach((uq) => {
-                          if (!userColorIndex.has(uq.userId)) {
-                            userColorIndex.set(uq.userId, userColorIndex.size);
-                          }
-                        });
-                        return store.userQueries.map((uq) => {
-                        const color = CHIP_COLORS[(userColorIndex.get(uq.userId) ?? 0) % CHIP_COLORS.length];
-                        const isOwn = uq.userId === store.currentUserId;
-                        const userObj = store.users.find((u) => u.id === uq.userId);
-                        const initial = getUserActivityLabel(userObj)?.[0]?.toUpperCase() ?? "?";
-                        return (
-                          <div
-                            key={`${uq.userId}-${uq.normalizedKey || uq.rawQuery}`}
-                            className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11.5px] font-medium [animation:chipPop_.22s_cubic-bezier(.16,1,.3,1)_both] ${color.wrap}`}
-                          >
-                            <div className={`flex h-[15px] w-[15px] shrink-0 items-center justify-center rounded-full text-[7px] font-extrabold text-white ${color.av}`}>
-                              {initial}
-                            </div>
-                            {uq.rawQuery}
-                            {isOwn && (
-                              <button
-                                type="button"
-                                onClick={() => void store.removeMyVibe(uq.normalizedKey)}
-                                className="ml-0.5 leading-none text-current opacity-50 transition hover:opacity-100"
-                                aria-label={`Remove vibe: ${uq.rawQuery}`}
-                              >
-                                ×
-                              </button>
-                            )}
-                          </div>
-                        );
-                      });
-                      })()}
-                    </div>
-                  )}
-
-                  <div className="flex items-center gap-2 px-3.5 pb-3">
-                    <div className={`relative flex-1 overflow-hidden rounded-[13px] border bg-[#1c1c22] transition-colors${store.isSearchingVenues ? " border-[rgba(0,229,160,0.3)]" : " border-white/10 focus-within:border-[rgba(0,229,160,0.3)]"}`}>
-                      <input
-                        value={store.venueSearchQuery}
-                        onChange={(e) => store.setVenueSearchQuery(e.target.value)}
-                        placeholder="Add your vibe…"
-                        autoComplete="off"
-                        spellCheck={false}
-                        className="w-full bg-transparent px-3.5 py-2.5 text-[14px] text-white placeholder:text-[#5a5a70] focus:outline-none"
-                      />
-                      <div
-                        className="absolute bottom-0 left-0 h-[2px] rounded-r-[2px] bg-gradient-to-r from-[#00e5a0] to-[#3d8ef5]"
-                        style={{ width: `${vibeProgress}%`, transition: "none" }}
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const q = store.venueSearchQuery.trim();
-                        if (q) {
-                          void store.submitMyQuery(q);
-                          store.setVenueSearchQuery("");
-                        }
-                      }}
-                      disabled={store.isSearchingVenues || !store.venueSearchQuery.trim()}
-                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-[#00e5a0] transition-all active:scale-95 active:brightness-90 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <svg width="15" height="15" fill="none" viewBox="0 0 16 16" aria-hidden="true">
-                        <path d="M3 8h10M9 4l4 4-4 4" stroke="#000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </button>
-                  </div>
-
-                  {store.venueCategory && VIBE_SUGGESTIONS[store.venueCategory] && (
-                    <div className="flex flex-wrap gap-1.5 px-3.5 pb-3">
-                      {VIBE_SUGGESTIONS[store.venueCategory]
-                        .filter((v) => !store.userQueries.some((q) => q.userId === store.currentUserId && q.rawQuery.toLowerCase() === v.toLowerCase()))
-                        .map((vibe) => (
-                          <button
-                            key={vibe}
-                            type="button"
-                            onClick={() => store.setVenueSearchQuery(vibe)}
-                            className="rounded-full border border-white/10 bg-[#1c1c22] px-2.5 py-1 text-[11.5px] text-[#8b8b9c] transition hover:border-[rgba(0,229,160,0.3)] hover:text-[#00e5a0] active:scale-95"
-                          >
-                            {vibe}
-                          </button>
-                        ))}
-                    </div>
-                  )}
-
-                  {store.isSearchingVenues && (
-                    <div className="mx-3.5 mb-3 flex items-center gap-2.5 rounded-[12px] border border-[rgba(0,229,160,0.15)] bg-[#1c1c22] px-3 py-2.5">
-                      <div className="flex shrink-0 items-center gap-[3px]">
-                        {([6, 12, 18, 12, 6] as const).map((h, idx) => (
-                          <div
-                            key={idx}
-                            className="w-[3px] rounded-sm bg-[#00e5a0]"
-                            style={{ height: h, animation: `vsWave 1s ease-in-out ${idx * 0.1}s infinite` }}
-                          />
-                        ))}
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-[12.5px] font-semibold text-[#f0f0f5]">Finding your vibe…</p>
-                        <p className="text-[11px] text-[#5a5a70]">Matching against venues</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {store.venueSearchError && (
-                    <p className="px-3.5 pb-3 text-[12px] text-rose-300">{store.venueSearchError}</p>
-                  )}
-
-                  {store.userQueries.some((q) => q.userId === store.currentUserId) && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        store.setVenueSearchQuery("");
-                        void store.clearMyQuery();
-                      }}
-                      className="flex items-center gap-1.5 px-3.5 pb-3 text-[11.5px] text-[#5a5a70] transition-colors hover:text-[#f0f0f5] active:text-[#f0f0f5]"
-                    >
-                      <svg width="11" height="11" fill="none" viewBox="0 0 12 12" aria-hidden="true">
-                        <path d="M2 2l8 8M10 2L2 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                      </svg>
-                      Clear my vibes · show default results
-                    </button>
-                  )}
+      {/* ── Discover tab ── */}
+      {activeTab === "discover" && (
+        <main className="mx-auto flex w-full max-w-[430px] flex-1 flex-col px-4 pb-28 pt-4">
+          <SessionSummary />
+          {showPreciseLocationBanner && (
+            <div className="mt-4 flex flex-wrap items-center gap-3 rounded-[18px] border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-[#a7acb8]">
+              <p className="min-w-0 flex-1 leading-5">
+                Share your precise location for closer suggestions and travel times.
+              </p>
+              {isDetectingPreciseLocation ? (
+                <div className="flex items-center gap-2 text-xs font-medium text-[#d7f7ea]">
+                  <span className="h-2 w-2 rounded-full bg-[#00e5a0] animate-pulse" />
+                  Detecting...
                 </div>
-              </div>
-            </div>
-          ) : null}
-          {store.isLoadingGroup && (
-            <Loader variant="dark" title="Loading group..." description="Fetching members, votes, and venues." />
-          )}
-
-          {!store.isLoadingGroup && (showSuggestionSkeletons || store.venues.length > 0) && (
-            <PlaceList
-              suggestedVenues={store.suggestedVenues}
-              manualVenues={store.manualVenues}
-              totalsByVenue={store.totalsByVenue}
-              etaMatrix={store.etaMatrix}
-              votes={store.votes}
-              users={store.users}
-              currentUserId={store.currentUserId}
-              selectedVenueId={store.selectedVenueId}
-              mostEfficientVenueId={store.mostEfficientVenueId}
-              onSelect={store.setSelectedVenue}
-              onVote={handleVote}
-              onThumbsDown={handleThumbsDown}
-              downvotedVenueIds={downvotedVenueIds}
-              pendingDismissalVenueIds={Array.from(pendingDismissals)}
-              onUndoDismissal={handleUndoDismissal}
-              loadingState={showSuggestionSkeletons ? "skeleton" : "idle"}
-              showSaveToCollectionsAction={isNative && authStatus === "signed_in"}
-              savingCollectionVenueId={savingCollectionVenueId}
-              savedCollectionVenueIds={savedCollectionVenueIds}
-              onSaveToCollections={handleSaveVenueToCollections}
-              userQueries={store.userQueries}
-            />
-          )}
-          {store.nextPageKey && (
-            <>
-              {store.isFetchingNextPage && (
-                <div className="flex justify-center py-4">
-                  <Loader variant="dark" />
+              ) : (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleAllowPreciseLocation}
+                    disabled={isDetectingPreciseLocation}
+                    className="rounded-full bg-[#00e5a0] px-4 py-2 text-xs font-bold text-black disabled:opacity-60"
+                  >
+                    Allow
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDenyPreciseLocation}
+                    disabled={isDetectingPreciseLocation}
+                    aria-label="Dismiss precise location prompt"
+                    className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 text-[#8b8b9c] transition hover:text-white disabled:opacity-60"
+                  >
+                    <svg viewBox="0 0 16 16" fill="none" aria-hidden="true" className="h-4 w-4">
+                      <path d="M4 4l8 8M12 4 4 12" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+                    </svg>
+                  </button>
                 </div>
               )}
-              <div ref={sentinelRef} className="h-4" />
-            </>
+            </div>
           )}
-        </section>
-      </main>
+          <section className="mt-4 space-y-4">
+            {!store.lockedVenue && store.venueCategory ? (
+              <div className={`relative rounded-[18px] bg-[#141418] p-[1.5px]${store.isSearchingVenues ? " vibe-searching" : ""}`}>
+                <div className="vibe-border-layer" />
+                <div className="overflow-hidden rounded-[17px] bg-[#141418]">
+                  <button
+                    type="button"
+                    onClick={() => setVibeOpen((o) => !o)}
+                    className="flex w-full items-center gap-2.5 px-3.5 py-[11px] active:opacity-70"
+                  >
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-[rgba(0,229,160,0.2)] bg-[rgba(0,229,160,0.11)] text-[15px]">
+                      ✦
+                    </div>
+                    <div className="min-w-0 flex-1 text-left">
+                      <p className="font-display text-[13px] font-bold leading-tight tracking-[-0.01em] text-[#f0f0f5]">
+                        Search by vibe
+                      </p>
+                      <p className="mt-0.5 truncate text-[11px] text-[#5a5a70]">{vibePillSub}</p>
+                    </div>
+                    <div
+                      className={`flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-[8px] border border-white/10 bg-[#1c1c22] text-[#5a5a70] transition-transform duration-[250ms]${vibeOpen ? " rotate-180" : ""}`}
+                    >
+                      <svg width="12" height="12" fill="none" viewBox="0 0 12 12" aria-hidden="true">
+                        <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </div>
+                  </button>
 
-      {showFinalizeCta && leadingVenue && (
+                  <div className={`overflow-hidden transition-[max-height] duration-[350ms] ease-[cubic-bezier(.16,1,.3,1)]${vibeOpen ? " max-h-[460px]" : " max-h-0"}`}>
+                    {store.userQueries.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 px-3.5 pb-2.5">
+                        {(() => {
+                          const userColorIndex = new Map<string, number>();
+                          store.userQueries.forEach((uq) => {
+                            if (!userColorIndex.has(uq.userId)) {
+                              userColorIndex.set(uq.userId, userColorIndex.size);
+                            }
+                          });
+                          return store.userQueries.map((uq) => {
+                          const color = CHIP_COLORS[(userColorIndex.get(uq.userId) ?? 0) % CHIP_COLORS.length];
+                          const isOwn = uq.userId === store.currentUserId;
+                          const userObj = store.users.find((u) => u.id === uq.userId);
+                          const initial = getUserActivityLabel(userObj)?.[0]?.toUpperCase() ?? "?";
+                          return (
+                            <div
+                              key={`${uq.userId}-${uq.normalizedKey || uq.rawQuery}`}
+                              className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11.5px] font-medium [animation:chipPop_.22s_cubic-bezier(.16,1,.3,1)_both] ${color.wrap}`}
+                            >
+                              <div className={`flex h-[15px] w-[15px] shrink-0 items-center justify-center rounded-full text-[7px] font-extrabold text-white ${color.av}`}>
+                                {initial}
+                              </div>
+                              {uq.rawQuery}
+                              {isOwn && (
+                                <button
+                                  type="button"
+                                  onClick={() => void store.removeMyVibe(uq.normalizedKey)}
+                                  className="ml-0.5 leading-none text-current opacity-50 transition hover:opacity-100"
+                                  aria-label={`Remove vibe: ${uq.rawQuery}`}
+                                >
+                                  ×
+                                </button>
+                              )}
+                            </div>
+                          );
+                        });
+                        })()}
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-2 px-3.5 pb-3">
+                      <div className={`relative flex-1 overflow-hidden rounded-[13px] border bg-[#1c1c22] transition-colors${store.isSearchingVenues ? " border-[rgba(0,229,160,0.3)]" : " border-white/10 focus-within:border-[rgba(0,229,160,0.3)]"}`}>
+                        <input
+                          value={store.venueSearchQuery}
+                          onChange={(e) => store.setVenueSearchQuery(e.target.value)}
+                          placeholder="Add your vibe…"
+                          autoComplete="off"
+                          spellCheck={false}
+                          className="w-full bg-transparent px-3.5 py-2.5 text-[14px] text-white placeholder:text-[#5a5a70] focus:outline-none"
+                        />
+                        <div
+                          className="absolute bottom-0 left-0 h-[2px] rounded-r-[2px] bg-gradient-to-r from-[#00e5a0] to-[#3d8ef5]"
+                          style={{ width: `${vibeProgress}%`, transition: "none" }}
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const q = store.venueSearchQuery.trim();
+                          if (q) {
+                            void store.submitMyQuery(q);
+                            store.setVenueSearchQuery("");
+                          }
+                        }}
+                        disabled={store.isSearchingVenues || !store.venueSearchQuery.trim()}
+                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-[#00e5a0] transition-all active:scale-95 active:brightness-90 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <svg width="15" height="15" fill="none" viewBox="0 0 16 16" aria-hidden="true">
+                          <path d="M3 8h10M9 4l4 4-4 4" stroke="#000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </button>
+                    </div>
+
+                    {store.venueCategory && VIBE_SUGGESTIONS[store.venueCategory] && (
+                      <div className="flex flex-wrap gap-1.5 px-3.5 pb-3">
+                        {VIBE_SUGGESTIONS[store.venueCategory]
+                          .filter((v) => !store.userQueries.some((q) => q.userId === store.currentUserId && q.rawQuery.toLowerCase() === v.toLowerCase()))
+                          .map((vibe) => (
+                            <button
+                              key={vibe}
+                              type="button"
+                              onClick={() => store.setVenueSearchQuery(vibe)}
+                              className="rounded-full border border-white/10 bg-[#1c1c22] px-2.5 py-1 text-[11.5px] text-[#8b8b9c] transition hover:border-[rgba(0,229,160,0.3)] hover:text-[#00e5a0] active:scale-95"
+                            >
+                              {vibe}
+                            </button>
+                          ))}
+                      </div>
+                    )}
+
+                    {store.isSearchingVenues && (
+                      <div className="mx-3.5 mb-3 flex items-center gap-2.5 rounded-[12px] border border-[rgba(0,229,160,0.15)] bg-[#1c1c22] px-3 py-2.5">
+                        <div className="flex shrink-0 items-center gap-[3px]">
+                          {([6, 12, 18, 12, 6] as const).map((h, idx) => (
+                            <div
+                              key={idx}
+                              className="w-[3px] rounded-sm bg-[#00e5a0]"
+                              style={{ height: h, animation: `vsWave 1s ease-in-out ${idx * 0.1}s infinite` }}
+                            />
+                          ))}
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-[12.5px] font-semibold text-[#f0f0f5]">Finding your vibe…</p>
+                          <p className="text-[11px] text-[#5a5a70]">Matching against venues</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {store.venueSearchError && (
+                      <p className="px-3.5 pb-3 text-[12px] text-rose-300">{store.venueSearchError}</p>
+                    )}
+
+                    {store.userQueries.some((q) => q.userId === store.currentUserId) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          store.setVenueSearchQuery("");
+                          void store.clearMyQuery();
+                        }}
+                        className="flex items-center gap-1.5 px-3.5 pb-3 text-[11.5px] text-[#5a5a70] transition-colors hover:text-[#f0f0f5] active:text-[#f0f0f5]"
+                      >
+                        <svg width="11" height="11" fill="none" viewBox="0 0 12 12" aria-hidden="true">
+                          <path d="M2 2l8 8M10 2L2 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                        </svg>
+                        Clear my vibes · show default results
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : null}
+            {store.isLoadingGroup && (
+              <Loader variant="dark" title="Loading group..." description="Fetching members, votes, and venues." />
+            )}
+
+            {!store.isLoadingGroup && (showSuggestionSkeletons || store.venues.length > 0) && (
+              <PlaceList
+                suggestedVenues={store.suggestedVenues}
+                manualVenues={store.manualVenues}
+                totalsByVenue={store.totalsByVenue}
+                etaMatrix={store.etaMatrix}
+                votes={store.votes}
+                users={store.users}
+                currentUserId={store.currentUserId}
+                selectedVenueId={store.selectedVenueId}
+                mostEfficientVenueId={store.mostEfficientVenueId}
+                onSelect={store.setSelectedVenue}
+                onVote={handleVote}
+                onThumbsDown={handleThumbsDown}
+                downvotedVenueIds={downvotedVenueIds}
+                pendingDismissalVenueIds={Array.from(pendingDismissals)}
+                onUndoDismissal={handleUndoDismissal}
+                loadingState={showSuggestionSkeletons ? "skeleton" : "idle"}
+                showSaveToCollectionsAction={isNative && authStatus === "signed_in"}
+                savingCollectionVenueId={savingCollectionVenueId}
+                savedCollectionVenueIds={savedCollectionVenueIds}
+                onSaveToCollections={handleSaveVenueToCollections}
+                userQueries={store.userQueries}
+                onPin={handlePin}
+                pinnedVenueIds={pinnedVenueIds}
+              />
+            )}
+            {store.nextPageKey && (
+              <>
+                {store.isFetchingNextPage && (
+                  <div className="flex justify-center py-4">
+                    <Loader variant="dark" />
+                  </div>
+                )}
+                <div ref={sentinelRef} className="h-4" />
+              </>
+            )}
+          </section>
+        </main>
+      )}
+
+      {/* ── Pinned tab ── */}
+      {activeTab === "pinned" && (
+        <main className="mx-auto flex w-full max-w-[430px] flex-1 flex-col px-4 pb-28 pt-4">
+          <VotingCountdown />
+          {pinnedVenues.length === 0 ? (
+            <div className="mt-14 flex flex-col items-center px-8 text-center">
+              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-[#141418] text-3xl">
+                📌
+              </div>
+              <p className="font-display text-[18px] font-bold">Nothing pinned yet</p>
+              <p className="mt-2 text-[13px] leading-relaxed text-[#5a5a70]">
+                Browse the{" "}
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("discover")}
+                  className="font-semibold text-[#f0f0f5] underline-offset-2 hover:underline"
+                >
+                  Discover
+                </button>{" "}
+                tab and tap <strong className="text-[#f0f0f5]">📌 Pin</strong> on any venue — it'll show up here for the group to vote on.
+              </p>
+            </div>
+          ) : (
+            <section className="mt-4 space-y-4">
+              <PlaceList
+                suggestedVenues={pinnedVenues}
+                manualVenues={[]}
+                totalsByVenue={store.totalsByVenue}
+                etaMatrix={store.etaMatrix}
+                votes={store.votes}
+                users={store.users}
+                currentUserId={store.currentUserId}
+                selectedVenueId={store.selectedVenueId}
+                mostEfficientVenueId={store.mostEfficientVenueId}
+                onSelect={store.setSelectedVenue}
+                onVote={handleVote}
+                loadingState="idle"
+                showSaveToCollectionsAction={isNative && authStatus === "signed_in"}
+                savingCollectionVenueId={savingCollectionVenueId}
+                savedCollectionVenueIds={savedCollectionVenueIds}
+                onSaveToCollections={handleSaveVenueToCollections}
+                userQueries={store.userQueries}
+                pinnedByNameByVenueId={pinnedByNameByVenueId}
+                onUnpin={handleUnpin}
+              />
+            </section>
+          )}
+        </main>
+      )}
+      {showFinalizeCta && leadingVenue && activeTab === "pinned" && (
         <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30">
           <div
             className="mx-auto w-full max-w-[430px] px-4 pt-3"
